@@ -5,7 +5,7 @@
 variable "project_name" {
   description = "Project name used in resource naming"
   type        = string
-  default     = "gps"
+  default     = "ww"
 }
 
 variable "environment" {
@@ -23,7 +23,7 @@ variable "location" {
 variable "sql_admin_login" {
   description = "SQL Server administrator login"
   type        = string
-  default     = "gpsadmin"
+  default     = "wwadmin"
 }
 
 variable "sql_admin_password" {

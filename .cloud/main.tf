@@ -3,10 +3,15 @@
 # Story 1.0: IaC with Terraform
 # -----------------------------------------------------------------------------
 
+resource "random_pet" "suffix" {
+  length    = 1
+  separator = "-"
+}
+
 locals {
-  prefix = "${var.project_name}-${var.environment}"
+  prefix = "${var.project_name}-${var.environment}-${random_pet.suffix.id}"
   tags = {
-    project     = "GRID_POWER_STREAM"
+    project     = "WATT_WATCHER"
     environment = var.environment
     managed_by  = "terraform"
   }
