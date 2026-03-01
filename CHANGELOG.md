@@ -1,3 +1,9 @@
+## [1.1.2](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.1.1...v1.1.2) (2026-03-01)
+
+### Bug Fixes
+
+* **deploy:** replace Azure SWA with Storage static website (student sub restriction) ([2033d14](https://github.com/DVDJNBR/WATT_WATCHER/commit/2033d144babb6ce490bb54cb5981f4315768f211))
+
 ## [1.1.1](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.1.0...v1.1.1) (2026-02-28)
 
 ## [1.1.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.0.0...v1.1.0) (2026-02-28)
