@@ -231,46 +231,50 @@ resource "azurerm_key_vault_access_policy" "func_kv" {
   secret_permissions = ["Get", "List"]
 }
 
+# ─── Log Analytics Workspace (required by App Insights v2) ──────────────────
+resource "azurerm_log_analytics_workspace" "main" {
+  name                = "${local.prefix}-law"
+  resource_group_name = azurerm_resource_group.main.name
+  location            = azurerm_resource_group.main.location
+  sku                 = "PerGB2018"
+  retention_in_days   = 30
+
+  tags = local.tags
+}
+
 # ─── Application Insights ───────────────────────────────────────────────────
 resource "azurerm_application_insights" "main" {
   name                = "${local.prefix}-ai"
   resource_group_name = azurerm_resource_group.main.name
   location            = azurerm_resource_group.main.location
   application_type    = "other"
+  workspace_id        = azurerm_log_analytics_workspace.main.id
+
+  tags = local.tags
+}
+
+# ─── Frontend Static Website (Azure Storage) ────────────────────────────────
+# Azure Static Web Apps is blocked on Student subscriptions (all regions 403)
+# → Storage Account with static website hosting = free, no region restriction
+resource "azurerm_storage_account" "frontend" {
+  name                     = replace("${local.prefix}websa", "-", "")
+  resource_group_name      = azurerm_resource_group.main.name
+  location                 = azurerm_resource_group.main.location
+  account_tier             = "Standard"
+  account_replication_type = "LRS"
+  account_kind             = "StorageV2"
+
+  static_website {
+    index_document     = "index.html"
+    error_404_document = "index.html"  # SPA fallback for React Router
+  }
 
   tags = local.tags
 }
 
 # ─── SQL Schema Initialization ──────────────────────────────────────────────
-# ─── Azure Static Web App (frontend) ────────────────────────────────────────
-resource "azurerm_static_web_app" "frontend" {
-  name                = "${local.prefix}-swa"
-  resource_group_name = azurerm_resource_group.main.name
-  location            = "westeurope"  # SWA available regions differ; westeurope covers FR
-  sku_tier            = "Free"
-  sku_size            = "Free"
-
-  tags = local.tags
-}
-
-resource "null_resource" "sql_schema" {
-  triggers = {
-    schema_hash = filesha256("${path.module}/sql/init_schema.sql")
-  }
-
-  provisioner "local-exec" {
-    command = <<-EOT
-      sqlcmd -S ${azurerm_mssql_server.main.fully_qualified_domain_name} \
-             -d ${azurerm_mssql_database.warehouse.name} \
-             -U ${var.sql_admin_login} \
-             -P '${var.sql_admin_password}' \
-             -i ${path.module}/sql/init_schema.sql
-    EOT
-  }
-
-  depends_on = [azurerm_mssql_database.warehouse, azurerm_mssql_firewall_rule.azure_services]
-}
-
+# Schema is initialized at runtime by ensure_schema() in dim_loader.py
+# Manual init: az sql db connect or Azure Cloud Shell with init_schema.sql
 resource "null_resource" "sql_seed" {
   triggers = {
     seed_hash = filesha256("${path.module}/sql/seed_dimensions.sql")
@@ -278,13 +282,10 @@ resource "null_resource" "sql_seed" {
 
   provisioner "local-exec" {
     command = <<-EOT
-      sqlcmd -S ${azurerm_mssql_server.main.fully_qualified_domain_name} \
-             -d ${azurerm_mssql_database.warehouse.name} \
-             -U ${var.sql_admin_login} \
-             -P '${var.sql_admin_password}' \
-             -i ${path.module}/sql/seed_dimensions.sql
+      echo "SQL seed skipped — run manually via Azure Cloud Shell or sqlcmd"
+      echo "File: ${path.module}/sql/seed_dimensions.sql"
     EOT
   }
 
-  depends_on = [null_resource.sql_schema]
+  depends_on = [azurerm_mssql_database.warehouse]
 }
