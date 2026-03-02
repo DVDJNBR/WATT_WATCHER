@@ -4,6 +4,7 @@ GRID_POWER_STREAM — Azure Function App Entry Point
 Story 1.1: Timer trigger — RTE eCO2mix ingestion → Bronze layer.
 Story 4.1: HTTP triggers — /v1/production/regional, /v1/export/csv.
 Story 4.3: HTTP triggers — /health, /docs, /openapi.json.
+Story 5.2: HTTP trigger — /v1/alerts.
 """
 
 import json
@@ -28,9 +29,10 @@ from shared.api.models import parse_production_request, parse_export_request
 from shared.api.production_service import query_production
 from shared.api.export_service import export_to_csv
 from shared.api.error_handlers import bad_request, not_found, server_error
-from shared.api.routes import ROUTE_PRODUCTION, ROUTE_EXPORT, ROUTE_HEALTH, ROUTE_DOCS, ROUTE_OPENAPI_JSON
+from shared.api.routes import ROUTE_PRODUCTION, ROUTE_EXPORT, ROUTE_HEALTH, ROUTE_DOCS, ROUTE_OPENAPI_JSON, ROUTE_ALERTS
 from shared.api.auth import require_auth
 from shared.api.openapi_spec import build_spec, build_swagger_ui_html
+from shared.api.alert_service import query_alerts
 
 logger = logging.getLogger(__name__)
 
@@ -269,6 +271,44 @@ if AZURE_FUNCTIONS_AVAILABLE:
 
         except Exception as exc:
             logger.error("export endpoint error [%s]: %s", request_id, exc, exc_info=True)
+            body = server_error(request_id=request_id)
+            return func.HttpResponse(
+                json.dumps(body), status_code=500,
+                mimetype="application/json",
+                headers={"X-Request-Id": request_id},
+            )
+
+    # ── Story 5.2: Alerts endpoint ───────────────────────────────────────────
+
+    @app.route(route=ROUTE_ALERTS, methods=["GET"], auth_level=func.AuthLevel.ANONYMOUS)
+    def get_alerts(req: func.HttpRequest) -> func.HttpResponse:
+        """
+        GET /v1/alerts?region_code={}&status=active&days=7&limit=50
+
+        AC #1: Returns active alerts for dashboard display.
+        AC #2: Reads from audit trail written by AlertEngine.
+        """
+        request_id = str(uuid.uuid4())
+        try:
+            region_code = req.params.get("region_code") or None
+            status = req.params.get("status", "active") or None
+            days = int(req.params.get("days", 7))
+            limit = min(int(req.params.get("limit", 50)), 200)
+
+            result = query_alerts(
+                region_code=region_code,
+                status=status,
+                days=days,
+                limit=limit,
+            )
+            return func.HttpResponse(
+                json.dumps(result, ensure_ascii=False),
+                status_code=200,
+                mimetype="application/json",
+                headers={"X-Request-Id": request_id},
+            )
+        except Exception as exc:
+            logger.error("alerts endpoint error [%s]: %s", request_id, exc, exc_info=True)
             body = server_error(request_id=request_id)
             return func.HttpResponse(
                 json.dumps(body), status_code=500,
