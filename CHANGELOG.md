@@ -1,3 +1,9 @@
+## [1.1.3](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.1.2...v1.1.3) (2026-03-02)
+
+### Bug Fixes
+
+* **gold:** bulk-load fact_loader with staging table + fix test failures ([9d0b782](https://github.com/DVDJNBR/WATT_WATCHER/commit/9d0b78293404ba094b31463dc3b7ed5073fdb685)), closes [#stg](https://github.com/DVDJNBR/WATT_WATCHER/issues/stg)
+
 ## [1.1.2](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.1.1...v1.1.2) (2026-03-01)
 
 ### Bug Fixes
