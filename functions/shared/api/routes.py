@@ -18,6 +18,10 @@ EXPORT_CSV = f"{PREFIX}/export/csv"
 ROUTE_PRODUCTION = f"{API_VERSION}/production/regional"
 ROUTE_EXPORT = f"{API_VERSION}/export/csv"
 
+# Alerts endpoint
+ALERTS = f"{PREFIX}/alerts"
+ROUTE_ALERTS = f"{API_VERSION}/alerts"
+
 # Public endpoints — exempt from @require_auth
 ROUTE_HEALTH = "health"
 ROUTE_DOCS = "docs"

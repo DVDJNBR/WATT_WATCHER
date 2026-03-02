@@ -1,20 +1,26 @@
 /**
  * App — Story 5.1, Tasks 2.1, 2.5, 3.3, 4.1, 4.4
+ *      Story 5.2, Tasks 3.3, 3.4
  *
  * Main dashboard layout: header + sidebar + main charts area.
  * AC #1: Fetches real-time data and displays interactive charts.
  * AC #2: Region selection updates all charts.
  * AC #3: Responsive, dark/light theme, glassmorphism design.
  * AC #4: MSAL.js SSO authentication via api.js.
+ * Story 5.2 AC #1: Alert polling every 60 s + AlertBanner + AlertHistory.
+ * Story 5.2 AC #3: Pulsing icon in header when active alerts exist.
  */
 import { useState, useEffect, useCallback } from 'react'
 import { KPICard } from './components/KPICard.jsx'
 import { RegionSelector } from './components/RegionSelector.jsx'
 import { ProductionChart } from './components/ProductionChart.jsx'
 import { CarbonGauge, computeCarbonIntensity } from './components/CarbonGauge.jsx'
-import { fetchProduction, fetchRegions } from './services/api.js'
+import { AlertBanner } from './components/AlertBanner.jsx'
+import { AlertHistory } from './components/AlertHistory.jsx'
+import { fetchProduction, fetchRegions, fetchAlerts } from './services/api.js'
 
 const REFRESH_INTERVAL_MS = 15 * 60 * 1000  // 15 minutes
+const ALERT_POLL_INTERVAL_MS = 60 * 1000    // 60 seconds
 
 const SOURCE_LABELS = {
   nucleaire:   'Nucléaire',
@@ -59,6 +65,11 @@ export default function App() {
   const [lastUpdated, setLastUpdated] = useState(null)
   const [refreshing, setRefreshing] = useState(false)
 
+  // Story 5.2 — alert state
+  const [alerts, setAlerts] = useState([])
+  const [alertsLoading, setAlertsLoading] = useState(false)
+  const [dismissedAlertId, setDismissedAlertId] = useState(null)
+
   // Apply theme to root element (AC #3)
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme)
@@ -77,6 +88,19 @@ export default function App() {
     }
   }, [])
 
+  // Story 5.2 — load alerts (AC #1: poll every 60 s)
+  const loadAlerts = useCallback(async (regionCode) => {
+    setAlertsLoading(true)
+    try {
+      const result = await fetchAlerts({ regionCode: regionCode || undefined })
+      setAlerts(result.alerts || [])
+    } catch {
+      // Non-blocking — alert failures don't break the dashboard
+    } finally {
+      setAlertsLoading(false)
+    }
+  }, [])
+
   // Initial load: fetch regions, then auto-select first region (AC #1)
   useEffect(() => {
     let cancelled = false
@@ -88,19 +112,21 @@ export default function App() {
         const defaultRegion = regsResult[0]?.code_insee || ''
         setSelectedRegion(defaultRegion)
         await loadData(defaultRegion)
+        await loadAlerts(defaultRegion)
         setLoading(false)
       }
     })()
     return () => { cancelled = true }
-  }, [loadData])
+  }, [loadData, loadAlerts])
 
   // Region change: refresh data (AC #2)
   const handleRegionChange = useCallback(async (code) => {
     setSelectedRegion(code)
     setRefreshing(true)
-    await loadData(code)
+    setDismissedAlertId(null)
+    await Promise.all([loadData(code), loadAlerts(code)])
     setRefreshing(false)
-  }, [loadData])
+  }, [loadData, loadAlerts])
 
   // Auto-refresh every 15 min (AC #1 — "real-time")
   useEffect(() => {
@@ -112,6 +138,12 @@ export default function App() {
     return () => clearInterval(id)
   }, [selectedRegion, loadData])
 
+  // Story 5.2 — alert polling every 60 s (AC #1, Task 3.3)
+  useEffect(() => {
+    const id = setInterval(() => loadAlerts(selectedRegion), ALERT_POLL_INTERVAL_MS)
+    return () => clearInterval(id)
+  }, [selectedRegion, loadAlerts])
+
   // Derive KPIs from latest data point
   const lastSources = productionData.length
     ? (productionData[productionData.length - 1].sources || {})
@@ -120,11 +152,30 @@ export default function App() {
   const dominantSource = computeDominantSource(productionData)
   const carbonIntensity = computeCarbonIntensity(lastSources)
 
+  // Top alert to display in banner (highest severity, not dismissed)
+  const severityOrder = { CRITICAL: 0, WARNING: 1, INFO: 2 }
+  const topAlert = alerts
+    .filter(a => a.alert_id !== dismissedAlertId)
+    .sort((a, b) => (severityOrder[a.severity] ?? 9) - (severityOrder[b.severity] ?? 9))[0] ?? null
+
+  const hasCritical = alerts.some(a => a.severity === 'CRITICAL' && a.alert_id !== dismissedAlertId)
+
   return (
     <div className="app-layout" data-testid="app-layout">
       {/* ── Header ────────────────────────────────────────────────── */}
       <header className="app-header">
-        <span className="logo" aria-label="WATT WATCHER">⚡ WATT WATCHER</span>
+        <span className="logo" aria-label="WATT WATCHER">
+          ⚡ WATT WATCHER
+          {/* Story 5.2 AC #3: pulsing icon when active critical alerts exist */}
+          {hasCritical && (
+            <span
+              className="alert-pulse-dot"
+              aria-label="Alertes critiques actives"
+              title="Alertes critiques actives"
+              data-testid="alert-pulse-dot"
+            />
+          )}
+        </span>
 
         <div className="header-actions">
           {(loading || refreshing) && (
@@ -151,6 +202,12 @@ export default function App() {
         </div>
       </header>
 
+      {/* ── Alert banner (Story 5.2, Task 3.1) ───────────────────── */}
+      <AlertBanner
+        alert={topAlert}
+        onDismiss={() => topAlert && setDismissedAlertId(topAlert.alert_id)}
+      />
+
       {/* ── Sidebar ───────────────────────────────────────────────── */}
       <aside className="app-sidebar">
         <RegionSelector
@@ -159,6 +216,8 @@ export default function App() {
           onChange={handleRegionChange}
           loading={loading}
         />
+        {/* Story 5.2, Task 3.2 — alert history */}
+        <AlertHistory alerts={alerts} loading={alertsLoading} />
       </aside>
 
       {/* ── Main ──────────────────────────────────────────────────── */}

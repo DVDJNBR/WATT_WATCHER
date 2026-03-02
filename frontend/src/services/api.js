@@ -85,6 +85,22 @@ export async function fetchProduction({ regionCode, startDate, endDate, sourceTy
 }
 
 /**
+ * Fetch active alerts — Story 5.2, Task 3.3.
+ *
+ * AC #1: Polls /v1/alerts every 60 s to keep dashboard current.
+ *
+ * @param {Object} params
+ * @param {string} [params.regionCode]  filter by region
+ * @param {string} [params.status]      'active' | 'acknowledged' | undefined (all)
+ * @param {number} [params.days]        look-back window (default 7)
+ * @param {number} [params.limit]       max alerts (default 50)
+ * @returns {Promise<{alerts: Array, total: number}>}
+ */
+export async function fetchAlerts({ regionCode, status = 'active', days = 7, limit = 50 } = {}) {
+  return authGet('/v1/alerts', { region_code: regionCode, status, days, limit })
+}
+
+/**
  * Fetch list of available regions from production data.
  * Derives unique regions from a broad production query.
  *
