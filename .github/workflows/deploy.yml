@@ -40,7 +40,7 @@ jobs:
           # Linux containers). This avoids the 1.5 GB Oryx remote-build memory limit on the
           # Linux Consumption plan which silently crashes, leaving packages uninstalled.
           pip install \
-            --platform manylinux2014_x86_64 \
+            --platform manylinux_2_28_x86_64 \
             --only-binary :all: \
             --python-version 3.11 \
             --implementation cp \
