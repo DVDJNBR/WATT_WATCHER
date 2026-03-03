@@ -13,7 +13,7 @@ from typing import Any
 
 import pandas as pd
 
-from functions.shared.gold.dim_loader import DimLoader
+from shared.gold.dim_loader import DimLoader
 
 logger = logging.getLogger(__name__)
 

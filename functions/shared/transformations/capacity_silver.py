@@ -13,7 +13,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from functions.shared.transformations.data_quality import (
+from shared.transformations.data_quality import (
     CAPACITY_QUALITY_RULES,
     apply_quality_rules,
 )

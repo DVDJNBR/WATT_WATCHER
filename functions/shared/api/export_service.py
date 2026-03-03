@@ -12,7 +12,7 @@ import logging
 import uuid
 from typing import Any, Optional
 
-from functions.shared.api.production_service import build_production_query
+from shared.api.production_service import build_production_query
 
 logger = logging.getLogger(__name__)
 

@@ -397,9 +397,9 @@ def run_full_pipeline(
     """
     import sqlite3 as _sqlite3
     from pathlib import Path as _Path
-    from functions.shared.transformations.rte_silver import transform_rte_to_silver
-    from functions.shared.gold.dim_loader import DimLoader
-    from functions.shared.gold.fact_loader import FactLoader
+    from shared.transformations.rte_silver import transform_rte_to_silver
+    from shared.gold.dim_loader import DimLoader
+    from shared.gold.fact_loader import FactLoader
 
     job_id = job_id or str(uuid.uuid4())
     results: dict = {"job_id": job_id, "stages": {}}
