@@ -1,3 +1,9 @@
+## [1.2.8](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.2.7...v1.2.8) (2026-03-03)
+
+### Bug Fixes
+
+* **deploy:** pre-install 7 packages on CI — polars kills Oryx even alone ([2d2e035](https://github.com/DVDJNBR/WATT_WATCHER/commit/2d2e035b60c1b597118fb549b25c4ce006c70e63))
+
 ## [1.2.7](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.2.6...v1.2.7) (2026-03-03)
 
 ### Bug Fixes
