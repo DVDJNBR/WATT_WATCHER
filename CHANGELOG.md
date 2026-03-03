@@ -1,3 +1,11 @@
+## [1.2.10](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.2.9...v1.2.10) (2026-03-03)
+
+### Bug Fixes
+
+* correct all bad absolute imports and add AzureWebJobsFeatureFlags ([56c30ae](https://github.com/DVDJNBR/WATT_WATCHER/commit/56c30aeba8d5e2934c6e6cda25bc4eaddaad30e9))
+* **deploy:** switch to Oryx remote build now that polars is removed ([cd81d4c](https://github.com/DVDJNBR/WATT_WATCHER/commit/cd81d4c4c4f6565870917d5c079f8bbd050877f5))
+* **terraform:** add AzureWebJobsFeatureFlags to infra definition ([4fdb1ef](https://github.com/DVDJNBR/WATT_WATCHER/commit/4fdb1eff906a9bcf9eef1feb47edf000bf47d145))
+
 ## [1.2.9](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.2.8...v1.2.9) (2026-03-03)
 
 ## [1.2.8](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.2.7...v1.2.8) (2026-03-03)
