@@ -1,3 +1,9 @@
+## [1.2.3](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.2.2...v1.2.3) (2026-03-03)
+
+### Bug Fixes
+
+* **deploy:** Oryx remote build only — no local .python_packages ([8643ddb](https://github.com/DVDJNBR/WATT_WATCHER/commit/8643ddbd7208452a22ac0be3e44e6d8d88303f77))
+
 ## [1.2.2](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.2.1...v1.2.2) (2026-03-03)
 
 ### Bug Fixes
