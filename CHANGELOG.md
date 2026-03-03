@@ -1,3 +1,9 @@
+## [1.2.5](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.2.4...v1.2.5) (2026-03-03)
+
+### Bug Fixes
+
+* **deploy:** use manylinux_2_28 platform — pyarrow 23.x dropped manylinux2014 ([ed897ef](https://github.com/DVDJNBR/WATT_WATCHER/commit/ed897efaf6cf8b904f58261e5f141b193cd1da22))
+
 ## [1.2.4](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.2.3...v1.2.4) (2026-03-03)
 
 ### Bug Fixes
