@@ -36,14 +36,13 @@ jobs:
           # Azure Functions expects function_app.py + host.json at package root.
           cp host.json functions/
           uv export --format requirements-txt --no-hashes --no-dev -o functions/requirements.txt
-          # Pre-install manylinux2014 wheels (glibc ≥ 2.17, compatible with Azure Functions
-          # Linux containers). This avoids the 1.5 GB Oryx remote-build memory limit on the
-          # Linux Consumption plan which silently crashes, leaving packages uninstalled.
+          # Pre-install wheels on the CI runner (Ubuntu 22.04, glibc 2.35).
+          # Packages in this project ship manylinux_2_17 or manylinux_2_28 wheels;
+          # both run on Azure Functions Ubuntu 20.04 (glibc 2.31). Native pip resolves
+          # the manylinux compat chain correctly (unlike --platform cross-install).
+          # This avoids the 1.5 GB Oryx remote-build memory limit on Linux Consumption plan.
           pip install \
-            --platform manylinux_2_28_x86_64 \
-            --only-binary :all: \
-            --python-version 3.11 \
-            --implementation cp \
+            --prefer-binary \
             --target functions/.python_packages/lib/site-packages \
             -r functions/requirements.txt
 
