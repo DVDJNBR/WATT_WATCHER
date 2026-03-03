@@ -204,10 +204,11 @@ resource "azurerm_linux_function_app" "main" {
   }
 
   app_settings = {
-    "KEY_VAULT_URL"        = azurerm_key_vault.main.vault_uri
-    "STORAGE_ACCOUNT_NAME" = azurerm_storage_account.datalake.name
-    "SQL_SERVER"           = azurerm_mssql_server.main.fully_qualified_domain_name
-    "SQL_DATABASE"         = azurerm_mssql_database.warehouse.name
+    "KEY_VAULT_URL"            = azurerm_key_vault.main.vault_uri
+    "STORAGE_ACCOUNT_NAME"     = azurerm_storage_account.datalake.name
+    "SQL_SERVER"               = azurerm_mssql_server.main.fully_qualified_domain_name
+    "SQL_DATABASE"             = azurerm_mssql_database.warehouse.name
+    "AzureWebJobsFeatureFlags" = "EnableWorkerIndexing"  # required for Python v2 decorator model
   }
 
   tags = local.tags
