@@ -34,13 +34,9 @@ jobs:
       - name: Prepare deployment package
         run: |
           # Azure Functions expects function_app.py + host.json at package root.
-          # Pre-install deps locally → .python_packages/lib/site-packages
-          # (Linux Consumption plan picks these up automatically at runtime).
+          # Oryx remote build will install requirements.txt into a venv.
           cp host.json functions/
           uv export --format requirements-txt --no-hashes --no-dev -o functions/requirements.txt
-          pip install --quiet \
-            --target=functions/.python_packages/lib/site-packages \
-            -r functions/requirements.txt
 
       - name: Deploy to Azure Functions
         uses: Azure/functions-action@v1
@@ -48,7 +44,7 @@ jobs:
           app-name: ${{ secrets.AZURE_FUNCTIONAPP_NAME }}
           publish-profile: ${{ secrets.AZURE_FUNCTIONAPP_PUBLISH_PROFILE }}
           package: functions
-          scm-do-build-during-deployment: false
+          scm-do-build-during-deployment: true
 
   # ── Frontend build + Azure Storage Static Website deployment ────────────────
   deploy-frontend:
