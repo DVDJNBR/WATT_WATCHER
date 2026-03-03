@@ -1,3 +1,9 @@
+## [1.2.4](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.2.3...v1.2.4) (2026-03-03)
+
+### Bug Fixes
+
+* **deploy:** pre-install manylinux2014 wheels to bypass Oryx memory limit ([ad89a5b](https://github.com/DVDJNBR/WATT_WATCHER/commit/ad89a5baa35f14d676507db681ab62bbbe5be910))
+
 ## [1.2.3](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.2.2...v1.2.3) (2026-03-03)
 
 ### Bug Fixes
