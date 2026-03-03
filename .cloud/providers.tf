@@ -26,5 +26,9 @@ provider "azurerm" {
     key_vault {
       purge_soft_delete_on_destroy = false
     }
+    resource_group {
+      # App Insights auto-creates "Smart Detection" action groups not managed by TF
+      prevent_deletion_if_contains_resources = false
+    }
   }
 }
