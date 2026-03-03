@@ -1,3 +1,9 @@
+## [1.2.6](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.2.5...v1.2.6) (2026-03-03)
+
+### Bug Fixes
+
+* **deploy:** native pip install instead of cross-platform --platform flag ([480bf57](https://github.com/DVDJNBR/WATT_WATCHER/commit/480bf570358cdf75ec24252989b62fd12f024e20))
+
 ## [1.2.5](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.2.4...v1.2.5) (2026-03-03)
 
 ### Bug Fixes
