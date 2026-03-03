@@ -1,3 +1,9 @@
+## [1.2.2](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.2.1...v1.2.2) (2026-03-03)
+
+### Bug Fixes
+
+* **deploy:** pre-install deps locally for Linux Consumption plan ([c101a73](https://github.com/DVDJNBR/WATT_WATCHER/commit/c101a73afcd8cef8904534c8b6bf77528a208c60))
+
 ## [1.2.1](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.2.0...v1.2.1) (2026-03-03)
 
 ### Bug Fixes
