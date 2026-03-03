@@ -34,9 +34,18 @@ jobs:
       - name: Prepare deployment package
         run: |
           # Azure Functions expects function_app.py + host.json at package root.
-          # Oryx remote build will install requirements.txt into a venv.
           cp host.json functions/
           uv export --format requirements-txt --no-hashes --no-dev -o functions/requirements.txt
+          # Pre-install manylinux2014 wheels (glibc ≥ 2.17, compatible with Azure Functions
+          # Linux containers). This avoids the 1.5 GB Oryx remote-build memory limit on the
+          # Linux Consumption plan which silently crashes, leaving packages uninstalled.
+          pip install \
+            --platform manylinux2014_x86_64 \
+            --only-binary :all: \
+            --python-version 3.11 \
+            --implementation cp \
+            --target functions/.python_packages/lib/site-packages \
+            -r functions/requirements.txt
 
       - name: Deploy to Azure Functions
         uses: Azure/functions-action@v1
@@ -44,7 +53,7 @@ jobs:
           app-name: ${{ secrets.AZURE_FUNCTIONAPP_NAME }}
           publish-profile: ${{ secrets.AZURE_FUNCTIONAPP_PUBLISH_PROFILE }}
           package: functions
-          scm-do-build-during-deployment: true
+          scm-do-build-during-deployment: false
 
   # ── Frontend build + Azure Storage Static Website deployment ────────────────
   deploy-frontend:
