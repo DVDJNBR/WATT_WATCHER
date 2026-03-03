@@ -1,3 +1,10 @@
+## [1.2.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.1.3...v1.2.0) (2026-03-02)
+
+### Features
+
+* **5.2:** merge Over-Production & Negative Price Alerts ([b203839](https://github.com/DVDJNBR/WATT_WATCHER/commit/b203839d0366d650fe085e10bcebcff4670b54d6))
+* **5.2:** Over-Production & Negative Price Alerts ([a133ac3](https://github.com/DVDJNBR/WATT_WATCHER/commit/a133ac3947a6e720351f4345ad82408e7e281434))
+
 ## [1.1.3](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.1.2...v1.1.3) (2026-03-02)
 
 ### Bug Fixes
