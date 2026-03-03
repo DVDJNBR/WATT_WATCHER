@@ -11,14 +11,14 @@ dependencies = [
     "azure-storage-file-datalake>=12.23.0",
     "parsel>=1.11.0",
     "polars>=1.38.1",
-    "pyarrow>=23.0.1",
-    "pyodbc>=5.2.0",
-    "python-docx>=1.2.0",
     "requests>=2.32.5",
 ]
 
 [dependency-groups]
 dev = [
+    "pyarrow>=23.0.1",
+    "pyodbc>=5.2.0",
+    "python-docx>=1.2.0",
     "pytest>=9.0.2",
     "pytest-mock>=3.15.1",
 ]
