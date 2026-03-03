@@ -1,3 +1,9 @@
+## [1.2.1](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.2.0...v1.2.1) (2026-03-03)
+
+### Bug Fixes
+
+* **deploy:** set package root to functions/ — function_app.py was not at ZIP root ([ee08637](https://github.com/DVDJNBR/WATT_WATCHER/commit/ee0863752127fca40584b9c7b8c77c495ce4c1b3))
+
 ## [1.2.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.1.3...v1.2.0) (2026-03-02)
 
 ### Features
