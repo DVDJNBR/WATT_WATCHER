@@ -14,7 +14,7 @@ import logging
 from datetime import datetime, timezone
 from pathlib import Path
 
-import polars as pl
+import pandas as pd
 
 from functions.shared.transformations.data_quality import (
     RTE_QUALITY_RULES,
@@ -77,43 +77,38 @@ def transform_rte_to_silver(
         if not frames:
             logger.warning("No JSON files found in %s", bronze_path)
             return {"status": "empty", "rows": 0}
-        df = pl.concat(frames)
+        df = pd.concat(frames, ignore_index=True)
     else:
         raise FileNotFoundError(f"Bronze path not found: {bronze_path}")
 
-    if df.is_empty():
+    if df.empty:
         return {"status": "empty", "rows": 0}
 
     # Drop artifact columns
     existing_drops = [c for c in DROP_COLUMNS if c in df.columns]
     if existing_drops:
-        df = df.drop(existing_drops)
+        df = df.drop(columns=existing_drops)
 
-    # Cast MW columns to Float64
+    # Cast MW columns to float
     for col in MW_CAST_COLUMNS:
         if col in df.columns:
-            df = df.with_columns(
-                pl.col(col).cast(pl.Utf8).str.strip_chars().cast(pl.Float64, strict=False)
-            )
+            df[col] = pd.to_numeric(df[col].astype(str).str.strip(), errors="coerce").astype(float)
 
     # Rename columns → snake_case
     existing_renames = {k: v for k, v in RENAME_MAP.items() if k in df.columns}
     if existing_renames:
-        df = df.rename(existing_renames)
+        df = df.rename(columns=existing_renames)
 
     # Parse datetime
     if "date_heure" in df.columns:
-        df = df.with_columns(
-            pl.col("date_heure")
-            .str.to_datetime(time_zone="UTC", strict=False)
-        )
+        df["date_heure"] = pd.to_datetime(df["date_heure"], utc=True, errors="coerce")
 
     # AC #3: Deduplicate on composite key
     dedup_cols = ["code_insee_region", "date_heure"]
     existing_dedup = [c for c in dedup_cols if c in df.columns]
     before_dedup = len(df)
     if len(existing_dedup) == 2:
-        df = df.unique(subset=existing_dedup, keep="last")
+        df = df.drop_duplicates(subset=existing_dedup, keep="last")
     dupes_removed = before_dedup - len(df)
 
     # AC #4: Apply quality rules
@@ -136,7 +131,7 @@ def transform_rte_to_silver(
     return summary
 
 
-def _load_json_file(path: Path) -> pl.DataFrame:
+def _load_json_file(path: Path) -> pd.DataFrame:
     """Load a Bronze JSON file into a DataFrame."""
     data = json.loads(path.read_text(encoding="utf-8"))
     if isinstance(data, dict) and "records" in data:
@@ -145,38 +140,35 @@ def _load_json_file(path: Path) -> pl.DataFrame:
         records = data
     else:
         records = [data]
-    # infer_schema_length=None: scan all rows before inferring types
-    # needed for Bronze JSON where some MW columns start as null then become numeric
-    return pl.DataFrame(records, infer_schema_length=None)
+    return pd.DataFrame(records)
 
 
 def _write_hive_partitioned(
-    df: pl.DataFrame, base_dir: Path, prefix: str
+    df: pd.DataFrame, base_dir: Path, prefix: str
 ) -> int:
     """Write DataFrame as Hive-partitioned Parquet."""
     if "date_heure" not in df.columns:
         # No partitioning possible — write single file
         out = base_dir / prefix / "data.parquet"
         out.parent.mkdir(parents=True, exist_ok=True)
-        df.write_parquet(out)
+        df.to_parquet(out, index=False)
         return 1
 
     # Add partition columns
-    df = df.with_columns([
-        pl.col("date_heure").dt.year().alias("year"),
-        pl.col("date_heure").dt.month().alias("month"),
-        pl.col("date_heure").dt.day().alias("day"),
-    ])
+    df = df.copy()
+    df["year"] = df["date_heure"].dt.year
+    df["month"] = df["date_heure"].dt.month
+    df["day"] = df["date_heure"].dt.day
 
     files = 0
-    for (year, month, day), group in df.group_by(["year", "month", "day"]):
+    for (year, month, day), group in df.groupby(["year", "month", "day"]):
         part_path = (
             base_dir / prefix
             / f"year={year}" / f"month={month:02d}" / f"day={day:02d}"
             / "data.parquet"
         )
         part_path.parent.mkdir(parents=True, exist_ok=True)
-        group.drop(["year", "month", "day"]).write_parquet(part_path)
+        group.drop(columns=["year", "month", "day"]).to_parquet(part_path, index=False)
         files += 1
 
     return files

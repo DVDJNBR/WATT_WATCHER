@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import Any
 
-import polars as pl
+import pandas as pd
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +28,7 @@ class CheckStatus(str, Enum):
 
 
 def null_check(
-    df: pl.DataFrame,
+    df: pd.DataFrame,
     columns: list[str],
     name: str = "null_check",
 ) -> dict:
@@ -42,7 +42,7 @@ def null_check(
         if col not in df.columns:
             nulls[col] = -1  # column missing entirely
             continue
-        count = df[col].null_count()
+        count = int(df[col].isna().sum())
         if count > 0:
             nulls[col] = count
 
@@ -56,7 +56,7 @@ def null_check(
 
 
 def range_check(
-    df: pl.DataFrame,
+    df: pd.DataFrame,
     column: str,
     min_val: float,
     max_val: float,
@@ -75,9 +75,7 @@ def range_check(
             "details": {"error": f"Column '{column}' not found"},
         }
 
-    out_of_range = df.filter(
-        (pl.col(column) < min_val) | (pl.col(column) > max_val)
-    )
+    out_of_range = df[(df[column] < min_val) | (df[column] > max_val)]
     count = len(out_of_range)
 
     status = CheckStatus.FAIL if count > 0 else CheckStatus.PASS
@@ -130,7 +128,7 @@ def row_count_check(
 
 
 def freshness_check(
-    df: pl.DataFrame,
+    df: pd.DataFrame,
     time_column: str,
     max_age_hours: int = 24,
     reference_time: datetime | None = None,
@@ -151,7 +149,7 @@ def freshness_check(
 
     # Get max timestamp
     max_ts = df[time_column].max()
-    if max_ts is None:
+    if max_ts is None or (hasattr(max_ts, '__class__') and pd.isna(max_ts)):
         return {
             "name": name,
             "check_type": "freshness",
@@ -164,6 +162,9 @@ def freshness_check(
         max_ts_dt = datetime.fromisoformat(max_ts.replace("Z", "+00:00"))
     elif isinstance(max_ts, datetime):
         max_ts_dt = max_ts
+    elif hasattr(max_ts, 'to_pydatetime'):
+        # pandas Timestamp
+        max_ts_dt = max_ts.to_pydatetime()
     else:
         return {
             "name": name,

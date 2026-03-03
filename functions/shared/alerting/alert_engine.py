@@ -17,7 +17,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-import polars as pl
+import pandas as pd
 
 logger = logging.getLogger(__name__)
 
@@ -38,15 +38,15 @@ def _get_threshold(env_var: str, default: float) -> float:
         return default
 
 
-def _read_latest_silver(silver_path: Path) -> pl.DataFrame:
+def _read_latest_silver(silver_path: Path) -> pd.DataFrame:
     """Load the most-recent Silver Parquet(s) from a directory or single file."""
     if silver_path.is_file():
-        return pl.read_parquet(silver_path)
+        return pd.read_parquet(silver_path)
     parquets = sorted(silver_path.rglob("*.parquet"))
     if not parquets:
-        return pl.DataFrame()
+        return pd.DataFrame()
     # Keep only the most recent partition (last file alphabetically = most recent date)
-    return pl.read_parquet(parquets[-1])
+    return pd.read_parquet(parquets[-1])
 
 
 def evaluate(silver_path: str | Path) -> list[dict[str, Any]]:
@@ -68,7 +68,7 @@ def evaluate(silver_path: str | Path) -> list[dict[str, Any]]:
 
     path = Path(silver_path)
     df = _read_latest_silver(path)
-    if df.is_empty():
+    if df.empty:
         logger.info("Alert engine: no Silver data found at %s", path)
         return []
 
@@ -80,38 +80,23 @@ def evaluate(silver_path: str | Path) -> list[dict[str, Any]]:
 
     id_cols = [c for c in ["date_heure", "code_insee_region", "libelle_region"] if c in df.columns]
 
-    df = (
-        df.select(id_cols + prod_present + ["consommation_mw"])
-        .filter(pl.col("consommation_mw").is_not_null() & (pl.col("consommation_mw") > 0))
-    )
+    df = df[id_cols + prod_present + ["consommation_mw"]].copy()
+    df = df[df["consommation_mw"].notna() & (df["consommation_mw"] > 0)]
 
     # Sum all production sources per row
-    df = df.with_columns(
-        pl.sum_horizontal([pl.col(c) for c in prod_present]).alias("production_total_mw"),
-    )
-    df = df.with_columns(
-        (pl.col("production_total_mw") / pl.col("consommation_mw")).alias("ratio"),
-    )
+    df["production_total_mw"] = df[prod_present].sum(axis=1)
+    df["ratio"] = df["production_total_mw"] / df["consommation_mw"]
 
     # Extract hour for low-demand detection
     if "date_heure" in df.columns:
-        dt_dtype = df["date_heure"].dtype
-        if str(dt_dtype) in ("Utf8", "String"):
-            df = df.with_columns(
-                pl.col("date_heure")
-                .str.to_datetime(time_unit="us", time_zone="UTC", strict=False)
-                .dt.hour()
-                .alias("_hour")
-            )
-        else:
-            df = df.with_columns(pl.col("date_heure").dt.hour().alias("_hour"))
+        df["_hour"] = pd.to_datetime(df["date_heure"], utc=True, errors="coerce").dt.hour
     else:
-        df = df.with_columns(pl.lit(12).alias("_hour"))
+        df["_hour"] = 12
 
     alerts: list[dict[str, Any]] = []
     now = datetime.now(timezone.utc).isoformat()
 
-    for row in df.iter_rows(named=True):
+    for row in df.to_dict("records"):
         ratio = row["ratio"]
         if ratio is None:
             continue

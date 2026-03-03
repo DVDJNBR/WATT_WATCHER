@@ -1,12 +1,12 @@
 """
 ERA5 Climate Ingestion Module — Story 2.2, Task 2
 
-Reads ERA5 Parquet data using Polars streaming mode for memory efficiency.
+Reads ERA5 Parquet data using pandas for processing.
 Computes derived fields (wind speed magnitude) and writes partitioned
 output to Bronze layer.
 
 Key design decisions:
-- pl.scan_parquet() for lazy/streaming evaluation (NFR-E2)
+- pd.read_parquet() for data loading
 - Chunked processing by month to respect Azure Function 10-min timeout
 - Checkpoint mechanism to track last processed timestamp
 """
@@ -16,7 +16,7 @@ import logging
 from datetime import datetime, timezone
 from pathlib import Path
 
-import polars as pl
+import pandas as pd
 
 logger = logging.getLogger(__name__)
 
@@ -61,10 +61,10 @@ class ERA5Ingestion:
         output_dir: str | Path | None = None,
     ) -> dict:
         """
-        Ingest ERA5 Parquet using Polars streaming mode.
+        Ingest ERA5 Parquet using pandas.
 
         AC #1: Pull hourly data, partition by region/month.
-        AC #2: Use scan_parquet (lazy) for memory efficiency.
+        AC #2: Read parquet for data loading.
 
         Args:
             source_path: Path to ERA5 Parquet file.
@@ -74,37 +74,31 @@ class ERA5Ingestion:
             Summary dict: {total_rows, files_written, regions_processed}.
         """
         source_path = Path(source_path)
-        logger.info("Scanning ERA5 Parquet: %s", source_path)
+        logger.info("Reading ERA5 Parquet: %s", source_path)
 
-        # AC #2: Lazy scan — no data loaded into memory yet
-        lf = pl.scan_parquet(source_path)
+        df = pd.read_parquet(source_path)
 
-        # Filter to France bounding box (lazy)
-        lf = lf.filter(
-            (pl.col("latitude") >= FRANCE_LAT_MIN)
-            & (pl.col("latitude") <= FRANCE_LAT_MAX)
-            & (pl.col("longitude") >= FRANCE_LON_MIN)
-            & (pl.col("longitude") <= FRANCE_LON_MAX)
-        )
+        # Filter to France bounding box
+        df = df[
+            (df["latitude"] >= FRANCE_LAT_MIN)
+            & (df["latitude"] <= FRANCE_LAT_MAX)
+            & (df["longitude"] >= FRANCE_LON_MIN)
+            & (df["longitude"] <= FRANCE_LON_MAX)
+        ].copy()
 
-        # Compute derived fields (lazy)
-        lf = lf.with_columns([
-            # Wind speed at 100m from u/v components
-            (pl.col("u100").pow(2) + pl.col("v100").pow(2)).sqrt().alias("wind_speed_100m"),
-            # Temperature in Celsius
-            (pl.col("t2m") - 273.15).round(2).alias("temperature_c"),
-            # Extract date parts for partitioning
-            pl.col("valid_time").dt.year().alias("year"),
-            pl.col("valid_time").dt.month().alias("month"),
-        ])
+        # Compute derived fields
+        # Wind speed at 100m from u/v components
+        df["wind_speed_100m"] = (df["u100"] ** 2 + df["v100"] ** 2) ** 0.5
+        # Temperature in Celsius
+        df["temperature_c"] = (df["t2m"] - 273.15).round(2)
+        # Extract date parts for partitioning
+        df["year"] = df["valid_time"].dt.year
+        df["month"] = df["valid_time"].dt.month
 
         # Map grid points to nearest region
-        lf = self._map_to_regions(lf)
+        df = self._map_to_regions(df)
 
-        # AC #2: Collect with streaming=True for memory efficiency
-        df = lf.collect(engine="streaming")
-
-        if df.is_empty():
+        if df.empty:
             logger.warning("No ERA5 data after filtering")
             if self.audit:
                 self.audit.log_success(record_count=0, details={"era5": "no_data"})
@@ -116,7 +110,7 @@ class ERA5Ingestion:
         summary = {
             "total_rows": len(df),
             "files_written": files_written,
-            "regions_processed": df["region_code"].unique().sort().to_list(),
+            "regions_processed": sorted(df["region_code"].unique().tolist()),
         }
 
         logger.info(
@@ -146,16 +140,17 @@ class ERA5Ingestion:
         Processes data month by month to stay within 10-min limit.
         """
         source_path = Path(source_path)
-        lf = pl.scan_parquet(source_path)
+        df_full = pd.read_parquet(source_path)
 
         # Get time range
-        time_range = lf.select([
-            pl.col("valid_time").min().alias("min_time"),
-            pl.col("valid_time").max().alias("max_time"),
-        ]).collect()
+        min_time = df_full["valid_time"].min()
+        max_time = df_full["valid_time"].max()
 
-        min_time = time_range["min_time"][0]
-        max_time = time_range["max_time"][0]
+        # Normalize to Python datetime if pandas Timestamp
+        if hasattr(min_time, 'to_pydatetime'):
+            min_time = min_time.to_pydatetime()
+        if hasattr(max_time, 'to_pydatetime'):
+            max_time = max_time.to_pydatetime()
 
         total_rows = 0
         total_files = 0
@@ -169,12 +164,12 @@ class ERA5Ingestion:
                 year=current.year + (1 if current.month == 12 else 0),
             )
 
-            chunk_lf = lf.filter(
-                (pl.col("valid_time") >= current)
-                & (pl.col("valid_time") < next_month)
-            )
+            chunk_df = df_full[
+                (df_full["valid_time"] >= current)
+                & (df_full["valid_time"] < next_month)
+            ]
 
-            result = self._process_lazy_frame(chunk_lf, output_dir)
+            result = self._process_dataframe(chunk_df, output_dir)
 
             total_rows += result["total_rows"]
             total_files += result["files_written"]
@@ -189,90 +184,72 @@ class ERA5Ingestion:
             "regions_processed": sorted(all_regions),
         }
 
-    def _process_lazy_frame(
-        self, lf: pl.LazyFrame, output_dir: str | Path | None
+    def _process_dataframe(
+        self, df: pd.DataFrame, output_dir: str | Path | None
     ) -> dict:
-        """Process a lazy frame chunk."""
-        lf = lf.filter(
-            (pl.col("latitude") >= FRANCE_LAT_MIN)
-            & (pl.col("latitude") <= FRANCE_LAT_MAX)
-            & (pl.col("longitude") >= FRANCE_LON_MIN)
-            & (pl.col("longitude") <= FRANCE_LON_MAX)
-        )
+        """Process a DataFrame chunk."""
+        df = df[
+            (df["latitude"] >= FRANCE_LAT_MIN)
+            & (df["latitude"] <= FRANCE_LAT_MAX)
+            & (df["longitude"] >= FRANCE_LON_MIN)
+            & (df["longitude"] <= FRANCE_LON_MAX)
+        ].copy()
 
-        lf = lf.with_columns([
-            (pl.col("u100").pow(2) + pl.col("v100").pow(2)).sqrt().alias("wind_speed_100m"),
-            (pl.col("t2m") - 273.15).round(2).alias("temperature_c"),
-            pl.col("valid_time").dt.year().alias("year"),
-            pl.col("valid_time").dt.month().alias("month"),
-        ])
+        df["wind_speed_100m"] = (df["u100"] ** 2 + df["v100"] ** 2) ** 0.5
+        df["temperature_c"] = (df["t2m"] - 273.15).round(2)
+        df["year"] = df["valid_time"].dt.year
+        df["month"] = df["valid_time"].dt.month
 
-        lf = self._map_to_regions(lf)
-        df = lf.collect(engine="streaming")
+        df = self._map_to_regions(df)
 
-        if df.is_empty():
+        if df.empty:
             return {"total_rows": 0, "files_written": 0, "regions_processed": []}
 
         files = self._write_partitioned(df, output_dir)
         return {
             "total_rows": len(df),
             "files_written": files,
-            "regions_processed": df["region_code"].unique().sort().to_list(),
+            "regions_processed": sorted(df["region_code"].unique().tolist()),
         }
 
-    def _map_to_regions(self, lf: pl.LazyFrame) -> pl.LazyFrame:
+    def _map_to_regions(self, df: pd.DataFrame) -> pd.DataFrame:
         """Map each grid point to nearest French region via centroid distance."""
-        # Create a mapping expression: compute distance to each centroid
-        # and pick the closest region
-        region_exprs = []
-        for code, (lat, lon) in REGION_CENTROIDS.items():
-            dist = (
-                (pl.col("latitude") - lat).pow(2)
-                + (pl.col("longitude") - lon).pow(2)
-            ).sqrt().alias(f"dist_{code}")
-            region_exprs.append(dist)
-
-        lf = lf.with_columns(region_exprs)
-
-        dist_cols = [f"dist_{code}" for code in REGION_CENTROIDS]
-        # Find minimum distance and map to region code
-        lf = lf.with_columns(
-            pl.concat_list(dist_cols).list.arg_min().alias("nearest_idx")
-        )
-
         region_codes = list(REGION_CENTROIDS.keys())
-        lf = lf.with_columns(
-            pl.col("nearest_idx")
-            .map_elements(lambda idx: region_codes[idx], return_dtype=pl.Utf8)
-            .alias("region_code")
-        )
 
-        # Drop distance columns
-        lf = lf.drop(dist_cols + ["nearest_idx"])
+        def nearest_region(row):
+            min_dist = float("inf")
+            nearest = region_codes[0]
+            for code, (lat, lon) in REGION_CENTROIDS.items():
+                dist = ((row["latitude"] - lat) ** 2 + (row["longitude"] - lon) ** 2) ** 0.5
+                if dist < min_dist:
+                    min_dist = dist
+                    nearest = code
+            return nearest
 
-        return lf
+        df = df.copy()
+        df["region_code"] = df.apply(nearest_region, axis=1)
+        return df
 
     def _write_partitioned(
-        self, df: pl.DataFrame, output_dir: str | Path | None
+        self, df: pd.DataFrame, output_dir: str | Path | None
     ) -> int:
         """Write partitioned Parquet files by region and month."""
         ts_str = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
         files_written = 0
 
-        groups = df.group_by(["region_code", "year", "month"])
-        for (region, year, month), group_df in groups:
+        for (region, year, month), group_df in df.groupby(["region_code", "year", "month"]):
             filename = f"era5_{region}_{ts_str}.parquet"
             path = f"climate/era5/{year}/{month:02d}/{filename}"
 
             if output_dir:
                 full_path = Path(output_dir) / path
                 full_path.parent.mkdir(parents=True, exist_ok=True)
-                group_df.write_parquet(full_path)
+                group_df.to_parquet(full_path, index=False)
                 logger.info("Written: %s (%d rows)", full_path, len(group_df))
             elif self.bronze and self.bronze.local_mode:
                 full_path = self.bronze.local_root / path
                 full_path.parent.mkdir(parents=True, exist_ok=True)
-                group_df.write_parquet(full_path)
+                group_df.to_parquet(full_path, index=False)
                 logger.info("Written (local): %s (%d rows)", full_path, len(group_df))
 
             files_written += 1

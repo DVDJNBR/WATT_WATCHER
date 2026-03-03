@@ -4,7 +4,7 @@ import json
 import os
 from pathlib import Path
 
-import polars as pl
+import pandas as pd
 import pytest
 
 from functions.shared.alerting.alert_engine import evaluate, _get_threshold, LOW_DEMAND_HOURS
@@ -18,7 +18,7 @@ def _make_silver(tmp_path: Path, ratio: float, hour: int = 12) -> Path:
     from datetime import datetime, timezone
     ts = datetime(2025, 6, 15, hour, 0, 0, tzinfo=timezone.utc).isoformat()
     production = ratio * 5000.0   # consumption fixed at 5000 MW
-    df = pl.DataFrame({
+    df = pd.DataFrame({
         "code_insee_region": ["11"],
         "libelle_region": ["Île-de-France"],
         "date_heure": [ts],
@@ -34,7 +34,7 @@ def _make_silver(tmp_path: Path, ratio: float, hour: int = 12) -> Path:
         "temperature_c": [18.5],
     })
     path = tmp_path / "silver.parquet"
-    df.write_parquet(path)
+    df.to_parquet(path, index=False)
     return path
 
 
@@ -102,9 +102,9 @@ class TestAlertEngine:
 
     def test_missing_consommation_col(self, tmp_path):
         """Alert engine is safe when consommation_mw is missing."""
-        df = pl.DataFrame({"date_heure": ["2025-06-15T10:00:00+00:00"], "nucleaire_mw": [3000.0]})
+        df = pd.DataFrame({"date_heure": ["2025-06-15T10:00:00+00:00"], "nucleaire_mw": [3000.0]})
         path = tmp_path / "s.parquet"
-        df.write_parquet(path)
+        df.to_parquet(path, index=False)
         alerts = evaluate(path)
         assert alerts == []
 

@@ -11,7 +11,7 @@ import logging
 from datetime import datetime, timezone
 from pathlib import Path
 
-import polars as pl
+import pandas as pd
 
 from functions.shared.transformations.data_quality import (
     CAPACITY_QUALITY_RULES,
@@ -30,22 +30,22 @@ def transform_capacity_to_silver(
     output_dir = Path(output_dir)
 
     if bronze_path.is_file():
-        df = pl.read_csv(bronze_path, infer_schema_length=1000)
+        df = pd.read_csv(bronze_path)
     elif bronze_path.is_dir():
         csvs = sorted(bronze_path.rglob("*.csv"))
         if not csvs:
             return {"status": "empty", "rows": 0}
-        df = pl.concat([pl.read_csv(f, infer_schema_length=1000) for f in csvs])
+        df = pd.concat([pd.read_csv(f) for f in csvs], ignore_index=True)
     else:
         raise FileNotFoundError(f"Bronze path not found: {bronze_path}")
 
     # Normalize column names → snake_case
-    df = df.rename({c: c.lower().replace(" ", "_").replace("-", "_") for c in df.columns})
+    df.columns = [c.lower().replace(" ", "_").replace("-", "_") for c in df.columns]
 
     # Cast numeric columns
     if "puissance_installee_mw" in df.columns:
-        df = df.with_columns(
-            pl.col("puissance_installee_mw").cast(pl.Float64, strict=False)
+        df["puissance_installee_mw"] = pd.to_numeric(
+            df["puissance_installee_mw"], errors="coerce"
         )
 
     # Apply quality rules
@@ -55,12 +55,12 @@ def transform_capacity_to_silver(
     before = len(df)
     dedup_cols = [c for c in ["code_insee_region", "filiere"] if c in df.columns]
     if dedup_cols:
-        df = df.unique(subset=dedup_cols, keep="last")
+        df = df.drop_duplicates(subset=dedup_cols, keep="last")
 
     # Write to Silver
     out_path = output_dir / "silver/reference/capacity/data.parquet"
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    df.write_parquet(out_path)
+    df.to_parquet(out_path, index=False)
 
     summary = {
         "status": "success",

@@ -13,7 +13,7 @@ import logging
 from datetime import datetime, timezone
 from pathlib import Path
 
-import polars as pl
+import pandas as pd
 
 logger = logging.getLogger(__name__)
 
@@ -41,46 +41,40 @@ def transform_maintenance_to_silver(
     if not records:
         return {"status": "empty", "rows": 0}
 
-    df = pl.DataFrame(records)
+    df = pd.DataFrame(records)
 
     # Parse dates
     for date_col in ["start_date", "end_date"]:
         if date_col in df.columns:
-            df = df.with_columns(
-                pl.col(date_col)
-                .str.to_datetime(time_zone="UTC", strict=False)
-            )
+            df[date_col] = pd.to_datetime(df[date_col], utc=True, errors="coerce")
 
     # Clean description text (strip extra whitespace)
     if "description" in df.columns:
-        df = df.with_columns(
-            pl.col("description").str.strip_chars().str.replace_all(r"\s+", " ")
-        )
+        df["description"] = df["description"].str.strip().str.replace(r"\s+", " ", regex=True)
 
     # Dedup on event_id
     before = len(df)
     if "event_id" in df.columns:
-        df = df.unique(subset=["event_id"], keep="last")
+        df = df.drop_duplicates(subset=["event_id"], keep="last")
 
     # Write partitioned by start_date year/month
     files = 0
     if "start_date" in df.columns:
-        df = df.with_columns([
-            pl.col("start_date").dt.year().alias("year"),
-            pl.col("start_date").dt.month().alias("month"),
-        ])
-        for (year, month), group in df.group_by(["year", "month"]):
+        df = df.copy()
+        df["year"] = df["start_date"].dt.year
+        df["month"] = df["start_date"].dt.month
+        for (year, month), group in df.groupby(["year", "month"]):
             out = (
                 output_dir / "silver/maintenance"
                 / f"year={year}" / f"month={month:02d}" / "data.parquet"
             )
             out.parent.mkdir(parents=True, exist_ok=True)
-            group.drop(["year", "month"]).write_parquet(out)
+            group.drop(columns=["year", "month"]).to_parquet(out, index=False)
             files += 1
     else:
         out = output_dir / "silver/maintenance/data.parquet"
         out.parent.mkdir(parents=True, exist_ok=True)
-        df.write_parquet(out)
+        df.to_parquet(out, index=False)
         files = 1
 
     summary = {

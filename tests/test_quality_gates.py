@@ -4,7 +4,7 @@ import sqlite3
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-import polars as pl
+import pandas as pd
 import pytest
 
 from functions.shared.gold.dim_loader import DimLoader
@@ -25,30 +25,30 @@ CONFIG_PATH = Path("config/quality_gates.json")
 
 class TestNullCheck:
     def test_pass_no_nulls(self):
-        df = pl.DataFrame({"a": [1, 2, 3], "b": ["x", "y", "z"]})
+        df = pd.DataFrame({"a": [1, 2, 3], "b": ["x", "y", "z"]})
         result = null_check(df, ["a", "b"])
         assert result["status"] == "PASS"
 
     def test_fail_with_nulls(self):
-        df = pl.DataFrame({"a": [1, None, 3], "b": ["x", "y", None]})
+        df = pd.DataFrame({"a": [1, None, 3], "b": ["x", "y", None]})
         result = null_check(df, ["a", "b"])
         assert result["status"] == "FAIL"
         assert result["details"]["nulls_found"]["a"] == 1
 
     def test_missing_column(self):
-        df = pl.DataFrame({"a": [1, 2]})
+        df = pd.DataFrame({"a": [1, 2]})
         result = null_check(df, ["nonexistent"])
         assert result["status"] == "FAIL"
 
 
 class TestRangeCheck:
     def test_pass_in_range(self):
-        df = pl.DataFrame({"mw": [100.0, 5000.0, 50000.0]})
+        df = pd.DataFrame({"mw": [100.0, 5000.0, 50000.0]})
         result = range_check(df, "mw", 0, 100000)
         assert result["status"] == "PASS"
 
     def test_fail_out_of_range(self):
-        df = pl.DataFrame({"mw": [100.0, -50.0, 200000.0]})
+        df = pd.DataFrame({"mw": [100.0, -50.0, 200000.0]})
         result = range_check(df, "mw", 0, 100000)
         assert result["status"] == "FAIL"
         assert result["details"]["out_of_range_count"] == 2
@@ -71,13 +71,13 @@ class TestRowCountCheck:
 class TestFreshnessCheck:
     def test_pass_fresh_data(self):
         now = datetime.now(timezone.utc)
-        df = pl.DataFrame({"ts": [now - timedelta(hours=2)]})
+        df = pd.DataFrame({"ts": [now - timedelta(hours=2)]})
         result = freshness_check(df, "ts", max_age_hours=24, reference_time=now)
         assert result["status"] == "PASS"
 
     def test_fail_stale_data(self):
         now = datetime.now(timezone.utc)
-        df = pl.DataFrame({"ts": [now - timedelta(days=5)]})
+        df = pd.DataFrame({"ts": [now - timedelta(days=5)]})
         result = freshness_check(df, "ts", max_age_hours=24, reference_time=now)
         assert result["status"] == "FAIL"
 
@@ -127,7 +127,7 @@ class TestFKIntegrity:
 class TestGateRunner:
     def test_run_programmatic(self):
         """AC #1: Run checks programmatically."""
-        df = pl.DataFrame({
+        df = pd.DataFrame({
             "code_insee_region": ["11", "84"],
             "date_heure": ["2025-06-15", "2025-06-15"],
             "consommation_mw": [8500.0, 5200.0],
@@ -165,7 +165,7 @@ class TestGateRunner:
         if not CONFIG_PATH.exists():
             pytest.skip("Config not found")
 
-        df = pl.DataFrame({
+        df = pd.DataFrame({
             "code_insee_region": ["11"],
             "date_heure": [datetime.now(timezone.utc)],
             "consommation_mw": [8500.0],

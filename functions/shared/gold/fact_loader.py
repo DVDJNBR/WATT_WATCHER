@@ -11,7 +11,7 @@ from datetime import datetime as _dt
 from pathlib import Path
 from typing import Any
 
-import polars as pl
+import pandas as pd
 
 from functions.shared.gold.dim_loader import DimLoader
 
@@ -62,16 +62,16 @@ class FactLoader:
 
         # Read Silver data
         if silver_path.is_file():
-            df = pl.read_parquet(silver_path)
+            df = pd.read_parquet(silver_path)
         elif silver_path.is_dir():
             parquets = sorted(silver_path.rglob("*.parquet"))
             if not parquets:
                 return {"status": "empty", "rows_loaded": 0}
-            df = pl.concat([pl.read_parquet(f) for f in parquets], how="diagonal")
+            df = pd.concat([pd.read_parquet(f) for f in parquets], ignore_index=True)
         else:
             raise FileNotFoundError(f"Silver path not found: {silver_path}")
 
-        if df.is_empty():
+        if df.empty:
             return {"status": "empty", "rows_loaded": 0}
 
         # Ensure DIM_SOURCE is populated
@@ -80,9 +80,9 @@ class FactLoader:
         # Auto-populate DIM_REGION from Silver data
         if "code_insee_region" in df.columns and "libelle_region" in df.columns:
             regions = (
-                df.select(["code_insee_region", "libelle_region"])
-                .unique()
-                .to_dicts()
+                df[["code_insee_region", "libelle_region"]]
+                .drop_duplicates()
+                .to_dict("records")
             )
             self.dim.upsert_regions([
                 {"code_insee": r["code_insee_region"], "nom_region": r["libelle_region"]}
@@ -91,31 +91,30 @@ class FactLoader:
 
         # Auto-populate DIM_TIME from Silver timestamps
         if "date_heure" in df.columns:
-            timestamps = df["date_heure"].cast(pl.Utf8).unique().to_list()
+            timestamps = df["date_heure"].astype(str).unique().tolist()
             self.dim.upsert_time(timestamps)
 
         # Unpivot: wide (one row per region/time) → long (one row per region/time/source)
         source_cols = [c for c in SOURCE_COLUMN_MAP if c in df.columns]
         id_cols = [c for c in ["date_heure", "code_insee_region", "temperature_c",
                                 "temperature_moyenne"] if c in df.columns]
-        long_df = df.select(id_cols + source_cols).unpivot(
-            on=source_cols, index=id_cols,
-            variable_name="source_col", value_name="valeur_mw",
-        ).filter(pl.col("valeur_mw").is_not_null())
-        dh_dtype = long_df["date_heure"].dtype
-        if str(dh_dtype) in ("Utf8", "String"):
-            horodatage_expr = (
-                pl.col("date_heure")
-                .str.to_datetime(time_unit="us", time_zone="UTC", strict=False)
-                .dt.replace_time_zone(None)
+        long_df = (
+            df[id_cols + source_cols]
+            .melt(
+                id_vars=id_cols,
+                value_vars=source_cols,
+                var_name="source_col",
+                value_name="valeur_mw",
             )
-        else:
-            horodatage_expr = pl.col("date_heure").dt.replace_time_zone(None)
-        long_df = long_df.with_columns(
-            pl.col("source_col").replace(SOURCE_COLUMN_MAP).alias("source_name"),
-            horodatage_expr.alias("horodatage"),
-            pl.col("valeur_mw").cast(pl.Float64),
+            .dropna(subset=["valeur_mw"])
         )
+
+        # Handle date_heure → horodatage (naive datetime for SQLite lookup)
+        ts = pd.to_datetime(long_df["date_heure"], utc=True, errors="coerce")
+        long_df["horodatage"] = ts.dt.tz_localize(None) if ts.dt.tz is None else ts.dt.tz_convert(None)
+        long_df["source_name"] = long_df["source_col"].map(SOURCE_COLUMN_MAP)
+        long_df["valeur_mw"] = pd.to_numeric(long_df["valeur_mw"], errors="coerce")
+
         temp_col = "temperature_c" if "temperature_c" in long_df.columns else \
                    ("temperature_moyenne" if "temperature_moyenne" in long_df.columns else None)
 
@@ -140,7 +139,7 @@ class FactLoader:
             cursor0.execute("SELECT id_source, source_name FROM DIM_SOURCE")
             source_map = {r[1]: r[0] for r in cursor0.fetchall()}
             params = []
-            for row in long_df.iter_rows(named=True):
+            for row in long_df.to_dict("records"):
                 id_r = region_map.get(str(row["code_insee_region"]))
                 id_d = time_map.get(row["horodatage"])
                 id_s = source_map.get(row["source_name"])
@@ -182,7 +181,7 @@ class FactLoader:
                     row["valeur_mw"],
                     row.get(temp_col) if temp_col else None,
                 )
-                for row in long_df.iter_rows(named=True)
+                for row in long_df.to_dict("records")
             ]
             BATCH = 5000
             for i in range(0, len(stg_rows), BATCH):

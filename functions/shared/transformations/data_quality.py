@@ -15,7 +15,7 @@ import logging
 from enum import Enum
 from datetime import datetime, timezone
 
-import polars as pl
+import pandas as pd
 
 logger = logging.getLogger(__name__)
 
@@ -61,10 +61,10 @@ ERA5_QUALITY_RULES: dict[str, NullStrategy] = {
 
 
 def apply_quality_rules(
-    df: pl.DataFrame,
+    df: pd.DataFrame,
     rules: dict[str, NullStrategy],
     source_name: str = "",
-) -> tuple[pl.DataFrame, dict]:
+) -> tuple[pd.DataFrame, dict]:
     """
     Apply null handling rules to a DataFrame.
 
@@ -76,6 +76,8 @@ def apply_quality_rules(
     Returns:
         Tuple of (cleaned DataFrame, quality metrics dict).
     """
+    df = df.copy()
+
     metrics = {
         "source": source_name,
         "input_rows": len(df),
@@ -88,7 +90,7 @@ def apply_quality_rules(
     # Count nulls per column before cleaning
     for col in rules:
         if col in df.columns:
-            null_count = df[col].null_count()
+            null_count = int(df[col].isna().sum())
             if null_count > 0:
                 metrics["nulls_found"][col] = null_count
 
@@ -97,33 +99,31 @@ def apply_quality_rules(
                  if strategy == NullStrategy.DROP and col in df.columns]
     if drop_cols:
         before = len(df)
-        df = df.drop_nulls(subset=drop_cols)
+        df = df.dropna(subset=drop_cols)
         metrics["rows_dropped"] = before - len(df)
 
     fill_zero_cols = [col for col, strategy in rules.items()
                       if strategy == NullStrategy.FILL_ZERO and col in df.columns]
     for col in fill_zero_cols:
-        null_count = df[col].null_count()
+        null_count = int(df[col].isna().sum())
         if null_count > 0:
-            df = df.with_columns(pl.col(col).fill_null(0.0))
+            df[col] = df[col].fillna(0.0)
             metrics["values_filled"] += null_count
 
     ffill_cols = [col for col, strategy in rules.items()
                   if strategy == NullStrategy.FORWARD_FILL and col in df.columns]
     for col in ffill_cols:
-        null_count = df[col].null_count()
+        null_count = int(df[col].isna().sum())
         if null_count > 0:
-            df = df.with_columns(pl.col(col).forward_fill())
+            df[col] = df[col].ffill()
             metrics["values_filled"] += null_count
 
     flag_cols = [col for col, strategy in rules.items()
                  if strategy == NullStrategy.FLAG and col in df.columns]
     for col in flag_cols:
-        null_count = df[col].null_count()
+        null_count = int(df[col].isna().sum())
         if null_count > 0:
-            df = df.with_columns(
-                pl.col(col).is_null().alias(f"{col}_is_null")
-            )
+            df[f"{col}_is_null"] = df[col].isna()
             metrics["values_flagged"] += null_count
 
     metrics["output_rows"] = len(df)

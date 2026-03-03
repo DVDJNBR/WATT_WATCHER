@@ -4,7 +4,7 @@ import json
 from datetime import datetime
 from pathlib import Path
 
-import polars as pl
+import pandas as pd
 import pytest
 
 from functions.shared.transformations.data_quality import (
@@ -24,35 +24,35 @@ FIXTURE_DIR = Path("tests/fixtures")
 
 class TestDataQuality:
     def test_fill_zero(self):
-        df = pl.DataFrame({"val": [1.0, None, 3.0]})
+        df = pd.DataFrame({"val": [1.0, None, 3.0]})
         rules = {"val": NullStrategy.FILL_ZERO}
         result, metrics = apply_quality_rules(df, rules, "test")
-        assert result["val"].to_list() == [1.0, 0.0, 3.0]
+        assert result["val"].tolist() == [1.0, 0.0, 3.0]
         assert metrics["values_filled"] == 1
 
     def test_drop_rows(self):
-        df = pl.DataFrame({"key": ["a", None, "c"], "val": [1, 2, 3]})
+        df = pd.DataFrame({"key": ["a", None, "c"], "val": [1, 2, 3]})
         rules = {"key": NullStrategy.DROP}
         result, metrics = apply_quality_rules(df, rules, "test")
         assert len(result) == 2
         assert metrics["rows_dropped"] == 1
 
     def test_flag_nulls(self):
-        df = pl.DataFrame({"val": [1.0, None, 3.0]})
+        df = pd.DataFrame({"val": [1.0, None, 3.0]})
         rules = {"val": NullStrategy.FLAG}
         result, metrics = apply_quality_rules(df, rules, "test")
         assert "val_is_null" in result.columns
-        assert result["val_is_null"].to_list() == [False, True, False]
+        assert result["val_is_null"].tolist() == [False, True, False]
         assert metrics["values_flagged"] == 1
 
     def test_forward_fill(self):
-        df = pl.DataFrame({"val": [10.0, None, None, 20.0]})
+        df = pd.DataFrame({"val": [10.0, None, None, 20.0]})
         rules = {"val": NullStrategy.FORWARD_FILL}
         result, _ = apply_quality_rules(df, rules, "test")
-        assert result["val"].to_list() == [10.0, 10.0, 10.0, 20.0]
+        assert result["val"].tolist() == [10.0, 10.0, 10.0, 20.0]
 
     def test_quality_metrics(self):
-        df = pl.DataFrame({"a": [1, None], "b": [None, 2]})
+        df = pd.DataFrame({"a": [1, None], "b": [None, 2]})
         rules = {"a": NullStrategy.DROP, "b": NullStrategy.FILL_ZERO}
         _, metrics = apply_quality_rules(df, rules, "test")
         assert metrics["input_rows"] == 2
@@ -127,7 +127,7 @@ class TestRTESilver:
     def test_column_rename(self, bronze_json, tmp_path):
         transform_rte_to_silver(bronze_json, tmp_path)
         parquets = list(tmp_path.rglob("*.parquet"))
-        df = pl.read_parquet(parquets[0])
+        df = pd.read_parquet(parquets[0])
         assert "consommation_mw" in df.columns
         assert "nucleaire_mw" in df.columns
 
@@ -135,8 +135,8 @@ class TestRTESilver:
         """Story 0.1 bug: pompage is sometimes str."""
         transform_rte_to_silver(bronze_json, tmp_path)
         parquets = list(tmp_path.rglob("*.parquet"))
-        df = pl.read_parquet(parquets[0])
-        assert df["pompage_mw"].dtype == pl.Float64
+        df = pd.read_parquet(parquets[0])
+        assert pd.api.types.is_float_dtype(df["pompage_mw"])
 
     def test_hive_partitioning(self, bronze_json, tmp_path):
         transform_rte_to_silver(bronze_json, tmp_path)
@@ -188,8 +188,8 @@ class TestMaintenanceSilver:
     def test_description_cleaned(self, maintenance_json, tmp_path):
         transform_maintenance_to_silver(maintenance_json, tmp_path)
         parquets = list(tmp_path.rglob("*.parquet"))
-        df = pl.read_parquet(parquets[0])
-        for desc in df["description"].to_list():
+        df = pd.read_parquet(parquets[0])
+        for desc in df["description"].tolist():
             assert "  " not in desc  # No double spaces
 
 
@@ -211,6 +211,6 @@ class TestERA5Silver:
     def test_derived_fields(self, tmp_path):
         transform_era5_to_silver(FIXTURE_DIR / "era5_sample.parquet", tmp_path)
         parquets = list(tmp_path.rglob("*.parquet"))
-        df = pl.read_parquet(parquets[0])
+        df = pd.read_parquet(parquets[0])
         assert "wind_speed_100m" in df.columns
         assert "temperature_c" in df.columns

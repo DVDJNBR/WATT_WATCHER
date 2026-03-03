@@ -10,8 +10,6 @@ import sqlite3
 from datetime import datetime, timezone
 from typing import Any
 
-import polars as pl
-
 logger = logging.getLogger(__name__)
 
 

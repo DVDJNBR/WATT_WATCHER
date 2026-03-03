@@ -4,7 +4,7 @@ import json
 import sqlite3
 from pathlib import Path
 
-import polars as pl
+import pandas as pd
 import pytest
 
 from functions.shared.gold.dim_loader import DimLoader
@@ -28,7 +28,7 @@ def dim(db):
 @pytest.fixture
 def silver_parquet(tmp_path):
     """Create a Silver Parquet fixture for Gold loading."""
-    df = pl.DataFrame([
+    df = pd.DataFrame([
         {
             "code_insee_region": "11",
             "libelle_region": "Île-de-France",
@@ -57,7 +57,7 @@ def silver_parquet(tmp_path):
         },
     ])
     path = tmp_path / "silver.parquet"
-    df.write_parquet(path)
+    df.to_parquet(path, index=False)
     return path
 
 
