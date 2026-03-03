@@ -1,3 +1,9 @@
+## [1.2.7](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.2.6...v1.2.7) (2026-03-03)
+
+### Bug Fixes
+
+* **deploy:** isolate Azure Functions deps in functions/requirements.txt ([b0f0dfe](https://github.com/DVDJNBR/WATT_WATCHER/commit/b0f0dfe01e9c23357fe2ed1894a0c33ae555a656))
+
 ## [1.2.6](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.2.5...v1.2.6) (2026-03-03)
 
 ### Bug Fixes
