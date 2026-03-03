@@ -32,15 +32,7 @@ jobs:
         run: uv run python -m pytest tests/ -q --tb=short
 
       - name: Prepare deployment package
-        run: |
-          cp host.json functions/
-          # Pre-install wheels on CI (Ubuntu 22.04). All packages use manylinux_2_17
-          # or manylinux_2_28 wheels — both run on Azure Functions Ubuntu 20.04 (glibc 2.31).
-          # polars alone exceeds Oryx's 1.5 GB memory limit, so remote build is disabled.
-          pip install \
-            --prefer-binary \
-            --target functions/.python_packages/lib/site-packages \
-            -r functions/requirements.txt
+        run: cp host.json functions/
 
       - name: Deploy to Azure Functions
         uses: Azure/functions-action@v1
@@ -48,7 +40,7 @@ jobs:
           app-name: ${{ secrets.AZURE_FUNCTIONAPP_NAME }}
           publish-profile: ${{ secrets.AZURE_FUNCTIONAPP_PUBLISH_PROFILE }}
           package: functions
-          scm-do-build-during-deployment: false
+          scm-do-build-during-deployment: true
 
   # ── Frontend build + Azure Storage Static Website deployment ────────────────
   deploy-frontend:
