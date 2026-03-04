@@ -1,3 +1,9 @@
+## [1.2.11](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.2.10...v1.2.11) (2026-03-04)
+
+### Bug Fixes
+
+* resolve ~40 Pyright type-checking errors across 10 files ([1ff50e5](https://github.com/DVDJNBR/WATT_WATCHER/commit/1ff50e5c04924412a36e1fff57cbc4b9fd85c166))
+
 ## [1.2.10](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.2.9...v1.2.10) (2026-03-03)
 
 ### Bug Fixes
