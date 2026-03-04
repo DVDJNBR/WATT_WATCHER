@@ -211,7 +211,7 @@ _bmad/
 .agent
 .claude
 .gemini
-
+LIVRABLES/
 # Terraform
 .cloud/.terraform/
 .cloud/.terraform.lock.hcl
@@ -224,8 +224,9 @@ bronze/
 silver/
 *.db
 
+
 # Azure Functions
 local.settings.json
 
 # Node (semantic-release)
-node_modules/
+node_modules/.cloud/*.backup

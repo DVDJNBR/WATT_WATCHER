@@ -6,7 +6,6 @@ calculates facteur_charge, and INSERTs into FACT_ENERGY_FLOW.
 """
 
 import logging
-import sqlite3
 from datetime import datetime as _dt
 from pathlib import Path
 from typing import Any

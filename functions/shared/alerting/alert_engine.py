@@ -88,7 +88,7 @@ def evaluate(silver_path: str | Path) -> list[dict[str, Any]]:
     df["ratio"] = df["production_total_mw"] / df["consommation_mw"]
 
     # Extract hour for low-demand detection
-    if "date_heure" in df.columns:
+    if "date_heure" in df.columns:  # type: ignore[union-attr]
         df["_hour"] = pd.to_datetime(df["date_heure"], utc=True, errors="coerce").dt.hour  # type: ignore[union-attr]
     else:
         df["_hour"] = 12

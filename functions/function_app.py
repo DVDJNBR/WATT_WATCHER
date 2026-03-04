@@ -420,10 +420,6 @@ def run_full_pipeline(
     # ── Stage 2: Silver transformation ──────────────────────────────────────
     logger.info("[%s] Stage 2: Silver transformation", job_id)
     try:
-        storage_account = os.environ.get("STORAGE_ACCOUNT_NAME") if not local_mode else None
-
-        bronze_files: list = []  # placeholder for future list_recent_files implementation
-
         if local_mode:
             # Local: read from filesystem
             bronze_base = _Path(__file__).parent.parent / "bronze" / "rte" / "production"

@@ -11,7 +11,6 @@ Cleans raw RTE eCO2mix JSON from Bronze:
 
 import json
 import logging
-from datetime import datetime, timezone
 from pathlib import Path
 
 import pandas as pd
@@ -92,7 +91,8 @@ def transform_rte_to_silver(
     # Cast MW columns to float
     for col in MW_CAST_COLUMNS:
         if col in df.columns:
-            df[col] = pd.to_numeric(df[col].astype(str).str.strip(), errors="coerce").astype(float)  # type: ignore[union-attr]
+            df[col] = pd.to_numeric(df[col].astype(str).str.strip(), errors="coerce").astype(float)  # type: ignore
+    df = pd.DataFrame(df)  # re-assert type for Pyright
 
     # Rename columns → snake_case
     existing_renames = {k: v for k, v in RENAME_MAP.items() if k in df.columns}
