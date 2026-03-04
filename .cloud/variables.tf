@@ -2,18 +2,6 @@
 # GRID_POWER_STREAM — Input Variables
 # -----------------------------------------------------------------------------
 
-variable "project_name" {
-  description = "Project name used in resource naming"
-  type        = string
-  default     = "ww"
-}
-
-variable "environment" {
-  description = "Environment (dev, staging, prod)"
-  type        = string
-  default     = "dev"
-}
-
 variable "location" {
   description = "Azure region for all resources"
   type        = string

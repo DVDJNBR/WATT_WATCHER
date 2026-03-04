@@ -3,17 +3,10 @@
 # Story 1.0: IaC with Terraform
 # -----------------------------------------------------------------------------
 
-resource "random_pet" "suffix" {
-  length    = 1
-  separator = "-"
-}
-
 locals {
-  prefix = "${var.project_name}-${var.environment}-${random_pet.suffix.id}"
   tags = {
-    project     = "WATT_WATCHER"
-    environment = var.environment
-    managed_by  = "terraform"
+    project    = "WATT_WATCHER"
+    managed_by = "terraform"
   }
 }
 
@@ -21,14 +14,14 @@ data "azurerm_client_config" "current" {}
 
 # ─── Resource Group ──────────────────────────────────────────────────────────
 resource "azurerm_resource_group" "main" {
-  name     = "${local.prefix}-rg"
+  name     = "watt-watcher-rg"
   location = var.location
   tags     = local.tags
 }
 
 # ─── ADLS Gen2 Storage Account ──────────────────────────────────────────────
 resource "azurerm_storage_account" "datalake" {
-  name                     = replace("${local.prefix}sa", "-", "")  # no hyphens allowed
+  name                     = "watchwatcherdatalake"  # no hyphens allowed, 24 char max
   resource_group_name      = azurerm_resource_group.main.name
   location                 = azurerm_resource_group.main.location
   account_tier             = "Standard"
@@ -113,7 +106,7 @@ resource "azurerm_storage_management_policy" "retention" {
 
 # ─── Azure SQL Serverless ───────────────────────────────────────────────────
 resource "azurerm_mssql_server" "main" {
-  name                         = "${local.prefix}-sql"
+  name                         = "sql-server-watt-watcher"
   resource_group_name          = azurerm_resource_group.main.name
   location                     = azurerm_resource_group.main.location
   version                      = "12.0"
@@ -124,7 +117,7 @@ resource "azurerm_mssql_server" "main" {
 }
 
 resource "azurerm_mssql_database" "warehouse" {
-  name      = "${local.prefix}-db"
+  name      = "database-watt-watcher"
   server_id = azurerm_mssql_server.main.id
   sku_name  = "GP_S_Gen5_1"  # Serverless Gen5, 1 vCore
 
@@ -145,13 +138,13 @@ resource "azurerm_mssql_firewall_rule" "azure_services" {
 
 # ─── Azure Key Vault ────────────────────────────────────────────────────────
 resource "azurerm_key_vault" "main" {
-  name                       = "${local.prefix}-kv"
+  name                       = "watt-watcher-key-vault"  # 22 chars — fits 24 char limit
   resource_group_name        = azurerm_resource_group.main.name
   location                   = azurerm_resource_group.main.location
   tenant_id                  = data.azurerm_client_config.current.tenant_id
   sku_name                   = "standard"
   soft_delete_retention_days = 7
-  purge_protection_enabled   = false  # dev only — enable in prod
+  purge_protection_enabled   = false
 
   # Allow deploying user to manage secrets
   access_policy {
@@ -166,7 +159,7 @@ resource "azurerm_key_vault" "main" {
 
 # ─── Azure Function App (Consumption Plan) ──────────────────────────────────
 resource "azurerm_service_plan" "functions" {
-  name                = "${local.prefix}-plan"
+  name                = "service-plan-watt-watcher"
   resource_group_name = azurerm_resource_group.main.name
   location            = azurerm_resource_group.main.location
   os_type             = "Linux"
@@ -176,7 +169,7 @@ resource "azurerm_service_plan" "functions" {
 }
 
 resource "azurerm_storage_account" "functions" {
-  name                     = replace("${local.prefix}funcsa", "-", "")
+  name                     = "watchwatcherfunctions"  # no hyphens allowed, 24 char max
   resource_group_name      = azurerm_resource_group.main.name
   location                 = azurerm_resource_group.main.location
   account_tier             = "Standard"
@@ -186,7 +179,7 @@ resource "azurerm_storage_account" "functions" {
 }
 
 resource "azurerm_linux_function_app" "main" {
-  name                       = "${local.prefix}-func"
+  name                       = "function-app-watt-watcher"
   resource_group_name        = azurerm_resource_group.main.name
   location                   = azurerm_resource_group.main.location
   service_plan_id            = azurerm_service_plan.functions.id
@@ -234,7 +227,7 @@ resource "azurerm_key_vault_access_policy" "func_kv" {
 
 # ─── Log Analytics Workspace (required by App Insights v2) ──────────────────
 resource "azurerm_log_analytics_workspace" "main" {
-  name                = "${local.prefix}-law"
+  name                = "log-analytics-watt-watcher"
   resource_group_name = azurerm_resource_group.main.name
   location            = azurerm_resource_group.main.location
   sku                 = "PerGB2018"
@@ -245,7 +238,7 @@ resource "azurerm_log_analytics_workspace" "main" {
 
 # ─── Application Insights ───────────────────────────────────────────────────
 resource "azurerm_application_insights" "main" {
-  name                = "${local.prefix}-ai"
+  name                = "app-insights-watt-watcher"
   resource_group_name = azurerm_resource_group.main.name
   location            = azurerm_resource_group.main.location
   application_type    = "other"
@@ -258,7 +251,7 @@ resource "azurerm_application_insights" "main" {
 # Azure Static Web Apps is blocked on Student subscriptions (all regions 403)
 # → Storage Account with static website hosting = free, no region restriction
 resource "azurerm_storage_account" "frontend" {
-  name                     = replace("${local.prefix}websa", "-", "")
+  name                     = "watchwatcherfrontend"  # no hyphens allowed, 24 char max
   resource_group_name      = azurerm_resource_group.main.name
   location                 = azurerm_resource_group.main.location
   account_tier             = "Standard"
