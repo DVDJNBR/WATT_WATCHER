@@ -1,3 +1,9 @@
+## [1.2.12](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.2.11...v1.2.12) (2026-03-04)
+
+### Bug Fixes
+
+* **terraform:** provision SQL_CONNECTION_STRING in function app settings ([8e19b10](https://github.com/DVDJNBR/WATT_WATCHER/commit/8e19b1002d2d55857f81ff7d7931a2804ce6dbcf))
+
 ## [1.2.11](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.2.10...v1.2.11) (2026-03-04)
 
 ### Bug Fixes
