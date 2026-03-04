@@ -1,21 +1,23 @@
-name: Deploy
+name: CI & Deploy
 
 on:
   push:
     branches: [main]
-  workflow_dispatch:  # allow manual trigger
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
 
 permissions:
-  contents: read
-  id-token: write  # for OIDC if needed
+  contents: write
+  issues: write
+  pull-requests: write
+  id-token: write
 
 jobs:
-  # ── Azure Functions deployment ──────────────────────────────────────────────
-  deploy-functions:
-    name: Deploy Azure Functions
+  # ── Tests (run once, gate everything) ───────────────────────────────────────
+  test:
+    name: Tests
     runs-on: ubuntu-latest
-    environment: production
-
     steps:
       - uses: actions/checkout@v4
 
@@ -28,8 +30,42 @@ jobs:
       - name: Install dependencies
         run: uv sync --all-extras
 
-      - name: Run tests before deploy
+      - name: Run tests
         run: uv run python -m pytest tests/ -q --tb=short
+
+  # ── Semantic release (version bump + changelog) ─────────────────────────────
+  release:
+    name: Release
+    needs: test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Semantic Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npx semantic-release
+
+  # ── Azure Functions deployment ───────────────────────────────────────────────
+  deploy-functions:
+    name: Deploy Azure Functions
+    needs: test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
 
       - name: Prepare deployment package
         run: cp host.json functions/
@@ -44,11 +80,11 @@ jobs:
 
   # ── Frontend build + Azure Storage Static Website deployment ────────────────
   deploy-frontend:
-    name: Deploy Frontend (Azure Storage)
-    runs-on: ubuntu-latest
+    name: Deploy Frontend
     needs: deploy-functions
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
     environment: production
-
     steps:
       - uses: actions/checkout@v4
 
