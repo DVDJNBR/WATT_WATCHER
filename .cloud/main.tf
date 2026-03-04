@@ -201,6 +201,7 @@ resource "azurerm_linux_function_app" "main" {
     "STORAGE_ACCOUNT_NAME"     = azurerm_storage_account.datalake.name
     "SQL_SERVER"               = azurerm_mssql_server.main.fully_qualified_domain_name
     "SQL_DATABASE"             = azurerm_mssql_database.warehouse.name
+    "SQL_CONNECTION_STRING"    = "Driver={ODBC Driver 18 for SQL Server};Server=${azurerm_mssql_server.main.fully_qualified_domain_name};Database=${azurerm_mssql_database.warehouse.name};Uid=${var.sql_admin_login};Pwd=${var.sql_admin_password};Encrypt=yes;TrustServerCertificate=no;"
     "AzureWebJobsFeatureFlags" = "EnableWorkerIndexing"  # required for Python v2 decorator model
   }
 
