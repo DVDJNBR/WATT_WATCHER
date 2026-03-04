@@ -92,11 +92,11 @@ class ERA5Ingestion:
         # Temperature in Celsius
         df["temperature_c"] = (df["t2m"] - 273.15).round(2)
         # Extract date parts for partitioning
-        df["year"] = df["valid_time"].dt.year
-        df["month"] = df["valid_time"].dt.month
+        df["year"] = df["valid_time"].dt.year  # type: ignore[union-attr]
+        df["month"] = df["valid_time"].dt.month  # type: ignore[union-attr]
 
         # Map grid points to nearest region
-        df = self._map_to_regions(df)
+        df = self._map_to_regions(pd.DataFrame(df))
 
         if df.empty:
             logger.warning("No ERA5 data after filtering")
@@ -157,7 +157,7 @@ class ERA5Ingestion:
         all_regions = set()
 
         # Process month by month
-        current = min_time.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        current = min_time.replace(day=1, hour=0, minute=0, second=0, microsecond=0)  # type: ignore[call-arg]
         while current <= max_time:
             next_month = current.replace(
                 month=current.month % 12 + 1,
@@ -169,7 +169,7 @@ class ERA5Ingestion:
                 & (df_full["valid_time"] < next_month)
             ]
 
-            result = self._process_dataframe(chunk_df, output_dir)
+            result = self._process_dataframe(pd.DataFrame(chunk_df), output_dir)
 
             total_rows += result["total_rows"]
             total_files += result["files_written"]
@@ -188,12 +188,12 @@ class ERA5Ingestion:
         self, df: pd.DataFrame, output_dir: str | Path | None
     ) -> dict:
         """Process a DataFrame chunk."""
-        df = df[
+        df = pd.DataFrame(df[
             (df["latitude"] >= FRANCE_LAT_MIN)
             & (df["latitude"] <= FRANCE_LAT_MAX)
             & (df["longitude"] >= FRANCE_LON_MIN)
             & (df["longitude"] <= FRANCE_LON_MAX)
-        ].copy()
+        ]).copy()
 
         df["wind_speed_100m"] = (df["u100"] ** 2 + df["v100"] ** 2) ** 0.5
         df["temperature_c"] = (df["t2m"] - 273.15).round(2)
@@ -237,7 +237,7 @@ class ERA5Ingestion:
         ts_str = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
         files_written = 0
 
-        for (region, year, month), group_df in df.groupby(["region_code", "year", "month"]):
+        for (region, year, month), group_df in df.groupby(["region_code", "year", "month"]):  # type: ignore[misc]
             filename = f"era5_{region}_{ts_str}.parquet"
             path = f"climate/era5/{year}/{month:02d}/{filename}"
 

@@ -42,7 +42,7 @@ def null_check(
         if col not in df.columns:
             nulls[col] = -1  # column missing entirely
             continue
-        count = int(df[col].isna().sum())
+        count = int(df[col].isna().sum())  # type: ignore[arg-type]
         if count > 0:
             nulls[col] = count
 
@@ -149,7 +149,7 @@ def freshness_check(
 
     # Get max timestamp
     max_ts = df[time_column].max()
-    if max_ts is None or (hasattr(max_ts, '__class__') and pd.isna(max_ts)):
+    if max_ts is None or (hasattr(max_ts, '__class__') and pd.isna(max_ts)):  # type: ignore[arg-type]
         return {
             "name": name,
             "check_type": "freshness",

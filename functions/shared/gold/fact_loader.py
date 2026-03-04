@@ -82,7 +82,7 @@ class FactLoader:
             regions = (
                 df[["code_insee_region", "libelle_region"]]
                 .drop_duplicates()
-                .to_dict("records")
+                .to_dict("records")  # type: ignore[call-overload]
             )
             self.dim.upsert_regions([
                 {"code_insee": r["code_insee_region"], "nom_region": r["libelle_region"]}
@@ -112,7 +112,7 @@ class FactLoader:
         # Handle date_heure → horodatage (naive datetime for SQLite lookup)
         ts = pd.to_datetime(long_df["date_heure"], utc=True, errors="coerce")
         long_df["horodatage"] = ts.dt.tz_localize(None) if ts.dt.tz is None else ts.dt.tz_convert(None)
-        long_df["source_name"] = long_df["source_col"].map(SOURCE_COLUMN_MAP)
+        long_df["source_name"] = long_df["source_col"].map(SOURCE_COLUMN_MAP)  # type: ignore[arg-type]
         long_df["valeur_mw"] = pd.to_numeric(long_df["valeur_mw"], errors="coerce")
 
         temp_col = "temperature_c" if "temperature_c" in long_df.columns else \

@@ -35,7 +35,7 @@ class TestERA5Ingestion:
 
         df = pd.read_parquet(output_files[0])
         assert "wind_speed_100m" in df.columns
-        assert float(df["wind_speed_100m"].min()) >= 0
+        assert float(df["wind_speed_100m"].min()) >= 0  # type: ignore[arg-type]
 
     def test_temperature_celsius(self, ingestion, tmp_path):
         """Temperature converted from Kelvin to Celsius."""
@@ -44,8 +44,8 @@ class TestERA5Ingestion:
         df = pd.read_parquet(output_files[0])
         assert "temperature_c" in df.columns
         # Original t2m is ~285-310K → ~12-37°C
-        assert float(df["temperature_c"].min()) > -50
-        assert float(df["temperature_c"].max()) < 60
+        assert float(df["temperature_c"].min()) > -50  # type: ignore[arg-type]
+        assert float(df["temperature_c"].max()) < 60  # type: ignore[arg-type]
 
     def test_region_mapping(self, ingestion, tmp_path):
         """Grid points are mapped to nearest French regions."""

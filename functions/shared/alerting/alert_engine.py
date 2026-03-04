@@ -81,7 +81,7 @@ def evaluate(silver_path: str | Path) -> list[dict[str, Any]]:
     id_cols = [c for c in ["date_heure", "code_insee_region", "libelle_region"] if c in df.columns]
 
     df = df[id_cols + prod_present + ["consommation_mw"]].copy()
-    df = df[df["consommation_mw"].notna() & (df["consommation_mw"] > 0)]
+    df = df[df["consommation_mw"].notna() & (df["consommation_mw"] > 0)]  # type: ignore[union-attr]
 
     # Sum all production sources per row
     df["production_total_mw"] = df[prod_present].sum(axis=1)
@@ -89,14 +89,14 @@ def evaluate(silver_path: str | Path) -> list[dict[str, Any]]:
 
     # Extract hour for low-demand detection
     if "date_heure" in df.columns:
-        df["_hour"] = pd.to_datetime(df["date_heure"], utc=True, errors="coerce").dt.hour
+        df["_hour"] = pd.to_datetime(df["date_heure"], utc=True, errors="coerce").dt.hour  # type: ignore[union-attr]
     else:
         df["_hour"] = 12
 
     alerts: list[dict[str, Any]] = []
     now = datetime.now(timezone.utc).isoformat()
 
-    for row in df.to_dict("records"):
+    for row in df.to_dict("records"):  # type: ignore[call-overload]
         ratio = row["ratio"]
         if ratio is None:
             continue

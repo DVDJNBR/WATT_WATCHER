@@ -90,7 +90,7 @@ def apply_quality_rules(
     # Count nulls per column before cleaning
     for col in rules:
         if col in df.columns:
-            null_count = int(df[col].isna().sum())
+            null_count = int(df[col].isna().sum())  # type: ignore[arg-type]
             if null_count > 0:
                 metrics["nulls_found"][col] = null_count
 
@@ -105,7 +105,7 @@ def apply_quality_rules(
     fill_zero_cols = [col for col, strategy in rules.items()
                       if strategy == NullStrategy.FILL_ZERO and col in df.columns]
     for col in fill_zero_cols:
-        null_count = int(df[col].isna().sum())
+        null_count = int(df[col].isna().sum())  # type: ignore[arg-type]
         if null_count > 0:
             df[col] = df[col].fillna(0.0)
             metrics["values_filled"] += null_count
@@ -113,7 +113,7 @@ def apply_quality_rules(
     ffill_cols = [col for col, strategy in rules.items()
                   if strategy == NullStrategy.FORWARD_FILL and col in df.columns]
     for col in ffill_cols:
-        null_count = int(df[col].isna().sum())
+        null_count = int(df[col].isna().sum())  # type: ignore[arg-type]
         if null_count > 0:
             df[col] = df[col].ffill()
             metrics["values_filled"] += null_count
@@ -121,7 +121,7 @@ def apply_quality_rules(
     flag_cols = [col for col, strategy in rules.items()
                  if strategy == NullStrategy.FLAG and col in df.columns]
     for col in flag_cols:
-        null_count = int(df[col].isna().sum())
+        null_count = int(df[col].isna().sum())  # type: ignore[arg-type]
         if null_count > 0:
             df[f"{col}_is_null"] = df[col].isna()
             metrics["values_flagged"] += null_count

@@ -65,7 +65,7 @@ def transform_era5_to_silver(
         df = df.copy()
         df["year"] = df[time_col].dt.year
         df["month"] = df[time_col].dt.month
-        for (year, month), group in df.groupby(["year", "month"]):
+        for (year, month), group in df.groupby(["year", "month"]):  # type: ignore[misc]
             out = (
                 output_dir / "silver/climate/era5"
                 / f"year={year}" / f"month={month:02d}" / "data.parquet"

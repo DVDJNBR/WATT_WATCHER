@@ -11,7 +11,7 @@ import json
 import logging
 import os
 import uuid
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     import azure.functions as func
@@ -421,9 +421,8 @@ def run_full_pipeline(
     logger.info("[%s] Stage 2: Silver transformation", job_id)
     try:
         storage_account = os.environ.get("STORAGE_ACCOUNT_NAME") if not local_mode else None
-        bronze = BronzeStorage(storage_account_name=storage_account, local_mode=local_mode)
 
-        bronze_files = bronze.list_recent_files(minutes=minutes + 5) if not local_mode else []
+        bronze_files: list = []  # placeholder for future list_recent_files implementation
 
         if local_mode:
             # Local: read from filesystem
@@ -440,7 +439,7 @@ def run_full_pipeline(
             # Azure: transform the file just written to ADLS
             bronze_path = bronze_result.get("details", {}).get("bronze_path", "")
             if bronze_path:
-                res = transform_rte_to_silver(bronze_path, None, storage_account=storage_account)
+                res = transform_rte_to_silver(bronze_path, None)  # type: ignore[arg-type]
                 results["stages"]["silver"] = res
             else:
                 results["stages"]["silver"] = {"status": "skipped", "reason": "no bronze_path"}

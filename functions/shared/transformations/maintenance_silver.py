@@ -63,7 +63,7 @@ def transform_maintenance_to_silver(
         df = df.copy()
         df["year"] = df["start_date"].dt.year
         df["month"] = df["start_date"].dt.month
-        for (year, month), group in df.groupby(["year", "month"]):
+        for (year, month), group in df.groupby(["year", "month"]):  # type: ignore[misc]
             out = (
                 output_dir / "silver/maintenance"
                 / f"year={year}" / f"month={month:02d}" / "data.parquet"

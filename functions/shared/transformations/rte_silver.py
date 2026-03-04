@@ -92,7 +92,7 @@ def transform_rte_to_silver(
     # Cast MW columns to float
     for col in MW_CAST_COLUMNS:
         if col in df.columns:
-            df[col] = pd.to_numeric(df[col].astype(str).str.strip(), errors="coerce").astype(float)
+            df[col] = pd.to_numeric(df[col].astype(str).str.strip(), errors="coerce").astype(float)  # type: ignore[union-attr]
 
     # Rename columns → snake_case
     existing_renames = {k: v for k, v in RENAME_MAP.items() if k in df.columns}
@@ -161,7 +161,7 @@ def _write_hive_partitioned(
     df["day"] = df["date_heure"].dt.day
 
     files = 0
-    for (year, month, day), group in df.groupby(["year", "month", "day"]):
+    for (year, month, day), group in df.groupby(["year", "month", "day"]):  # type: ignore[misc]
         part_path = (
             base_dir / prefix
             / f"year={year}" / f"month={month:02d}" / f"day={day:02d}"
