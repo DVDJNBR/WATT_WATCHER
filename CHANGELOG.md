@@ -1,3 +1,9 @@
+## [1.3.3](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.3.2...v1.3.3) (2026-03-05)
+
+### Bug Fixes
+
+* **deps:** add pyarrow to Azure Function requirements ([cd4a44b](https://github.com/DVDJNBR/WATT_WATCHER/commit/cd4a44b86502b50fcc8fd94dbd04d4f417d7df2f))
+
 ## [1.3.2](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.3.1...v1.3.2) (2026-03-05)
 
 ### Bug Fixes
