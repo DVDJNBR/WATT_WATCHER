@@ -25,6 +25,7 @@ def build_production_query(
     source_type: Optional[str] = None,
     limit: int = 100,
     offset: int = 0,
+    is_sqlite: bool = False,
 ) -> tuple[str, list]:
     """
     Build parameterized SQL query for production data.
@@ -35,6 +36,9 @@ def build_production_query(
     Note: LIMIT is applied on raw rows (one per source). Multiply by 10 to
     ensure enough rows are fetched before aggregation into (region, timestamp)
     records. Final pagination is applied in query_production() after aggregation.
+
+    Args:
+        is_sqlite: Use LIMIT syntax (SQLite) vs TOP syntax (SQL Server).
     """
     where_clauses: list[str] = []
     params: list[Any] = []
@@ -61,23 +65,44 @@ def build_production_query(
     # enough raw rows are fetched to build `limit` aggregated records after pivot.
     sql_limit = (offset + limit) * 10
 
-    sql = f"""
-        SELECT
-            r.code_insee,
-            r.nom_region,
-            t.horodatage,
-            s.source_name,
-            f.valeur_mw,
-            f.facteur_charge
-        FROM FACT_ENERGY_FLOW f
-        JOIN DIM_REGION r ON f.id_region = r.id_region
-        JOIN DIM_TIME t ON f.id_date = t.id_date
-        JOIN DIM_SOURCE s ON f.id_source = s.id_source
-        {where}
-        ORDER BY t.horodatage ASC, r.code_insee
-        LIMIT ?
-    """
-    params.append(sql_limit)
+    if is_sqlite:
+        # SQLite: LIMIT clause at end
+        sql = f"""
+            SELECT
+                r.code_insee,
+                r.nom_region,
+                t.horodatage,
+                s.source_name,
+                f.valeur_mw,
+                f.facteur_charge
+            FROM FACT_ENERGY_FLOW f
+            JOIN DIM_REGION r ON f.id_region = r.id_region
+            JOIN DIM_TIME t ON f.id_date = t.id_date
+            JOIN DIM_SOURCE s ON f.id_source = s.id_source
+            {where}
+            ORDER BY t.horodatage ASC, r.code_insee
+            LIMIT ?
+        """
+        params.append(sql_limit)
+    else:
+        # SQL Server: TOP clause at top of SELECT (? placeholder before WHERE params)
+        sql = f"""
+            SELECT TOP(?)
+                r.code_insee,
+                r.nom_region,
+                t.horodatage,
+                s.source_name,
+                f.valeur_mw,
+                f.facteur_charge
+            FROM FACT_ENERGY_FLOW f
+            JOIN DIM_REGION r ON f.id_region = r.id_region
+            JOIN DIM_TIME t ON f.id_date = t.id_date
+            JOIN DIM_SOURCE s ON f.id_source = s.id_source
+            {where}
+            ORDER BY t.horodatage ASC, r.code_insee
+        """
+        params.insert(0, sql_limit)
+
     return sql, params
 
 
@@ -133,8 +158,12 @@ def query_production(
     """
     request_id = request_id or str(uuid.uuid4())
 
+    import sqlite3
+    is_sqlite = isinstance(conn, sqlite3.Connection)
+
     sql, params = build_production_query(
-        region_code, start_date, end_date, source_type, limit, offset
+        region_code, start_date, end_date, source_type, limit, offset,
+        is_sqlite=is_sqlite,
     )
 
     cursor = conn.cursor()

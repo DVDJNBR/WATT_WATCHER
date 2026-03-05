@@ -191,17 +191,24 @@ class TestRoutes:
 # ─── Task 5.1: production_service unit tests ─────────────────────────────────
 
 class TestProductionService:
-    def test_build_query_no_filters(self):
-        sql, params = build_production_query()
+    def test_build_query_no_filters_sqlite(self):
+        sql, params = build_production_query(is_sqlite=True)
         assert "FACT_ENERGY_FLOW" in sql
-        # OFFSET is applied in Python after aggregation, not in SQL
         assert "LIMIT ?" in sql
         assert "OFFSET ?" not in sql
         # sql_limit = (offset=0 + limit=100) * 10 = 1000
         assert params[-1] == 1000
 
+    def test_build_query_no_filters_sqlserver(self):
+        sql, params = build_production_query(is_sqlite=False)
+        assert "FACT_ENERGY_FLOW" in sql
+        assert "TOP(?)" in sql.replace(" ", "")
+        assert "LIMIT" not in sql
+        # sql_limit is first param for TOP(?)
+        assert params[0] == 1000
+
     def test_build_query_with_region(self):
-        sql, params = build_production_query(region_code="11")
+        sql, params = build_production_query(region_code="11", is_sqlite=True)
         assert "r.code_insee = ?" in sql
         assert "11" in params
 
@@ -213,6 +220,7 @@ class TestProductionService:
             source_type="eolien",
             limit=50,
             offset=10,
+            is_sqlite=True,
         )
         assert params.count("11") == 1
         assert "2025-06-01" in params
