@@ -253,6 +253,45 @@ class TestKeyLoading:
         assert key2 == "key-v2"
 
 
+# ─── KeyVaultClient initialization fallback ──────────────────────────────────
+
+class TestKeyVaultClientFallback:
+    """Jules suggestion: test KeyVaultClient fallback when Azure SDK raises."""
+
+    def test_init_without_vault_url_is_env_only_mode(self):
+        """No vault URL → _client is None, get_secret uses env vars."""
+        from shared.keyvault import KeyVaultClient
+        with patch.dict(os.environ, {}, clear=True):
+            os.environ.pop("KEY_VAULT_URL", None)
+            kv = KeyVaultClient(vault_url=None)
+        assert kv._client is None
+
+    def test_init_azure_sdk_exception_falls_back_gracefully(self):
+        """Azure SDK raises on init → _client stays None, no exception propagated."""
+        from shared.keyvault import KeyVaultClient
+        # Simulate DefaultAzureCredential raising during KeyVaultClient.__init__
+        with patch("azure.identity.DefaultAzureCredential", side_effect=Exception("credential error")):
+            # Must not raise even though credential fails
+            kv = KeyVaultClient(vault_url="https://vault.example.com/")
+        assert kv._client is None  # gracefully fell back
+
+    def test_get_secret_falls_back_to_env_when_no_client(self):
+        """_client is None → get_secret reads from env var."""
+        from shared.keyvault import KeyVaultClient
+        kv = KeyVaultClient(vault_url=None)
+        with patch.dict(os.environ, {"MY_SECRET": "env-value"}):
+            val = kv.get_secret("MY-SECRET", env_fallback="MY_SECRET")
+        assert val == "env-value"
+
+    def test_get_secret_returns_none_when_not_found(self):
+        """No client, no env var → returns None without raising."""
+        from shared.keyvault import KeyVaultClient
+        kv = KeyVaultClient(vault_url=None)
+        with patch.dict(os.environ, {}, clear=True):
+            val = kv.get_secret("NONEXISTENT_SECRET")
+        assert val is None
+
+
 # ─── AC #3: Applied to all non-public endpoints ───────────────────────────────
 
 class TestRoutesAuth:

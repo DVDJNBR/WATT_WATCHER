@@ -139,85 +139,102 @@ class DimLoader:
         Returns:
             Number of rows upserted.
         """
+        if not regions:
+            return 0
         cursor = self.conn.cursor()
-        count = 0
-        for r in regions:
-            if self._is_sqlite:
+        rows = [
+            (r["code_insee"], r["nom_region"], r.get("population"), r.get("superficie_km2"))
+            for r in regions
+        ]
+        if self._is_sqlite:
+            cursor.executemany(
+                """INSERT INTO DIM_REGION (code_insee, nom_region, population, superficie_km2)
+                   VALUES (?, ?, ?, ?)
+                   ON CONFLICT(code_insee) DO UPDATE SET
+                       nom_region = excluded.nom_region,
+                       population = excluded.population,
+                       superficie_km2 = excluded.superficie_km2""",
+                rows,
+            )
+        else:
+            # SQL Server: batch MERGE via VALUES table constructor (max ~300 rows / 2100 params)
+            BATCH = 200
+            for i in range(0, len(rows), BATCH):
+                chunk = rows[i:i + BATCH]
+                placeholders = ",".join(["(?,?,?,?)"] * len(chunk))
+                params = [v for row in chunk for v in row]
                 cursor.execute(
-                    """INSERT INTO DIM_REGION (code_insee, nom_region, population, superficie_km2)
-                       VALUES (?, ?, ?, ?)
-                       ON CONFLICT(code_insee) DO UPDATE SET
-                           nom_region = excluded.nom_region,
-                           population = excluded.population,
-                           superficie_km2 = excluded.superficie_km2""",
-                    (r["code_insee"], r["nom_region"],
-                     r.get("population"), r.get("superficie_km2")),
+                    f"""MERGE DIM_REGION AS t
+                        USING (VALUES {placeholders})
+                            AS s(code_insee, nom_region, population, superficie_km2)
+                        ON t.code_insee = s.code_insee
+                        WHEN MATCHED THEN UPDATE SET
+                            nom_region = s.nom_region,
+                            population = s.population,
+                            superficie_km2 = s.superficie_km2
+                        WHEN NOT MATCHED THEN INSERT
+                            (code_insee, nom_region, population, superficie_km2)
+                            VALUES (s.code_insee, s.nom_region, s.population, s.superficie_km2);""",
+                    params,
                 )
-            else:
-                # T-SQL MERGE for Azure SQL
-                cursor.execute(
-                    """MERGE DIM_REGION AS t
-                       USING (VALUES (?, ?, ?, ?))
-                           AS s(code_insee, nom_region, population, superficie_km2)
-                       ON t.code_insee = s.code_insee
-                       WHEN MATCHED THEN UPDATE SET
-                           nom_region = s.nom_region,
-                           population = s.population,
-                           superficie_km2 = s.superficie_km2
-                       WHEN NOT MATCHED THEN INSERT
-                           (code_insee, nom_region, population, superficie_km2)
-                           VALUES (s.code_insee, s.nom_region, s.population, s.superficie_km2);""",
-                    (r["code_insee"], r["nom_region"],
-                     r.get("population"), r.get("superficie_km2")),
-                )
-            count += 1
         self.conn.commit()
-        logger.info("Upserted %d regions", count)
-        return count
+        logger.info("Upserted %d regions", len(rows))
+        return len(rows)
 
     def upsert_time(self, timestamps: list[str]) -> int:
         """
         Upsert DIM_TIME entries from timestamp strings.
 
+        Batched to avoid N+1 queries: one MERGE for all timestamps.
+
         Args:
             timestamps: ISO 8601 datetime strings.
         """
-        cursor = self.conn.cursor()
-        count = 0
+        rows = []
         for ts_str in timestamps:
             try:
                 ts = datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
             except (ValueError, AttributeError):
+                logger.debug("Skipping unparseable timestamp: %r", ts_str)
                 continue
-
-            params = (
+            rows.append((
                 ts_str, ts.day, ts.month, ts.year, ts.hour,
                 ts.isoweekday(), 1 if ts.isoweekday() >= 6 else 0,
+            ))
+
+        if not rows:
+            return 0
+
+        cursor = self.conn.cursor()
+        if self._is_sqlite:
+            cursor.executemany(
+                """INSERT INTO DIM_TIME
+                   (horodatage, jour, mois, annee, heure, jour_semaine, est_weekend)
+                   VALUES (?, ?, ?, ?, ?, ?, ?)
+                   ON CONFLICT(horodatage) DO NOTHING""",
+                rows,
             )
-            if self._is_sqlite:
+        else:
+            # SQL Server: batch MERGE (7 params/row → max 300 rows per batch)
+            BATCH = 200
+            for i in range(0, len(rows), BATCH):
+                chunk = rows[i:i + BATCH]
+                placeholders = ",".join(["(?,?,?,?,?,?,?)"] * len(chunk))
+                params = [v for row in chunk for v in row]
                 cursor.execute(
-                    """INSERT INTO DIM_TIME
-                       (horodatage, jour, mois, annee, heure, jour_semaine, est_weekend)
-                       VALUES (?, ?, ?, ?, ?, ?, ?)
-                       ON CONFLICT(horodatage) DO NOTHING""",
+                    f"""MERGE DIM_TIME AS t
+                        USING (VALUES {placeholders})
+                            AS s(horodatage, jour, mois, annee, heure, jour_semaine, est_weekend)
+                        ON t.horodatage = s.horodatage
+                        WHEN NOT MATCHED THEN INSERT
+                            (horodatage, jour, mois, annee, heure, jour_semaine, est_weekend)
+                            VALUES (s.horodatage, s.jour, s.mois, s.annee,
+                                    s.heure, s.jour_semaine, s.est_weekend);""",
                     params,
                 )
-            else:
-                cursor.execute(
-                    """MERGE DIM_TIME AS t
-                       USING (VALUES (?, ?, ?, ?, ?, ?, ?))
-                           AS s(horodatage, jour, mois, annee, heure, jour_semaine, est_weekend)
-                       ON t.horodatage = s.horodatage
-                       WHEN NOT MATCHED THEN INSERT
-                           (horodatage, jour, mois, annee, heure, jour_semaine, est_weekend)
-                           VALUES (s.horodatage, s.jour, s.mois, s.annee,
-                                   s.heure, s.jour_semaine, s.est_weekend);""",
-                    params,
-                )
-            count += 1
         self.conn.commit()
-        logger.info("Upserted %d time entries", count)
-        return count
+        logger.info("Upserted %d time entries", len(rows))
+        return len(rows)
 
     def upsert_sources(self, sources: list[dict] | None = None) -> int:
         """

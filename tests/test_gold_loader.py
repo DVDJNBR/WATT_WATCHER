@@ -99,6 +99,34 @@ class TestDimLoader:
         cursor.execute("SELECT est_weekend FROM DIM_TIME WHERE horodatage = '2025-06-15T10:00:00+00:00'")
         assert cursor.fetchone()[0] == 1
 
+    def test_upsert_time_skips_invalid_timestamps(self, dim):
+        """Malformed timestamps are silently skipped, valid ones still inserted."""
+        count = dim.upsert_time([
+            "not-a-date",
+            "2025-06-15T10:00:00+00:00",  # valid
+            "",
+            None,
+            "9999-99-99T99:99:99",
+        ])
+        # Only the valid timestamp is inserted
+        assert count == 1
+        assert dim.get_time_id("2025-06-15T10:00:00+00:00") is not None
+
+    def test_upsert_time_all_invalid_returns_zero(self, dim):
+        """All invalid timestamps → returns 0 without raising."""
+        count = dim.upsert_time(["garbage", "also-garbage"])
+        assert count == 0
+
+    def test_upsert_time_empty_list(self, dim):
+        """Empty list → returns 0."""
+        count = dim.upsert_time([])
+        assert count == 0
+
+    def test_upsert_regions_empty_list(self, dim):
+        """Empty regions list → returns 0 without error."""
+        count = dim.upsert_regions([])
+        assert count == 0
+
 
 # ─── Fact Loader Tests ───────────────────────────────────────────────────────
 

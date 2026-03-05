@@ -133,8 +133,8 @@ class FactLoader:
                 try:
                     ts = _dt.fromisoformat(str(ts_str).replace("Z", "+00:00").replace(" UTC", "+00:00"))
                     time_map[ts.replace(tzinfo=None)] = id_date
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug("Could not parse timestamp %r for time_map: %s", ts_str, e)
             cursor0.execute("SELECT id_source, source_name FROM DIM_SOURCE")
             source_map = {r[1]: r[0] for r in cursor0.fetchall()}
             params = []
