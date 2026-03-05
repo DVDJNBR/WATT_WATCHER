@@ -1,3 +1,9 @@
+## [1.3.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.2.12...v1.3.0) (2026-03-05)
+
+### Features
+
+* **auth:** replace JWT/Azure AD with API key authentication ([3e96b1e](https://github.com/DVDJNBR/WATT_WATCHER/commit/3e96b1ebd8e17e3d90dc4968b97816abfd578e5c))
+
 ## [1.2.12](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.2.11...v1.2.12) (2026-03-04)
 
 ### Bug Fixes
