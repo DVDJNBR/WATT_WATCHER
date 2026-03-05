@@ -1,3 +1,9 @@
+## [1.3.1](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.3.0...v1.3.1) (2026-03-05)
+
+### Bug Fixes
+
+* **api:** use TOP(?) for SQL Server instead of LIMIT (SQLite-only syntax) ([19f1e84](https://github.com/DVDJNBR/WATT_WATCHER/commit/19f1e84b3d08eab0f3ffa626dd1dd8ad2190799f))
+
 ## [1.3.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.2.12...v1.3.0) (2026-03-05)
 
 ### Features
