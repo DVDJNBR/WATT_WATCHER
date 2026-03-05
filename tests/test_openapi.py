@@ -170,31 +170,31 @@ class TestEndpointCoverage:
 # ─── Task 4.3: Security documentation ────────────────────────────────────────
 
 class TestSecurityDocumentation:
-    """AC #3: BearerAuth scheme documented; protected endpoints marked."""
+    """AC #3: ApiKeyAuth scheme documented; protected endpoints marked."""
 
-    def test_bearer_auth_scheme_defined(self, spec):
+    def test_apikey_auth_scheme_defined(self, spec):
         schemes = spec["components"]["securitySchemes"]
-        assert "BearerAuth" in schemes
-        scheme = schemes["BearerAuth"]
-        assert scheme["type"] == "http"
-        assert scheme["scheme"] == "bearer"
-        assert scheme["bearerFormat"] == "JWT"
+        assert "ApiKeyAuth" in schemes
+        scheme = schemes["ApiKeyAuth"]
+        assert scheme["type"] == "apiKey"
+        assert scheme["in"] == "header"
+        assert scheme["name"] == "X-Api-Key"
 
-    def test_bearer_auth_has_description(self, spec):
-        scheme = spec["components"]["securitySchemes"]["BearerAuth"]
+    def test_apikey_auth_has_description(self, spec):
+        scheme = spec["components"]["securitySchemes"]["ApiKeyAuth"]
         assert "description" in scheme
-        assert "Azure AD" in scheme["description"] or "AZURE_AD" in scheme["description"]
+        assert len(scheme["description"]) > 0
 
     def test_production_endpoint_requires_auth(self, spec):
         """AC #3: Protected endpoint has security requirement."""
         security = spec["paths"]["/v1/production/regional"]["get"].get("security", [])
         assert len(security) > 0
-        assert any("BearerAuth" in s for s in security)
+        assert any("ApiKeyAuth" in s for s in security)
 
     def test_export_endpoint_requires_auth(self, spec):
         security = spec["paths"]["/v1/export/csv"]["get"].get("security", [])
         assert len(security) > 0
-        assert any("BearerAuth" in s for s in security)
+        assert any("ApiKeyAuth" in s for s in security)
 
     def test_health_endpoint_is_public(self, spec):
         """AC #3: /health has security: [] (explicitly public)."""
@@ -203,10 +203,9 @@ class TestSecurityDocumentation:
             "/health should have security: [] to explicitly opt out of global auth"
 
     def test_api_description_mentions_auth(self, spec):
-        """AC #3: Token acquisition instructions in API description."""
+        """AC #3: Auth method documented in API description."""
         description = spec["info"]["description"]
-        assert "Bearer" in description or "JWT" in description
-        assert "Azure AD" in description or "AZURE_AD" in description
+        assert "X-Api-Key" in description or "API key" in description.lower()
 
 
 # ─── Task 4.2: Swagger UI HTML ───────────────────────────────────────────────

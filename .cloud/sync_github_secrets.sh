@@ -23,12 +23,24 @@ PUBLISH_PROFILE=$(az functionapp deployment list-publishing-profiles \
   --resource-group "$RG" \
   --xml)
 
+echo "Fetching API key from Key Vault..."
+KV_NAME=$(terraform output -raw key_vault_name 2>/dev/null || echo "watt-watcher-key-vault")
+VITE_API_KEY=$(az keyvault secret show \
+  --vault-name "$KV_NAME" \
+  --name "API-KEY" \
+  --query "value" -o tsv 2>/dev/null || echo "")
+
 echo "Updating GitHub secrets on $REPO..."
 gh secret set AZURE_FUNCTIONAPP_NAME    --body "$FUNC_APP_NAME"       --repo "$REPO"
 gh secret set AZURE_FUNCTIONS_URL       --body "$FUNC_APP_URL"        --repo "$REPO"
 gh secret set AZURE_FRONTEND_STORAGE_NAME --body "$FRONTEND_STORAGE_NAME" --repo "$REPO"
 gh secret set AZURE_FRONTEND_STORAGE_KEY  --body "$FRONTEND_STORAGE_KEY"  --repo "$REPO"
 gh secret set AZURE_FUNCTIONAPP_PUBLISH_PROFILE --body "$PUBLISH_PROFILE" --repo "$REPO"
+if [ -n "$VITE_API_KEY" ]; then
+  gh secret set VITE_API_KEY --body "$VITE_API_KEY" --repo "$REPO"
+else
+  echo "Warning: could not read API-KEY from Key Vault — set VITE_API_KEY manually"
+fi
 
 echo ""
 echo "Done. Secrets updated:"
@@ -37,3 +49,4 @@ echo "  AZURE_FUNCTIONS_URL             = $FUNC_APP_URL"
 echo "  AZURE_FRONTEND_STORAGE_NAME     = $FRONTEND_STORAGE_NAME"
 echo "  AZURE_FRONTEND_STORAGE_KEY      = (hidden)"
 echo "  AZURE_FUNCTIONAPP_PUBLISH_PROFILE = (hidden)"
+echo "  VITE_API_KEY                    = (hidden)"

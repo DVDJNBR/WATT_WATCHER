@@ -1,13 +1,12 @@
 """
-JWT Authentication — Story 4.2, Tasks 1 & 2
+API Key Authentication — Story 4.2
 
-Azure AD JWT validation with RS256 + JWKS endpoint.
-@require_auth decorator for Azure Function HTTP triggers.
+Validates the X-Api-Key header against the secret stored in Key Vault.
+Falls back to the API_KEY environment variable for local development.
 
-AC #1: 401 on missing/invalid Authorization header.
-AC #2: Token validated against Azure AD JWKS.
-AC #3: 401 + descriptive message for expired/tampered tokens.
-AC #4: Applied to all non-public endpoints.
+AC #1: 401 on missing/invalid X-Api-Key header.
+AC #2: Valid key → handler called.
+AC #3: Applied to all non-public endpoints.
 """
 
 import functools
@@ -19,251 +18,93 @@ from typing import Any, Callable, Optional
 
 logger = logging.getLogger(__name__)
 
-try:
-    import jwt as pyjwt
-    from jwt.algorithms import RSAAlgorithm
-    HAS_JWT = True
-except ImportError:
-    pyjwt = None  # type: ignore[assignment]
-    HAS_JWT = False
-
-try:
-    import requests as _requests
-    HAS_REQUESTS = True
-except ImportError:
-    _requests = None  # type: ignore[assignment]
-    HAS_REQUESTS = False
+# Module-level cache — loaded once per cold start
+_api_key: Optional[str] = None
 
 
-# ─── Auth error ──────────────────────────────────────────────────────────────
-
-class AuthError(Exception):
-    """JWT validation failure — maps to HTTP 401."""
-
-    def __init__(self, message: str):
-        super().__init__(message)
-        self.message = message
-
-
-# ─── JWT Validator ───────────────────────────────────────────────────────────
-
-class JWTValidator:
+def _load_api_key() -> str:
     """
-    Azure AD RS256 JWT validator.
-
-    Fetches public keys from the Azure AD JWKS endpoint and validates:
-    - Signature (RS256 via JWKS)
-    - Issuer  (iss == https://login.microsoftonline.com/{tenant_id}/v2.0)
-    - Audience (aud == client_id)
-    - Expiration (exp) and not-before (nbf)
-
-    Task 3.3: JWKS URI is derived from AZURE_AD_TENANT_ID env var.
+    Load the API key from Key Vault (production) or env var (local dev).
+    Cached after first load.
     """
+    global _api_key
+    if _api_key is not None:
+        return _api_key
 
-    def __init__(
-        self,
-        tenant_id: str,
-        client_id: str,
-        jwks_override: Optional[dict] = None,
-    ):
-        """
-        Args:
-            tenant_id: Azure AD tenant ID (AZURE_AD_TENANT_ID).
-            client_id: App Registration client ID = expected audience (AZURE_AD_CLIENT_ID).
-            jwks_override: Inject JWKS directly — used in tests to avoid HTTP calls.
-        """
-        self.tenant_id = tenant_id
-        self.client_id = client_id
-        self.issuer = f"https://login.microsoftonline.com/{tenant_id}/v2.0"
-        self.jwks_uri = (
-            f"https://login.microsoftonline.com/{tenant_id}/discovery/v2.0/keys"
-        )
-        self._jwks_cache: Optional[dict] = jwks_override
-
-    def validate(self, token: str) -> dict:
-        """
-        Validate a Bearer token and return verified claims.
-
-        Raises:
-            AuthError: on any validation failure (expired, tampered, missing key…).
-        """
-        if not HAS_JWT:
-            raise AuthError("PyJWT not available")
-
+    # Try Key Vault first (production)
+    key_vault_url = os.environ.get("KEY_VAULT_URL")
+    if key_vault_url:
         try:
-            header = pyjwt.get_unverified_header(token)  # type: ignore[union-attr]
-        except pyjwt.DecodeError as exc:  # type: ignore[union-attr]
-            raise AuthError(f"Malformed token: {exc}") from exc
-
-        alg = header.get("alg", "")
-        if alg != "RS256":
-            raise AuthError(f"Unsupported algorithm: {alg!r} (expected RS256)")
-
-        kid = header.get("kid")
-
-        try:
-            public_key = self._get_public_key(kid)
+            from shared.keyvault import KeyVaultClient
+            kv = KeyVaultClient(vault_url=key_vault_url)
+            value = kv.get_secret("API-KEY")
+            if value:
+                _api_key = value
+                logger.info("API key loaded from Key Vault")
+                return _api_key
         except Exception as exc:
-            raise AuthError(f"Cannot retrieve signing key: {exc}") from exc
+            logger.warning("Could not load API key from Key Vault: %s", exc)
 
-        try:
-            claims: dict = pyjwt.decode(  # type: ignore[union-attr]
-                token,
-                public_key,
-                algorithms=["RS256"],
-                audience=self.client_id,
-                options={"verify_exp": True, "verify_nbf": True, "verify_iss": True},
-                issuer=self.issuer,
-            )
-        except pyjwt.ExpiredSignatureError as exc:  # type: ignore[union-attr]
-            raise AuthError("Token has expired") from exc
-        except pyjwt.InvalidAudienceError as exc:  # type: ignore[union-attr]
-            raise AuthError("Invalid token audience") from exc
-        except pyjwt.InvalidIssuerError as exc:  # type: ignore[union-attr]
-            raise AuthError("Invalid token issuer") from exc
-        except pyjwt.InvalidSignatureError as exc:  # type: ignore[union-attr]
-            raise AuthError("Invalid token signature") from exc
-        except pyjwt.DecodeError as exc:  # type: ignore[union-attr]
-            raise AuthError(f"Token decode error: {exc}") from exc
-        except pyjwt.InvalidTokenError as exc:  # type: ignore[union-attr]
-            raise AuthError(f"Invalid token: {exc}") from exc
+    # Fallback: env var (local dev)
+    value = os.environ.get("API_KEY", "")
+    if not value:
+        raise EnvironmentError("API key not configured (Key Vault: API-KEY or env: API_KEY)")
 
-        return claims
-
-    def _get_public_key(self, kid: Optional[str]) -> Any:
-        """Fetch (and cache) JWKS; return public key matching kid."""
-        if self._jwks_cache is None:
-            if not HAS_REQUESTS:
-                raise RuntimeError("requests not available to fetch JWKS")
-            resp = _requests.get(self.jwks_uri, timeout=5)  # type: ignore[union-attr]
-            resp.raise_for_status()
-            self._jwks_cache = resp.json()
-
-        jwks = self._jwks_cache
-        assert jwks is not None
-        keys = jwks.get("keys", [])
-
-        # Match by kid; fallback to first key if kid is absent
-        for key_data in keys:
-            if kid is None or key_data.get("kid") == kid:
-                return RSAAlgorithm.from_jwk(key_data)  # type: ignore[possibly-undefined]
-
-        if keys:
-            return RSAAlgorithm.from_jwk(keys[0])  # type: ignore[possibly-undefined]
-
-        raise ValueError("No keys found in JWKS response")
+    _api_key = value
+    logger.info("API key loaded from environment variable")
+    return _api_key
 
 
-# ─── Module-level validator (one instance per function host cold-start) ───────
-
-_validator: Optional[JWTValidator] = None
-
-
-def get_validator(jwks_override: Optional[dict] = None) -> JWTValidator:
-    """
-    Return (or create) the module-level JWTValidator.
-
-    Task 3.2: Reads AZURE_AD_TENANT_ID + AZURE_AD_CLIENT_ID from env.
-    jwks_override bypasses the JWKS HTTP call for tests.
-    """
-    global _validator
-
-    if jwks_override is not None:
-        # Test mode: fresh validator with injected JWKS
-        return JWTValidator(
-            tenant_id=os.environ.get("AZURE_AD_TENANT_ID", "test-tenant"),
-            client_id=os.environ.get("AZURE_AD_CLIENT_ID", "test-client"),
-            jwks_override=jwks_override,
-        )
-
-    if _validator is None:
-        tenant_id = os.environ.get("AZURE_AD_TENANT_ID", "")
-        client_id = os.environ.get("AZURE_AD_CLIENT_ID", "")
-        if not tenant_id or not client_id:
-            raise EnvironmentError(
-                "AZURE_AD_TENANT_ID and AZURE_AD_CLIENT_ID must be configured"
-            )
-        _validator = JWTValidator(tenant_id=tenant_id, client_id=client_id)
-
-    return _validator
-
-
-def reset_validator() -> None:
-    """Clear the cached validator (useful in tests that change env vars)."""
-    global _validator
-    _validator = None
-
-
-# ─── Token extraction ─────────────────────────────────────────────────────────
-
-def extract_bearer_token(authorization_header: str) -> Optional[str]:
-    """
-    Parse 'Authorization: Bearer <token>' and return the raw token.
-    Returns None if the header is absent or malformed.
-    """
-    if not authorization_header:
-        return None
-    parts = authorization_header.split(None, 1)
-    if len(parts) == 2 and parts[0].lower() == "bearer":
-        return parts[1]
-    return None
+def reset_api_key() -> None:
+    """Clear cached key — used in tests."""
+    global _api_key
+    _api_key = None
 
 
 # ─── @require_auth decorator ─────────────────────────────────────────────────
 
 def require_auth(handler: Callable) -> Callable:
     """
-    Decorator that enforces Azure AD JWT authentication on HTTP trigger handlers.
+    Decorator that enforces API key authentication on HTTP trigger handlers.
 
-    AC #1: Missing / malformed Authorization header → 401.
-    AC #2: Valid token → claims extracted, handler called.
-    AC #3: Expired or tampered token → 401 with descriptive message.
+    Clients must send:  X-Api-Key: <key>
 
-    Usage (inside `if AZURE_FUNCTIONS_AVAILABLE:` block):
-
-        @app.route(route=ROUTE_PRODUCTION, methods=["GET"],
-                   auth_level=func.AuthLevel.ANONYMOUS)
-        @require_auth
-        def get_production_regional(req: func.HttpRequest) -> func.HttpResponse:
-            ...
+    AC #1: Missing or wrong key → 401.
+    AC #2: Valid key → handler called.
     """
     @functools.wraps(handler)
     def wrapper(req: Any) -> Any:
         request_id = str(uuid.uuid4())
 
-        auth_header = ""
+        provided_key = ""
         if hasattr(req, "headers"):
-            auth_header = req.headers.get("Authorization", "")
+            provided_key = req.headers.get("X-Api-Key", "")
 
-        token = extract_bearer_token(auth_header)
-
-        if not token:
-            return _make_401(
-                "Missing or invalid Authorization header — Bearer token required",
-                request_id,
-            )
+        if not provided_key:
+            return _make_401("Missing X-Api-Key header", request_id)
 
         try:
-            validator = get_validator()
-            claims = validator.validate(token)
-            # Attach claims for optional use by the handler
-            try:
-                req._auth_claims = claims  # type: ignore[attr-defined]
-            except (AttributeError, TypeError):
-                pass  # immutable req in some test mocks — harmless
+            expected_key = _load_api_key()
         except EnvironmentError as exc:
             logger.error("Auth config error [%s]: %s", request_id, exc)
             return _make_401("Authentication service misconfigured", request_id)
-        except AuthError as exc:
-            return _make_401(exc.message, request_id)
+
+        if not _secure_compare(provided_key, expected_key):
+            return _make_401("Invalid API key", request_id)
 
         return handler(req)
 
     return wrapper
 
 
+def _secure_compare(a: str, b: str) -> bool:
+    """Constant-time string comparison to prevent timing attacks."""
+    import hmac
+    return hmac.compare_digest(a.encode(), b.encode())
+
+
 def _make_401(message: str, request_id: str) -> Any:
-    """Build a 401 response — Azure Functions HttpResponse or plain _Response."""
+    """Build a 401 response."""
     body = json.dumps({
         "request_id": request_id,
         "status_code": 401,
@@ -273,7 +114,7 @@ def _make_401(message: str, request_id: str) -> Any:
     })
     headers = {
         "X-Request-Id": request_id,
-        "WWW-Authenticate": 'Bearer realm="api"',
+        "WWW-Authenticate": 'ApiKey realm="watt-watcher"',
     }
 
     try:

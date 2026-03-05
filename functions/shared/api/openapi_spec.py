@@ -6,7 +6,7 @@ GRID_POWER_STREAM API.
 
 AC #1: All endpoints documented (production/regional, export/csv, health).
 AC #2: Request params, response schemas, examples.
-AC #3: BearerAuth security scheme; protected endpoints marked.
+AC #3: ApiKeyAuth security scheme; protected endpoints marked.
 """
 
 from __future__ import annotations
@@ -15,18 +15,16 @@ API_TITLE = "GRID_POWER_STREAM API"
 API_VERSION = "1.0.0"
 OPENAPI_VERSION = "3.0.3"
 
-_BEARER_AUTH_DESCRIPTION = (
-    "Azure AD JWT Bearer token. "
-    "Obtain a token via: "
-    "`az account get-access-token --resource <AZURE_AD_CLIENT_ID>` "
-    "or via MSAL with `AZURE_AD_TENANT_ID` + `AZURE_AD_CLIENT_ID`."
+_APIKEY_AUTH_DESCRIPTION = (
+    "API key passed in the X-Api-Key request header. "
+    "Contact the administrator to obtain your key."
 )
 
 _API_DESCRIPTION = (
     "REST API for French regional electricity production and carbon intensity data.\n\n"
     "## Authentication\n\n"
-    "All `/v1/*` endpoints require a valid **Azure AD JWT Bearer token**.\n\n"
-    "```\nAuthorization: Bearer <token>\n```\n\n"
+    "All `/v1/*` endpoints require a valid **API key** in the `X-Api-Key` header.\n\n"
+    "```\nX-Api-Key: <your-api-key>\n```\n\n"
     "Public endpoints (`/health`) do not require authentication."
 )
 
@@ -197,7 +195,7 @@ def _production_path() -> dict:
             ),
             "operationId": "getProductionRegional",
             "tags": ["Production"],
-            "security": [{"BearerAuth": []}],
+            "security": [{"ApiKeyAuth": []}],
             "parameters": _production_query_params(),
             "responses": {
                 "200": {
@@ -217,7 +215,7 @@ def _production_path() -> dict:
                     },
                 },
                 "401": {
-                    "description": "Missing or invalid Bearer token",
+                    "description": "Missing or invalid X-Api-Key header",
                     "content": {
                         "application/json": {
                             "schema": {"$ref": "#/components/schemas/ErrorResponse"},
@@ -255,7 +253,7 @@ def _export_path() -> dict:
             ),
             "operationId": "getExportCsv",
             "tags": ["Export"],
-            "security": [{"BearerAuth": []}],
+            "security": [{"ApiKeyAuth": []}],
             "parameters": _export_query_params(),
             "responses": {
                 "200": {
@@ -273,7 +271,7 @@ def _export_path() -> dict:
                     },
                 },
                 "401": {
-                    "description": "Missing or invalid Bearer token",
+                    "description": "Missing or invalid X-Api-Key header",
                     "content": {
                         "application/json": {
                             "schema": {"$ref": "#/components/schemas/ErrorResponse"},
@@ -336,11 +334,11 @@ def build_spec() -> dict:
         },
         "components": {
             "securitySchemes": {
-                "BearerAuth": {
-                    "type": "http",
-                    "scheme": "bearer",
-                    "bearerFormat": "JWT",
-                    "description": _BEARER_AUTH_DESCRIPTION,
+                "ApiKeyAuth": {
+                    "type": "apiKey",
+                    "in": "header",
+                    "name": "X-Api-Key",
+                    "description": _APIKEY_AUTH_DESCRIPTION,
                 }
             },
             "schemas": {

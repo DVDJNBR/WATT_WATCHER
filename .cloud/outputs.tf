@@ -25,6 +25,11 @@ output "key_vault_uri" {
   value       = azurerm_key_vault.main.vault_uri
 }
 
+output "key_vault_name" {
+  description = "Key Vault name (for az keyvault secret show)"
+  value       = azurerm_key_vault.main.name
+}
+
 output "function_app_name" {
   value = azurerm_linux_function_app.main.name
 }
