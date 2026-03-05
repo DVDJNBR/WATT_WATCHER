@@ -432,11 +432,33 @@ def run_full_pipeline(
                 silver_rows += res.get("rows_written", res.get("rows", 0))
             results["stages"]["silver"] = {"status": "success", "rows": silver_rows}
         else:
-            # Azure: transform the file just written to ADLS
-            bronze_path = bronze_result.get("details", {}).get("bronze_path", "")
-            if bronze_path:
-                res = transform_rte_to_silver(bronze_path, None)  # type: ignore[arg-type]
+            # Azure: download bronze from ADLS → /tmp, transform → /tmp/silver
+            bronze_adls_path = bronze_result.get("details", {}).get("bronze_path", "")
+            if bronze_adls_path:
+                import tempfile
+                from azure.identity import DefaultAzureCredential
+                from azure.storage.filedatalake import DataLakeServiceClient as _DLClient
+
+                storage_account = os.environ.get("STORAGE_ACCOUNT_NAME", "")
+                account_url = f"https://{storage_account}.dfs.core.windows.net"
+                svc = _DLClient(account_url=account_url, credential=DefaultAzureCredential())
+
+                # bronze_adls_path = "bronze/rte/production/.../file.json"
+                parts = bronze_adls_path.split("/", 1)
+                container, file_in_container = parts[0], parts[1]
+                fs = svc.get_file_system_client(container)
+                bronze_bytes = fs.get_file_client(file_in_container).download_file().readall()
+
+                with tempfile.NamedTemporaryFile(suffix=".json", delete=False, mode="wb") as tf:
+                    tf.write(bronze_bytes)
+                    tmp_bronze = tf.name
+
+                tmp_silver = _Path(tempfile.mkdtemp()) / "silver"
+                tmp_silver.mkdir(parents=True, exist_ok=True)
+
+                res = transform_rte_to_silver(tmp_bronze, tmp_silver)
                 results["stages"]["silver"] = res
+                results["stages"]["silver"]["_tmp_silver_dir"] = str(tmp_silver)
             else:
                 results["stages"]["silver"] = {"status": "skipped", "reason": "no bronze_path"}
 
@@ -451,11 +473,9 @@ def run_full_pipeline(
     logger.info("[%s] Stage 3: Gold loading", job_id)
     try:
         conn = _get_db_connection()
-        is_sqlite = isinstance(conn, _sqlite3.Connection)
 
         dim = DimLoader(conn)
-        if is_sqlite:
-            dim.ensure_schema()
+        dim.ensure_schema()
 
         fact = FactLoader(conn)
 
@@ -463,10 +483,12 @@ def run_full_pipeline(
             silver_base = _Path(__file__).parent.parent / "silver"
             gold_result = fact.load_from_silver(silver_base)
         else:
-            silver_path = results["stages"]["silver"].get("silver_path", "")
-            gold_result = fact.load_from_silver(silver_path) if silver_path else {
-                "status": "skipped", "rows_loaded": 0
-            }
+            # Use /tmp silver dir written by the Silver stage
+            tmp_silver_dir = results["stages"]["silver"].get("_tmp_silver_dir", "")
+            if tmp_silver_dir:
+                gold_result = fact.load_from_silver(_Path(tmp_silver_dir))
+            else:
+                gold_result = {"status": "skipped", "rows_loaded": 0}
 
         conn.close()
         results["stages"]["gold"] = gold_result
