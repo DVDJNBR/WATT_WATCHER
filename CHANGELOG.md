@@ -1,3 +1,9 @@
+## [1.3.2](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.3.1...v1.3.2) (2026-03-05)
+
+### Bug Fixes
+
+* **pipeline:** create SQL Server schema on first run + download bronze from ADLS for silver stage ([dcdab1b](https://github.com/DVDJNBR/WATT_WATCHER/commit/dcdab1bf61329d1fc752d0303048ea74fb078d1f))
+
 ## [1.3.1](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.3.0...v1.3.1) (2026-03-05)
 
 ### Bug Fixes
