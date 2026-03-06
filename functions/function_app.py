@@ -52,7 +52,8 @@ def _get_db_connection() -> Any:
     if conn_str:
         try:
             import pyodbc  # type: ignore[import]
-            return pyodbc.connect(conn_str)
+            # timeout=90 handles Azure SQL Serverless auto-resume (can take ~60 s)
+            return pyodbc.connect(conn_str, timeout=90)
         except ImportError as e:
             raise RuntimeError("pyodbc not available — install it for Azure SQL") from e
 
