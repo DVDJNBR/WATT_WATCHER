@@ -194,6 +194,13 @@ resource "azurerm_linux_function_app" "main" {
     application_stack {
       python_version = "3.11"
     }
+    cors {
+      allowed_origins = [
+        "https://${azurerm_storage_account.frontend.name}.z28.web.core.windows.net",
+        "http://localhost:5173",
+        "http://localhost:4173",
+      ]
+    }
   }
 
   app_settings = {
