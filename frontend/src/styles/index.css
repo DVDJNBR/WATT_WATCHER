@@ -293,6 +293,75 @@ body {
 .chart-error { color: #ef4444; }
 .chart-error p { font-size: 0.875rem; }
 
+/* ── Empty state ──────────────────────────────────────────────────────────── */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px;
+  gap: 12px;
+  text-align: center;
+}
+
+.empty-state__icon {
+  font-size: 3rem;
+  opacity: 0.5;
+}
+
+.empty-state__title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.empty-state__hint {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  line-height: 1.6;
+}
+
+/* ── Date range picker ────────────────────────────────────────────────────── */
+.date-range {
+  padding: 12px 0;
+  border-top: 1px solid var(--color-border);
+}
+
+.date-range__fields {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 6px 8px;
+  margin-top: 8px;
+}
+
+.date-range__label {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.date-range__presets {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+.btn-xs {
+  font-size: 0.72rem;
+  padding: 3px 10px;
+  border-radius: 6px;
+}
+
+/* Date input dark-mode fix */
+input[type="date"] {
+  color-scheme: dark;
+}
+[data-theme="light"] input[type="date"] {
+  color-scheme: light;
+}
+
 /* ── Carbon gauge labels ──────────────────────────────────────────────────── */
 .carbon-label {
   text-align: center;

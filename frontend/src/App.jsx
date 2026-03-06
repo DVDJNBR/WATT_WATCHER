@@ -55,6 +55,13 @@ function formatTime(date) {
   return date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
 }
 
+/** Return ISO date string (YYYY-MM-DD) for a Date offset by `days` from today. */
+function isoDate(offsetDays = 0) {
+  const d = new Date()
+  d.setDate(d.getDate() + offsetDays)
+  return d.toISOString().slice(0, 10)
+}
+
 export default function App() {
   const [theme, setTheme] = useState('dark')
   const [selectedRegion, setSelectedRegion] = useState('')
@@ -64,6 +71,10 @@ export default function App() {
   const [error, setError] = useState(null)
   const [lastUpdated, setLastUpdated] = useState(null)
   const [refreshing, setRefreshing] = useState(false)
+
+  // Date range filter (default: last 7 days)
+  const [startDate, setStartDate] = useState(isoDate(-7))
+  const [endDate, setEndDate] = useState(isoDate(0))
 
   // Story 5.2 — alert state
   const [alerts, setAlerts] = useState([])
@@ -75,10 +86,10 @@ export default function App() {
     document.documentElement.setAttribute('data-theme', theme)
   }, [theme])
 
-  const loadData = useCallback(async (regionCode) => {
+  const loadData = useCallback(async (regionCode, start, end) => {
     try {
       setError(null)
-      const params = { limit: 48 }
+      const params = { limit: 200, startDate: start, endDate: end }
       if (regionCode) params.regionCode = regionCode
       const result = await fetchProduction(params)
       setProductionData(result.data || [])
@@ -111,12 +122,13 @@ export default function App() {
         setRegions(regsResult)
         const defaultRegion = regsResult[0]?.code_insee || ''
         setSelectedRegion(defaultRegion)
-        await loadData(defaultRegion)
+        await loadData(defaultRegion, startDate, endDate)
         await loadAlerts(defaultRegion)
         setLoading(false)
       }
     })()
     return () => { cancelled = true }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadData, loadAlerts])
 
   // Region change: refresh data (AC #2)
@@ -124,19 +136,26 @@ export default function App() {
     setSelectedRegion(code)
     setRefreshing(true)
     setDismissedAlertId(null)
-    await Promise.all([loadData(code), loadAlerts(code)])
+    await Promise.all([loadData(code, startDate, endDate), loadAlerts(code)])
     setRefreshing(false)
-  }, [loadData, loadAlerts])
+  }, [loadData, loadAlerts, startDate, endDate])
+
+  // Date range change: reload data
+  const handleDateChange = useCallback(async (newStart, newEnd) => {
+    setRefreshing(true)
+    await loadData(selectedRegion, newStart, newEnd)
+    setRefreshing(false)
+  }, [loadData, selectedRegion])
 
   // Auto-refresh every 15 min (AC #1 — "real-time")
   useEffect(() => {
     const id = setInterval(async () => {
       setRefreshing(true)
-      await loadData(selectedRegion)
+      await loadData(selectedRegion, startDate, endDate)
       setRefreshing(false)
     }, REFRESH_INTERVAL_MS)
     return () => clearInterval(id)
-  }, [selectedRegion, loadData])
+  }, [selectedRegion, startDate, endDate, loadData])
 
   // Story 5.2 — alert polling every 60 s (AC #1, Task 3.3)
   useEffect(() => {
@@ -216,6 +235,62 @@ export default function App() {
           onChange={handleRegionChange}
           loading={loading}
         />
+
+        {/* Date range picker */}
+        <div className="date-range" data-testid="date-range">
+          <p className="selector-label">Plage de dates</p>
+          <div className="date-range__fields">
+            <label className="date-range__label" htmlFor="date-start">Début</label>
+            <input
+              id="date-start"
+              type="date"
+              className="selector-input"
+              value={startDate}
+              max={endDate}
+              onChange={e => {
+                setStartDate(e.target.value)
+                handleDateChange(e.target.value, endDate)
+              }}
+              data-testid="date-start"
+            />
+            <label className="date-range__label" htmlFor="date-end">Fin</label>
+            <input
+              id="date-end"
+              type="date"
+              className="selector-input"
+              value={endDate}
+              min={startDate}
+              max={isoDate(0)}
+              onChange={e => {
+                setEndDate(e.target.value)
+                handleDateChange(startDate, e.target.value)
+              }}
+              data-testid="date-end"
+            />
+          </div>
+          <div className="date-range__presets">
+            {[
+              { label: '24h',   days: -1 },
+              { label: '7j',    days: -7 },
+              { label: '30j',   days: -30 },
+            ].map(({ label, days }) => (
+              <button
+                key={label}
+                className="btn btn-ghost btn-xs"
+                onClick={() => {
+                  const s = isoDate(days)
+                  const e = isoDate(0)
+                  setStartDate(s)
+                  setEndDate(e)
+                  handleDateChange(s, e)
+                }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+
         {/* Story 5.2, Task 3.2 — alert history */}
         <AlertHistory alerts={alerts} loading={alertsLoading} />
       </aside>
