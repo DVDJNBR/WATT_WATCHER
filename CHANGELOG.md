@@ -1,3 +1,9 @@
+## [1.3.4](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.3.3...v1.3.4) (2026-03-06)
+
+### Bug Fixes
+
+* **deps:** add pyodbc to Azure Function requirements ([babf1b9](https://github.com/DVDJNBR/WATT_WATCHER/commit/babf1b941d6144ccce474316f2c1a954fd58af79))
+
 ## [1.3.3](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.3.2...v1.3.3) (2026-03-05)
 
 ### Bug Fixes
