@@ -243,6 +243,22 @@ class TestProductionService:
         assert record["sources"]["eolien"] == 450.0
         assert record["sources"]["solaire"] == 320.0
 
+    def test_aggregate_rows_datetime_serializable(self):
+        """pyodbc returns datetime objects — must be JSON serializable."""
+        import json
+        from datetime import datetime
+        from decimal import Decimal
+        cols = ["code_insee", "nom_region", "horodatage", "source_name", "valeur_mw", "facteur_charge"]
+        rows = [
+            ("11", "IDF", datetime(2025, 6, 15, 10, 0, 0), "eolien", Decimal("450.00"), Decimal("0.09")),
+        ]
+        data = _aggregate_rows(rows, cols)
+        # Must not raise — all values must be JSON serializable
+        serialized = json.dumps(data)
+        reparsed = json.loads(serialized)
+        assert reparsed[0]["sources"]["eolien"] == 450.0
+        assert "2025-06-15" in reparsed[0]["timestamp"]
+
     def test_query_production_returns_data(self, db):
         """AC #1: Returns aggregated data from Gold SQL."""
         result = query_production(db, request_id="test-rid")

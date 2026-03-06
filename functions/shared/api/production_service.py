@@ -106,29 +106,48 @@ def build_production_query(
     return sql, params
 
 
+def _to_json_safe(value):
+    """Convert pyodbc non-JSON-serializable types (datetime, Decimal) to native Python."""
+    if value is None:
+        return None
+    # datetime / date → ISO string
+    if hasattr(value, "isoformat"):
+        return value.isoformat()
+    # Decimal → float
+    try:
+        from decimal import Decimal
+        if isinstance(value, Decimal):
+            return float(value)
+    except ImportError:
+        pass
+    return value
+
+
 def _aggregate_rows(rows: list, cols: list[str]) -> list[dict]:
     """
     Pivot flat SQL rows into region/timestamp records with source breakdown.
 
     AC #3: {region, timestamp, sources: {eolien, ...}, facteur_charge}
+    Converts pyodbc-specific types (datetime, Decimal) to JSON-serializable types.
     """
     aggregated: dict[tuple, dict] = {}
 
     for row in rows:
         r = dict(zip(cols, row))
-        key = (r["code_insee"], r["horodatage"])
+        ts = _to_json_safe(r["horodatage"])
+        key = (r["code_insee"], ts)
 
         if key not in aggregated:
             aggregated[key] = {
                 "code_insee": r["code_insee"],
                 "region": r["nom_region"],
-                "timestamp": r["horodatage"],
+                "timestamp": ts,
                 "sources": {},
-                "facteur_charge": r["facteur_charge"],
+                "facteur_charge": _to_json_safe(r["facteur_charge"]),
             }
 
         source = r["source_name"]
-        aggregated[key]["sources"][source] = r["valeur_mw"]
+        aggregated[key]["sources"][source] = _to_json_safe(r["valeur_mw"])
 
     return list(aggregated.values())
 
