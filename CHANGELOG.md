@@ -1,3 +1,9 @@
+## [1.4.3](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.4.2...v1.4.3) (2026-03-06)
+
+### Bug Fixes
+
+* **infra:** add CORS allowed origins to Azure Function App ([10aec27](https://github.com/DVDJNBR/WATT_WATCHER/commit/10aec27e79c1cb62fcf8d82943c2cf6760685e93))
+
 ## [1.4.2](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.4.1...v1.4.2) (2026-03-06)
 
 ### Bug Fixes
