@@ -1,3 +1,9 @@
+## [1.4.2](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.4.1...v1.4.2) (2026-03-06)
+
+### Bug Fixes
+
+* **api:** convert pyodbc datetime/Decimal to JSON-serializable types ([fda3d74](https://github.com/DVDJNBR/WATT_WATCHER/commit/fda3d74d7685b18dedc14765f1c2db062478cc1c))
+
 ## [1.4.1](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.4.0...v1.4.1) (2026-03-06)
 
 ### Bug Fixes
