@@ -1,3 +1,9 @@
+## [1.4.1](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.4.0...v1.4.1) (2026-03-06)
+
+### Bug Fixes
+
+* **db:** increase pyodbc connection timeout for Azure SQL auto-resume ([dbddca4](https://github.com/DVDJNBR/WATT_WATCHER/commit/dbddca44bdc511c90a351644162737afc72de7d3))
+
 ## [1.4.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.3.4...v1.4.0) (2026-03-06)
 
 ### Features
