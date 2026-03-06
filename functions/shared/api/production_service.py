@@ -53,6 +53,9 @@ def build_production_query(
 
     if end_date:
         where_clauses.append("t.horodatage <= ?")
+        # Date-only string (YYYY-MM-DD) → include the whole day up to 23:59:59
+        if len(end_date) == 10:
+            end_date = end_date + " 23:59:59"
         params.append(end_date)
 
     if source_type:

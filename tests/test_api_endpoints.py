@@ -224,10 +224,21 @@ class TestProductionService:
         )
         assert params.count("11") == 1
         assert "2025-06-01" in params
-        assert "2025-06-30" in params
+        # Date-only end_date must be expanded to include full day
+        assert "2025-06-30 23:59:59" in params
         assert "eolien" in params
         # sql_limit = (offset=10 + limit=50) * 10 = 600; no OFFSET in SQL params
         assert params[-1] == 600
+
+    def test_build_query_end_date_only_expanded(self):
+        """Date-only end_date (YYYY-MM-DD) must be expanded to 23:59:59."""
+        _, params = build_production_query(end_date="2025-06-30", is_sqlite=True)
+        assert "2025-06-30 23:59:59" in params
+
+    def test_build_query_end_date_datetime_unchanged(self):
+        """Datetime end_date (with time) must not be modified."""
+        _, params = build_production_query(end_date="2025-06-30T18:00:00", is_sqlite=True)
+        assert "2025-06-30T18:00:00" in params
 
     def test_aggregate_rows_pivot(self):
         """AC #3: sources dict is correctly built from flat rows."""
