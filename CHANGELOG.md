@@ -1,3 +1,9 @@
+## [1.4.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.3.4...v1.4.0) (2026-03-06)
+
+### Features
+
+* **dashboard:** add date range picker, empty state, and visual polish ([9b5f946](https://github.com/DVDJNBR/WATT_WATCHER/commit/9b5f946f70f120d719ebef6b83b096bd0c736a1a))
+
 ## [1.3.4](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.3.3...v1.3.4) (2026-03-06)
 
 ### Bug Fixes
