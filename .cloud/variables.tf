@@ -23,7 +23,7 @@ variable "sql_admin_password" {
 variable "sql_auto_pause_delay" {
   description = "Minutes of inactivity before SQL auto-pause (-1 to disable)"
   type        = number
-  default     = 60
+  default     = -1
 }
 
 variable "retention_bronze_days" {
