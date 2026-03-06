@@ -1,3 +1,9 @@
+## [1.4.4](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.4.3...v1.4.4) (2026-03-06)
+
+### Bug Fixes
+
+* **api:** expand date-only end_date to 23:59:59 to include full day ([d5d49f8](https://github.com/DVDJNBR/WATT_WATCHER/commit/d5d49f8cc6866a578eca516905541e47f3c50c77))
+
 ## [1.4.3](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.4.2...v1.4.3) (2026-03-06)
 
 ### Bug Fixes
