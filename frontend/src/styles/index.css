@@ -534,6 +534,8 @@ input[type="date"] {
 
 .map-wrapper {
   user-select: none;
+  max-height: 420px;
+  overflow: hidden;
 }
 
 .map-hint {

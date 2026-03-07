@@ -12,7 +12,7 @@ echo "Reading Terraform outputs..."
 cd "$(dirname "$0")"
 
 FUNC_APP_NAME=$(terraform output -raw function_app_name)
-FUNC_APP_URL=$(terraform output -raw function_app_url)
+FUNC_APP_URL="$(terraform output -raw function_app_url)/api"
 FRONTEND_STORAGE_NAME=$(terraform output -raw frontend_storage_name)
 FRONTEND_STORAGE_KEY=$(terraform output -raw frontend_storage_key)
 RG=$(terraform output -raw resource_group_name)
