@@ -519,3 +519,81 @@ input[type="date"] {
 .alert-history__region { font-size: 0.8rem; font-weight: 500; color: var(--color-text); }
 .alert-history__details { font-size: 0.75rem; color: var(--color-text-muted); line-height: 1.4; }
 .alert-history__time { font-size: 0.7rem; color: var(--color-text-muted); opacity: 0.7; }
+
+/* ── France map ───────────────────────────────────────────────────────────── */
+.map-card {
+  padding: 20px 24px 12px;
+}
+
+.map-card .chart-title { margin-bottom: 12px; }
+
+.map-selected-label {
+  color: var(--color-accent);
+  font-weight: 500;
+}
+
+.map-wrapper {
+  user-select: none;
+}
+
+.map-hint {
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+  text-align: center;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--color-border);
+}
+
+.map-tooltip {
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  padding: 5px 12px;
+  font-size: 0.8rem;
+  color: var(--color-text);
+  white-space: nowrap;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.map-tooltip__value {
+  color: var(--color-accent);
+  font-weight: 600;
+}
+
+.map-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.map-header .chart-title { margin-bottom: 0; }
+
+/* Colour legend */
+.map-legend {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+  padding-top: 8px;
+}
+
+.map-legend__label {
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
+  min-width: 70px;
+}
+
+.map-legend__label:last-child { text-align: right; }
+
+.map-legend__bar {
+  flex: 1;
+  height: 8px;
+  border-radius: 4px;
+  background: linear-gradient(to right, rgb(28,37,56), rgb(79,142,247));
+}

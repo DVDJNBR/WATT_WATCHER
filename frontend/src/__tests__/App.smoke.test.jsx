@@ -8,18 +8,34 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import App from '../App.jsx'
-import { fetchProduction, fetchRegions } from '../services/api.js'
+import { fetchProduction, fetchRegions, fetchAlerts } from '../services/api.js'
 
 // vi.mock hoisted above imports — factory must NOT reference module-level vars
 vi.mock('../services/api.js', () => ({
   fetchProduction: vi.fn(),
-  fetchRegions: vi.fn(),
+  fetchRegions:    vi.fn(),
+  fetchAlerts:     vi.fn(),
 }))
 
 vi.mock('../services/auth.js', () => ({
-  acquireToken: vi.fn().mockResolvedValue('mock-token'),
-  getMsalInstance: vi.fn(),
-  getCurrentAccount: vi.fn().mockResolvedValue(null),
+  acquireToken:        vi.fn().mockResolvedValue('mock-token'),
+  getMsalInstance:     vi.fn(),
+  getCurrentAccount:   vi.fn().mockResolvedValue(null),
+}))
+
+// FranceMap uses react-simple-maps which fetches a GeoJSON URL —
+// not possible in jsdom. Render a lightweight stub instead.
+vi.mock('../components/FranceMap.jsx', () => ({
+  FranceMap: ({ regions, selectedCode, onSelect }) => (
+    <div data-testid="france-map">
+      {regions.map(r => (
+        <button key={r.code_insee} onClick={() => onSelect(r.code_insee)}>
+          {r.region}
+        </button>
+      ))}
+      {selectedCode && <span data-testid="map-selected">{selectedCode}</span>}
+    </div>
+  ),
 }))
 
 const MOCK_DATA = [
@@ -50,6 +66,7 @@ describe('App smoke test (Task 6.3)', () => {
     vi.clearAllMocks()
     fetchProduction.mockResolvedValue({ data: MOCK_DATA, total_records: 2, request_id: 'smoke-1' })
     fetchRegions.mockResolvedValue(MOCK_REGIONS)
+    fetchAlerts.mockResolvedValue({ alerts: [] })
   })
 
   it('renders the dashboard layout container', () => {
@@ -62,9 +79,9 @@ describe('App smoke test (Task 6.3)', () => {
     expect(screen.getByText(/WATT WATCHER/)).toBeInTheDocument()
   })
 
-  it('renders region selector in sidebar', () => {
+  it('renders france map for region selection', () => {
     render(<App />)
-    expect(screen.getByTestId('region-selector')).toBeInTheDocument()
+    expect(screen.getByTestId('france-map')).toBeInTheDocument()
   })
 
   it('renders theme toggle button', () => {
@@ -84,13 +101,6 @@ describe('App smoke test (Task 6.3)', () => {
     })
   })
 
-  it('shows charts grid after data loads (AC #1)', async () => {
-    render(<App />)
-    await waitFor(() => {
-      expect(screen.getByTestId('charts-grid')).toBeInTheDocument()
-    })
-  })
-
   it('calls fetchProduction on mount (AC #1 — real-time data)', async () => {
     render(<App />)
     await waitFor(() => {
@@ -98,7 +108,7 @@ describe('App smoke test (Task 6.3)', () => {
     })
   })
 
-  it('calls fetchRegions on mount for sidebar population', async () => {
+  it('calls fetchRegions on mount for map population', async () => {
     render(<App />)
     await waitFor(() => {
       expect(fetchRegions).toHaveBeenCalled()

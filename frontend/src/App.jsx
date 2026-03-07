@@ -10,10 +10,10 @@
  * Story 5.2 AC #1: Alert polling every 60 s + AlertBanner + AlertHistory.
  * Story 5.2 AC #3: Pulsing icon in header when active alerts exist.
  */
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { KPICard } from './components/KPICard.jsx'
-import { RegionSelector } from './components/RegionSelector.jsx'
-import { ProductionChart } from './components/ProductionChart.jsx'
+import { FranceMap } from './components/FranceMap.jsx'
+import { HistoryChart } from './components/HistoryChart.jsx'
 import { CarbonGauge, computeCarbonIntensity } from './components/CarbonGauge.jsx'
 import { AlertBanner } from './components/AlertBanner.jsx'
 import { AlertHistory } from './components/AlertHistory.jsx'
@@ -66,7 +66,12 @@ export default function App() {
   const [theme, setTheme] = useState('dark')
   const [selectedRegion, setSelectedRegion] = useState('')
   const [regions, setRegions] = useState([])
+
+  // globalData: all regions, unfiltered — used for choropleth coloring
+  const [globalData, setGlobalData] = useState([])
+  // productionData: filtered to selectedRegion (or all when '' after initial load)
   const [productionData, setProductionData] = useState([])
+
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [lastUpdated, setLastUpdated] = useState(null)
@@ -86,13 +91,21 @@ export default function App() {
     document.documentElement.setAttribute('data-theme', theme)
   }, [theme])
 
-  const loadData = useCallback(async (regionCode, start, end) => {
+  /**
+   * Load production data.
+   * If regionCode is empty, result is stored in both globalData and productionData
+   * (used as initial full-country fetch for choropleth).
+   * If regionCode is set, only productionData is updated (globalData stays for choropleth).
+   */
+  const loadData = useCallback(async (regionCode, start, end, updateGlobal = false) => {
     try {
       setError(null)
-      const params = { limit: 200, startDate: start, endDate: end }
+      const params = { limit: 500, startDate: start, endDate: end }
       if (regionCode) params.regionCode = regionCode
       const result = await fetchProduction(params)
-      setProductionData(result.data || [])
+      const data = result.data || []
+      setProductionData(data)
+      if (updateGlobal || !regionCode) setGlobalData(data)
       setLastUpdated(new Date())
     } catch (err) {
       setError(err.message || 'Erreur de chargement des données')
@@ -112,7 +125,7 @@ export default function App() {
     }
   }, [])
 
-  // Initial load: fetch regions, then auto-select first region (AC #1)
+  // Initial load: fetch all regions without filter (choropleth view)
   useEffect(() => {
     let cancelled = false
     ;(async () => {
@@ -120,10 +133,9 @@ export default function App() {
       const regsResult = await fetchRegions().catch(() => [])
       if (!cancelled) {
         setRegions(regsResult)
-        const defaultRegion = regsResult[0]?.code_insee || ''
-        setSelectedRegion(defaultRegion)
-        await loadData(defaultRegion, startDate, endDate)
-        await loadAlerts(defaultRegion)
+        // Load ALL regions data for the choropleth (no region filter)
+        await loadData('', startDate, endDate, true)
+        await loadAlerts('')
         setLoading(false)
       }
     })()
@@ -131,19 +143,33 @@ export default function App() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadData, loadAlerts])
 
-  // Region change: refresh data (AC #2)
+  // Region change: drill down into a specific region (or reset to global view)
   const handleRegionChange = useCallback(async (code) => {
     setSelectedRegion(code)
     setRefreshing(true)
     setDismissedAlertId(null)
-    await Promise.all([loadData(code, startDate, endDate), loadAlerts(code)])
+    if (code) {
+      // Drill-down: load selected region only
+      await Promise.all([loadData(code, startDate, endDate), loadAlerts(code)])
+    } else {
+      // Back to global view: reload all-regions data
+      await Promise.all([loadData('', startDate, endDate, true), loadAlerts('')])
+    }
     setRefreshing(false)
   }, [loadData, loadAlerts, startDate, endDate])
 
-  // Date range change: reload data
+  // Date range change: reload data (preserve region selection)
   const handleDateChange = useCallback(async (newStart, newEnd) => {
     setRefreshing(true)
-    await loadData(selectedRegion, newStart, newEnd)
+    if (selectedRegion) {
+      // Keep choropleth up to date too
+      await Promise.all([
+        loadData(selectedRegion, newStart, newEnd),
+        loadData('', newStart, newEnd, true).then(() => {}),
+      ])
+    } else {
+      await loadData('', newStart, newEnd, true)
+    }
     setRefreshing(false)
   }, [loadData, selectedRegion])
 
@@ -151,7 +177,11 @@ export default function App() {
   useEffect(() => {
     const id = setInterval(async () => {
       setRefreshing(true)
-      await loadData(selectedRegion, startDate, endDate)
+      if (selectedRegion) {
+        await loadData(selectedRegion, startDate, endDate)
+      } else {
+        await loadData('', startDate, endDate, true)
+      }
       setRefreshing(false)
     }, REFRESH_INTERVAL_MS)
     return () => clearInterval(id)
@@ -163,12 +193,28 @@ export default function App() {
     return () => clearInterval(id)
   }, [selectedRegion, loadAlerts])
 
-  // Derive KPIs from latest data point
-  const lastSources = productionData.length
-    ? (productionData[productionData.length - 1].sources || {})
+  // Compute per-region total production for choropleth (latest point per region)
+  const regionTotals = useMemo(() => {
+    const latest = {}
+    for (const r of globalData) {
+      if (!latest[r.code_insee] || r.timestamp > latest[r.code_insee].timestamp) {
+        latest[r.code_insee] = r
+      }
+    }
+    const totals = {}
+    for (const [code, rec] of Object.entries(latest)) {
+      totals[code] = Object.values(rec.sources).reduce((s, v) => s + (v > 0 ? v : 0), 0)
+    }
+    return totals
+  }, [globalData])
+
+  // Derive KPIs from current data (region-specific or global)
+  const displayData = selectedRegion ? productionData : globalData
+  const lastSources = displayData.length
+    ? (displayData[displayData.length - 1].sources || {})
     : {}
-  const totalMw = computeTotalMw(productionData)
-  const dominantSource = computeDominantSource(productionData)
+  const totalMw = computeTotalMw(displayData)
+  const dominantSource = computeDominantSource(displayData)
   const carbonIntensity = computeCarbonIntensity(lastSources)
 
   // Top alert to display in banner (highest severity, not dismissed)
@@ -179,13 +225,14 @@ export default function App() {
 
   const hasCritical = alerts.some(a => a.severity === 'CRITICAL' && a.alert_id !== dismissedAlertId)
 
+  const selectedRegionName = regions.find(r => r.code_insee === selectedRegion)?.region
+
   return (
     <div className="app-layout" data-testid="app-layout">
       {/* ── Header ────────────────────────────────────────────────── */}
       <header className="app-header">
         <span className="logo" aria-label="WATT WATCHER">
           ⚡ WATT WATCHER
-          {/* Story 5.2 AC #3: pulsing icon when active critical alerts exist */}
           {hasCritical && (
             <span
               className="alert-pulse-dot"
@@ -229,13 +276,6 @@ export default function App() {
 
       {/* ── Sidebar ───────────────────────────────────────────────── */}
       <aside className="app-sidebar">
-        <RegionSelector
-          regions={regions}
-          selected={selectedRegion}
-          onChange={handleRegionChange}
-          loading={loading}
-        />
-
         {/* Date range picker */}
         <div className="date-range" data-testid="date-range">
           <p className="selector-label">Plage de dates</p>
@@ -297,10 +337,10 @@ export default function App() {
 
       {/* ── Main ──────────────────────────────────────────────────── */}
       <main className="app-main">
-        {/* KPI widgets */}
+        {/* KPI widgets — show totals for selected region or all France */}
         <div className="kpi-grid" data-testid="kpi-grid">
           <KPICard
-            title="Production totale"
+            title={selectedRegionName ? `Production — ${selectedRegionName}` : 'Production France'}
             value={totalMw.toLocaleString('fr-FR')}
             unit="MW"
             loading={loading}
@@ -317,30 +357,41 @@ export default function App() {
             loading={loading}
           />
           <KPICard
-            title="Points de données"
-            value={productionData.length}
+            title={selectedRegion ? 'Points de données' : 'Régions actives'}
+            value={selectedRegion ? productionData.length : Object.keys(regionTotals).length}
             loading={loading}
           />
         </div>
 
-        {/* Charts */}
+        {/* Choropleth map — always visible */}
+        <FranceMap
+          regions={regions}
+          regionTotals={regionTotals}
+          selectedCode={selectedRegion}
+          onSelect={handleRegionChange}
+          loading={loading}
+        />
+
+        {/* Drill-down: shown when a region is selected */}
         {error ? (
           <div className="glass-card chart-card chart-error" data-testid="app-error">
             <p>Erreur : {error}</p>
           </div>
-        ) : (
-          <div className="charts-grid" data-testid="charts-grid">
-            <ProductionChart
+        ) : selectedRegion ? (
+          <div data-testid="charts-grid">
+            <HistoryChart
               data={productionData}
-              loading={loading}
-              error={null}
+              region={selectedRegionName}
+              loading={loading || refreshing}
             />
-            <CarbonGauge
-              sources={lastSources}
-              loading={loading}
-            />
+            <div style={{ marginTop: '24px' }}>
+              <CarbonGauge
+                sources={lastSources}
+                loading={loading}
+              />
+            </div>
           </div>
-        )}
+        ) : null}
       </main>
     </div>
   )
