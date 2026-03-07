@@ -1,3 +1,9 @@
+## [1.5.1](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.5.0...v1.5.1) (2026-03-07)
+
+### Bug Fixes
+
+* **dashboard:** cap map height + fix API URL /api suffix in sync script ([96366ae](https://github.com/DVDJNBR/WATT_WATCHER/commit/96366ae30c1a8ebd745b3eb3a17700759dbebaeb))
+
 ## [1.5.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.4.4...v1.5.0) (2026-03-07)
 
 ### Features
