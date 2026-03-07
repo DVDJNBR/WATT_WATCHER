@@ -1,3 +1,9 @@
+## [1.5.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.4.4...v1.5.0) (2026-03-07)
+
+### Features
+
+* **dashboard:** interactive France choropleth map + history chart ([e46a1f1](https://github.com/DVDJNBR/WATT_WATCHER/commit/e46a1f16ebacb2ebec9dc74f22b23dc29eab939a))
+
 ## [1.4.4](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.4.3...v1.4.4) (2026-03-06)
 
 ### Bug Fixes
