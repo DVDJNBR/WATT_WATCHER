@@ -259,7 +259,7 @@ resource "azurerm_application_insights" "main" {
 # Azure Static Web Apps is blocked on Student subscriptions (all regions 403)
 # → Storage Account with static website hosting = free, no region restriction
 resource "azurerm_storage_account" "frontend" {
-  name                     = "watchwatcherfrontend"  # no hyphens allowed, 24 char max
+  name                     = "wattwatcher"  # no hyphens allowed, 24 char max
   resource_group_name      = azurerm_resource_group.main.name
   location                 = azurerm_resource_group.main.location
   account_tier             = "Standard"

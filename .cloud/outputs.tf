@@ -64,3 +64,4 @@ output "function_app_url" {
   description = "Azure Functions base URL — use as VITE_API_BASE_URL in frontend"
   value       = "https://${azurerm_linux_function_app.main.default_hostname}"
 }
+
