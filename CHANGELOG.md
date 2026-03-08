@@ -1,3 +1,9 @@
+## [1.5.2](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.5.1...v1.5.2) (2026-03-08)
+
+### Bug Fixes
+
+* **pipeline:** pass minutes param through ingestion chain, raise default to 240min ([db877c4](https://github.com/DVDJNBR/WATT_WATCHER/commit/db877c4e27796a8c4879c3c4afb0375c74878238))
+
 ## [1.5.1](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.5.0...v1.5.1) (2026-03-07)
 
 ### Bug Fixes
