@@ -6,11 +6,11 @@
  * Clicking a region triggers onSelect(code_insee) for drill-down.
  */
 import { memo, useState, useMemo } from 'react'
-import { ComposableMap, Geographies, Geography } from 'react-simple-maps'
+import { ComposableMap, Geographies, Geography, ZoomableGroup } from 'react-simple-maps'
 
 const GEO_URL = '/france-regions.geojson'
 
-const PROJECTION_CONFIG = { center: [2.5, 46.5], scale: 2900 }
+const PROJECTION_CONFIG = { center: [2.5, 46.5], scale: 2200 }
 
 /** Linear interpolation between two RGB colours based on t ∈ [0, 1]. */
 function lerpColor(r1, g1, b1, r2, g2, b2, t) {
@@ -43,7 +43,8 @@ export const FranceMap = memo(function FranceMap({
   onSelect,
   loading = false,
 }) {
-  const [hovered, setHovered] = useState(null) // { name, value, x, y }
+  const [hovered, setHovered] = useState(null)   // { name, value, x, y }
+  const [position, setPosition] = useState({ coordinates: [2.5, 46.5], zoom: 1 })
 
   const availableCodes = useMemo(() => new Set(regions.map(r => r.code_insee)), [regions])
   const selectedRegionName = regions.find(r => r.code_insee === selectedCode)?.region
@@ -84,6 +85,13 @@ export const FranceMap = memo(function FranceMap({
             height={460}
             style={{ width: '100%', height: 'auto' }}
           >
+            <ZoomableGroup
+              zoom={position.zoom}
+              center={position.coordinates}
+              onMoveEnd={setPosition}
+              minZoom={0.8}
+              maxZoom={8}
+            >
             <Geographies geography={GEO_URL}>
               {({ geographies }) =>
                 geographies.map(geo => {
@@ -135,6 +143,7 @@ export const FranceMap = memo(function FranceMap({
                 })
               }
             </Geographies>
+            </ZoomableGroup>
           </ComposableMap>
 
           {/* Floating tooltip */}
