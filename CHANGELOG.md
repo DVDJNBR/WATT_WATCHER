@@ -1,3 +1,9 @@
+## [1.6.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.5.2...v1.6.0) (2026-03-08)
+
+### Features
+
+* **map:** add pan + zoom with ZoomableGroup (drag to pan, scroll to zoom) ([39c4832](https://github.com/DVDJNBR/WATT_WATCHER/commit/39c483213393dcc319b10b938de2d6ba873db0b7))
+
 ## [1.5.2](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.5.1...v1.5.2) (2026-03-08)
 
 ### Bug Fixes
