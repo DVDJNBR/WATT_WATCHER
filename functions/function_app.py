@@ -84,7 +84,7 @@ if AZURE_FUNCTIONS_AVAILABLE:
         """Timer-triggered RTE eCO2mix ingestion to Bronze layer."""
         job_id = str(uuid.uuid4())
         logger.info("Starting RTE ingestion job: %s", job_id)
-        run_ingestion(job_id=job_id)
+        run_ingestion(job_id=job_id, minutes=240)
 
     # ── Story 4.1: Production regional endpoint ──────────────────────────────
 
@@ -321,6 +321,7 @@ if AZURE_FUNCTIONS_AVAILABLE:
 def run_ingestion(
     job_id: str | None = None,
     local_mode: bool = False,
+    minutes: int = 240,
 ) -> dict:
     """
     Core ingestion logic — callable both from Azure Function and locally.
@@ -344,8 +345,8 @@ def run_ingestion(
     client = RTEClient()
 
     try:
-        # Fetch latest records (last 30 minutes to handle overlap)
-        records = client.fetch_all_recent(minutes=30)
+        # Fetch latest records — RTE API has ~2h lag, use 240 min default
+        records = client.fetch_all_recent(minutes=minutes)
 
         if not records:
             logger.info("No records returned from API")
@@ -408,7 +409,7 @@ def run_full_pipeline(
     # ── Stage 1: Bronze ingestion ────────────────────────────────────────────
     logger.info("[%s] Stage 1: Bronze ingestion (minutes=%d, backfill_days=%d)",
                 job_id, minutes, backfill_days)
-    bronze_result = run_ingestion(job_id=job_id, local_mode=local_mode)
+    bronze_result = run_ingestion(job_id=job_id, local_mode=local_mode, minutes=minutes)
     results["stages"]["bronze"] = bronze_result
     logger.info("[%s] Bronze: %s (%d records)",
                 job_id, bronze_result.get("status"), bronze_result.get("record_count", 0))
