@@ -1,3 +1,9 @@
+## [1.7.1](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.7.0...v1.7.1) (2026-03-11)
+
+### Bug Fixes
+
+* commit missing subscription_service module ([b92a00a](https://github.com/DVDJNBR/WATT_WATCHER/commit/b92a00a8bcf51d0024549e38c8dd49b7fb6844db))
+
 ## [1.7.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.6.0...v1.7.0) (2026-03-11)
 
 ### Features
