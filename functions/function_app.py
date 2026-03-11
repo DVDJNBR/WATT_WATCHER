@@ -28,11 +28,28 @@ from shared.audit_logger import AuditLogger
 from shared.api.models import parse_production_request, parse_export_request
 from shared.api.production_service import query_production
 from shared.api.export_service import export_to_csv
-from shared.api.error_handlers import bad_request, not_found, server_error
-from shared.api.routes import ROUTE_PRODUCTION, ROUTE_EXPORT, ROUTE_HEALTH, ROUTE_DOCS, ROUTE_OPENAPI_JSON, ROUTE_ALERTS
+from shared.api.error_handlers import bad_request, not_found, server_error, conflict, forbidden
+from shared.api.routes import (
+    ROUTE_PRODUCTION, ROUTE_EXPORT, ROUTE_HEALTH, ROUTE_DOCS, ROUTE_OPENAPI_JSON, ROUTE_ALERTS,
+    ROUTE_AUTH_REGISTER, ROUTE_AUTH_CONFIRM, ROUTE_AUTH_RESEND,
+    ROUTE_AUTH_LOGIN, ROUTE_AUTH_LOGOUT,
+    ROUTE_AUTH_RESET_REQUEST, ROUTE_AUTH_RESET_CONFIRM,
+    ROUTE_AUTH_ACCOUNT,
+    ROUTE_PIPELINE_REFRESH,
+    ROUTE_SUBSCRIPTIONS,
+)
 from shared.api.auth import require_auth
 from shared.api.openapi_spec import build_spec, build_swagger_ui_html
 from shared.api.alert_service import query_alerts
+from shared.api.auth_service import (
+    register, confirm_email, resend_confirmation,
+    login, logout,
+    request_password_reset, confirm_password_reset,
+    delete_account,
+    ConflictError, TokenError, AlreadyConfirmedError, AuthError, UnconfirmedError,
+)
+from shared.api.email_service import EmailService
+from shared.api.subscription_service import get_subscriptions, update_subscriptions
 
 logger = logging.getLogger(__name__)
 
@@ -173,13 +190,14 @@ if AZURE_FUNCTIONS_AVAILABLE:
 
     # ── Story 7.0: Manual pipeline trigger (Bronze → Silver → Gold) ─────────
 
-    @app.route(route="v1/admin/pipeline/run", methods=["POST"], auth_level=func.AuthLevel.FUNCTION)
+    @app.route(route=ROUTE_PIPELINE_REFRESH, methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
+    @require_auth
     def run_pipeline_now(req: func.HttpRequest) -> func.HttpResponse:
         """
-        POST /v1/admin/pipeline/run
+        POST /v1/pipeline/refresh
 
-        Manual trigger for the full ETL pipeline: Bronze → Silver → Gold.
-        Auth level FUNCTION — requires x-functions-key header.
+        User-triggered full ETL pipeline: Bronze → Silver → Gold.
+        Protected by @require_auth (X-Api-Key). Callable from the frontend.
         Accepts optional JSON body: {"minutes": 60, "backfill_days": 0}
         """
         request_id = str(uuid.uuid4())
@@ -278,6 +296,433 @@ if AZURE_FUNCTIONS_AVAILABLE:
                 mimetype="application/json",
                 headers={"X-Request-Id": request_id},
             )
+
+    # ── Story 2.2: Auth — Register ───────────────────────────────────────────
+
+    @app.route(route=ROUTE_AUTH_REGISTER, methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
+    def post_auth_register(req: func.HttpRequest) -> func.HttpResponse:
+        """POST /v1/auth/register — create new user account."""
+        request_id = str(uuid.uuid4())
+        try:
+            body = req.get_json()
+        except Exception:
+            body = {}
+
+        email = (body.get("email") or "").strip() if body else ""
+        password = (body.get("password") or "") if body else ""
+
+        if not email or not password:
+            return func.HttpResponse(
+                json.dumps(bad_request("email and password are required", request_id)),
+                status_code=400, mimetype="application/json",
+                headers={"X-Request-Id": request_id},
+            )
+
+        conn = None
+        try:
+            conn = _get_db_connection()
+            svc = EmailService()
+            result = register(conn, email, password, svc)
+            return func.HttpResponse(
+                json.dumps({
+                    "request_id": request_id,
+                    "user_id": result["user_id"],
+                    "email": result["email"],
+                }),
+                status_code=201, mimetype="application/json",
+                headers={"X-Request-Id": request_id},
+            )
+        except ValueError as exc:
+            return func.HttpResponse(
+                json.dumps(bad_request(str(exc), request_id)),
+                status_code=400, mimetype="application/json",
+                headers={"X-Request-Id": request_id},
+            )
+        except ConflictError as exc:
+            return func.HttpResponse(
+                json.dumps(conflict(str(exc), request_id)),
+                status_code=409, mimetype="application/json",
+                headers={"X-Request-Id": request_id},
+            )
+        except Exception as exc:
+            logger.error("register error [%s]: %s", request_id, exc, exc_info=True)
+            return func.HttpResponse(
+                json.dumps(server_error(request_id=request_id)),
+                status_code=500, mimetype="application/json",
+                headers={"X-Request-Id": request_id},
+            )
+        finally:
+            if conn:
+                conn.close()
+
+    # ── Story 2.2: Auth — Confirm email ──────────────────────────────────────
+
+    @app.route(route=ROUTE_AUTH_CONFIRM, methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
+    def post_auth_confirm(req: func.HttpRequest) -> func.HttpResponse:
+        """POST /v1/auth/confirm — confirm email with UUID token."""
+        request_id = str(uuid.uuid4())
+        try:
+            body = req.get_json()
+        except Exception:
+            body = {}
+
+        token = (body.get("token") or "").strip() if body else ""
+        if not token:
+            return func.HttpResponse(
+                json.dumps(bad_request("token is required", request_id)),
+                status_code=400, mimetype="application/json",
+                headers={"X-Request-Id": request_id},
+            )
+
+        conn = None
+        try:
+            conn = _get_db_connection()
+            result = confirm_email(conn, token)
+            return func.HttpResponse(
+                json.dumps({
+                    "request_id": request_id,
+                    "message": "Account confirmed",
+                    "user_id": result["user_id"],
+                }),
+                status_code=200, mimetype="application/json",
+                headers={"X-Request-Id": request_id},
+            )
+        except TokenError as exc:
+            return func.HttpResponse(
+                json.dumps(bad_request(str(exc), request_id)),
+                status_code=400, mimetype="application/json",
+                headers={"X-Request-Id": request_id},
+            )
+        except Exception as exc:
+            logger.error("confirm error [%s]: %s", request_id, exc, exc_info=True)
+            return func.HttpResponse(
+                json.dumps(server_error(request_id=request_id)),
+                status_code=500, mimetype="application/json",
+                headers={"X-Request-Id": request_id},
+            )
+        finally:
+            if conn:
+                conn.close()
+
+    # ── Story 2.2: Auth — Resend confirmation ─────────────────────────────────
+
+    @app.route(route=ROUTE_AUTH_RESEND, methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
+    def post_auth_resend(req: func.HttpRequest) -> func.HttpResponse:
+        """POST /v1/auth/resend-confirmation — resend confirmation email."""
+        request_id = str(uuid.uuid4())
+        try:
+            body = req.get_json()
+        except Exception:
+            body = {}
+
+        email = (body.get("email") or "").strip() if body else ""
+        if not email:
+            return func.HttpResponse(
+                json.dumps(bad_request("email is required", request_id)),
+                status_code=400, mimetype="application/json",
+                headers={"X-Request-Id": request_id},
+            )
+
+        conn = None
+        try:
+            conn = _get_db_connection()
+            svc = EmailService()
+            result = resend_confirmation(conn, email, svc)
+            return func.HttpResponse(
+                json.dumps({"request_id": request_id, "message": result["message"]}),
+                status_code=200, mimetype="application/json",
+                headers={"X-Request-Id": request_id},
+            )
+        except AlreadyConfirmedError as exc:
+            return func.HttpResponse(
+                json.dumps(bad_request(str(exc), request_id)),
+                status_code=400, mimetype="application/json",
+                headers={"X-Request-Id": request_id},
+            )
+        except Exception as exc:
+            logger.error("resend error [%s]: %s", request_id, exc, exc_info=True)
+            return func.HttpResponse(
+                json.dumps(server_error(request_id=request_id)),
+                status_code=500, mimetype="application/json",
+                headers={"X-Request-Id": request_id},
+            )
+        finally:
+            if conn:
+                conn.close()
+
+    # ── Story 2.3: Auth — Login ───────────────────────────────────────────────
+
+    @app.route(route=ROUTE_AUTH_LOGIN, methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
+    def post_auth_login(req: func.HttpRequest) -> func.HttpResponse:
+        """POST /v1/auth/login — authenticate and return JWT."""
+        request_id = str(uuid.uuid4())
+        try:
+            body = req.get_json()
+        except Exception:
+            body = {}
+
+        email = (body.get("email") or "").strip() if body else ""
+        password = (body.get("password") or "") if body else ""
+
+        if not email or not password:
+            return func.HttpResponse(
+                json.dumps(bad_request("email and password are required", request_id)),
+                status_code=400, mimetype="application/json",
+                headers={"X-Request-Id": request_id},
+            )
+
+        conn = None
+        try:
+            conn = _get_db_connection()
+            result = login(conn, email, password)
+            return func.HttpResponse(
+                json.dumps({"request_id": request_id, **result}),
+                status_code=200, mimetype="application/json",
+                headers={"X-Request-Id": request_id},
+            )
+        except AuthError as exc:
+            return func.HttpResponse(
+                json.dumps({
+                    "request_id": request_id,
+                    "status_code": 401,
+                    "error": "Unauthorized",
+                    "message": str(exc),
+                    "details": {},
+                }),
+                status_code=401, mimetype="application/json",
+                headers={"X-Request-Id": request_id, "WWW-Authenticate": 'Bearer realm="watt-watcher"'},
+            )
+        except UnconfirmedError as exc:
+            return func.HttpResponse(
+                json.dumps(forbidden(str(exc), request_id)),
+                status_code=403, mimetype="application/json",
+                headers={"X-Request-Id": request_id},
+            )
+        except Exception as exc:
+            logger.error("login error [%s]: %s", request_id, exc, exc_info=True)
+            return func.HttpResponse(
+                json.dumps(server_error(request_id=request_id)),
+                status_code=500, mimetype="application/json",
+                headers={"X-Request-Id": request_id},
+            )
+        finally:
+            if conn:
+                conn.close()
+
+    # ── Story 2.3: Auth — Logout ──────────────────────────────────────────────
+
+    @app.route(route=ROUTE_AUTH_LOGOUT, methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
+    def post_auth_logout(req: func.HttpRequest) -> func.HttpResponse:
+        """POST /v1/auth/logout — stateless JWT logout (no-op server-side)."""
+        request_id = str(uuid.uuid4())
+        result = logout()
+        return func.HttpResponse(
+            json.dumps({"request_id": request_id, "message": result["message"]}),
+            status_code=200, mimetype="application/json",
+            headers={"X-Request-Id": request_id},
+        )
+
+    # ── Story 2.4: Auth — Reset Password ─────────────────────────────────────
+
+    @app.route(route=ROUTE_AUTH_RESET_REQUEST, methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
+    def post_auth_reset_request(req: func.HttpRequest) -> func.HttpResponse:
+        """POST /v1/auth/reset-password/request — initiate password reset (always 200)."""
+        request_id = str(uuid.uuid4())
+        try:
+            body = req.get_json()
+        except Exception:
+            body = {}
+
+        email = (body.get("email") or "").strip() if body else ""
+
+        if not email:
+            return func.HttpResponse(
+                json.dumps(bad_request("email is required", request_id)),
+                status_code=400, mimetype="application/json",
+                headers={"X-Request-Id": request_id},
+            )
+
+        email_svc = EmailService()
+        conn = None
+        try:
+            conn = _get_db_connection()
+            result = request_password_reset(conn, email, email_svc)
+            return func.HttpResponse(
+                json.dumps({"request_id": request_id, **result}),
+                status_code=200, mimetype="application/json",
+                headers={"X-Request-Id": request_id},
+            )
+        except Exception as exc:
+            logger.error("reset-request error [%s]: %s", request_id, exc, exc_info=True)
+            return func.HttpResponse(
+                json.dumps(server_error(request_id=request_id)),
+                status_code=500, mimetype="application/json",
+                headers={"X-Request-Id": request_id},
+            )
+        finally:
+            if conn:
+                conn.close()
+
+    @app.route(route=ROUTE_AUTH_RESET_CONFIRM, methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
+    def post_auth_reset_confirm(req: func.HttpRequest) -> func.HttpResponse:
+        """POST /v1/auth/reset-password/confirm — apply new password via token."""
+        request_id = str(uuid.uuid4())
+        try:
+            body = req.get_json()
+        except Exception:
+            body = {}
+
+        token = (body.get("token") or "").strip() if body else ""
+        new_password = (body.get("new_password") or "") if body else ""
+
+        if not token or not new_password:
+            return func.HttpResponse(
+                json.dumps(bad_request("token and new_password are required", request_id)),
+                status_code=400, mimetype="application/json",
+                headers={"X-Request-Id": request_id},
+            )
+
+        conn = None
+        try:
+            conn = _get_db_connection()
+            result = confirm_password_reset(conn, token, new_password)
+            return func.HttpResponse(
+                json.dumps({"request_id": request_id, **result}),
+                status_code=200, mimetype="application/json",
+                headers={"X-Request-Id": request_id},
+            )
+        except (TokenError, ValueError) as exc:
+            return func.HttpResponse(
+                json.dumps(bad_request(str(exc), request_id)),
+                status_code=400, mimetype="application/json",
+                headers={"X-Request-Id": request_id},
+            )
+        except Exception as exc:
+            logger.error("reset-confirm error [%s]: %s", request_id, exc, exc_info=True)
+            return func.HttpResponse(
+                json.dumps(server_error(request_id=request_id)),
+                status_code=500, mimetype="application/json",
+                headers={"X-Request-Id": request_id},
+            )
+        finally:
+            if conn:
+                conn.close()
+
+    # ── Story 2.5: Auth — Delete Account ─────────────────────────────────────
+
+    @app.route(route=ROUTE_AUTH_ACCOUNT, methods=["DELETE"], auth_level=func.AuthLevel.ANONYMOUS)
+    @require_jwt
+    def delete_auth_account(req: func.HttpRequest, user: dict) -> func.HttpResponse:
+        """DELETE /v1/auth/account — permanently delete authenticated user's account (RGPD)."""
+        request_id = str(uuid.uuid4())
+        user_id = user.get("user_id")
+        if not user_id:
+            return func.HttpResponse(
+                json.dumps(bad_request("Invalid token claims", request_id)),
+                status_code=400, mimetype="application/json",
+                headers={"X-Request-Id": request_id},
+            )
+        conn = None
+        try:
+            conn = _get_db_connection()
+            delete_account(conn, user_id)
+            return func.HttpResponse(
+                body="",
+                status_code=204,
+                headers={"X-Request-Id": request_id},
+            )
+        except Exception as exc:
+            logger.error("delete-account error [%s]: %s", request_id, exc, exc_info=True)
+            return func.HttpResponse(
+                json.dumps(server_error(request_id=request_id)),
+                status_code=500, mimetype="application/json",
+                headers={"X-Request-Id": request_id},
+            )
+        finally:
+            if conn:
+                conn.close()
+
+    # ── Story 4.1: Subscriptions API ─────────────────────────────────────────
+
+    @app.route(route=ROUTE_SUBSCRIPTIONS, methods=["GET"], auth_level=func.AuthLevel.ANONYMOUS)
+    @require_jwt
+    def get_subscriptions_endpoint(req: func.HttpRequest, user: dict) -> func.HttpResponse:
+        """GET /v1/subscriptions — list active alert subscriptions for authenticated user."""
+        request_id = str(uuid.uuid4())
+        user_id = user.get("user_id")
+        if not user_id:
+            return func.HttpResponse(
+                json.dumps(bad_request("Invalid token claims", request_id)),
+                status_code=400, mimetype="application/json",
+                headers={"X-Request-Id": request_id},
+            )
+        conn = None
+        try:
+            conn = _get_db_connection()
+            result = get_subscriptions(conn, user_id)
+            return func.HttpResponse(
+                json.dumps({"request_id": request_id, "subscriptions": result}),
+                status_code=200, mimetype="application/json",
+                headers={"X-Request-Id": request_id},
+            )
+        except Exception as exc:
+            logger.error("get-subscriptions error [%s]: %s", request_id, exc, exc_info=True)
+            return func.HttpResponse(
+                json.dumps(server_error(request_id=request_id)),
+                status_code=500, mimetype="application/json",
+                headers={"X-Request-Id": request_id},
+            )
+        finally:
+            if conn:
+                conn.close()
+
+    @app.route(route=ROUTE_SUBSCRIPTIONS, methods=["PUT"], auth_level=func.AuthLevel.ANONYMOUS)
+    @require_jwt
+    def put_subscriptions_endpoint(req: func.HttpRequest, user: dict) -> func.HttpResponse:
+        """PUT /v1/subscriptions — replace all alert subscriptions for authenticated user."""
+        request_id = str(uuid.uuid4())
+        user_id = user.get("user_id")
+        if not user_id:
+            return func.HttpResponse(
+                json.dumps(bad_request("Invalid token claims", request_id)),
+                status_code=400, mimetype="application/json",
+                headers={"X-Request-Id": request_id},
+            )
+        try:
+            body = req.get_json()
+        except Exception:
+            body = []
+        if not isinstance(body, list):
+            return func.HttpResponse(
+                json.dumps(bad_request("Body must be a JSON array", request_id)),
+                status_code=400, mimetype="application/json",
+                headers={"X-Request-Id": request_id},
+            )
+        conn = None
+        try:
+            conn = _get_db_connection()
+            result = update_subscriptions(conn, user_id, body)
+            return func.HttpResponse(
+                json.dumps({"request_id": request_id, "subscriptions": result}),
+                status_code=200, mimetype="application/json",
+                headers={"X-Request-Id": request_id},
+            )
+        except ValueError as exc:
+            return func.HttpResponse(
+                json.dumps(bad_request(str(exc), request_id)),
+                status_code=400, mimetype="application/json",
+                headers={"X-Request-Id": request_id},
+            )
+        except Exception as exc:
+            logger.error("put-subscriptions error [%s]: %s", request_id, exc, exc_info=True)
+            return func.HttpResponse(
+                json.dumps(server_error(request_id=request_id)),
+                status_code=500, mimetype="application/json",
+                headers={"X-Request-Id": request_id},
+            )
+        finally:
+            if conn:
+                conn.close()
 
     # ── Story 5.2: Alerts endpoint ───────────────────────────────────────────
 

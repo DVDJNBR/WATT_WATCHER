@@ -17,7 +17,7 @@ import { HistoryChart } from './components/HistoryChart.jsx'
 import { CarbonGauge, computeCarbonIntensity } from './components/CarbonGauge.jsx'
 import { AlertBanner } from './components/AlertBanner.jsx'
 import { AlertHistory } from './components/AlertHistory.jsx'
-import { fetchProduction, fetchRegions, fetchAlerts } from './services/api.js'
+import { fetchProduction, fetchRegions, fetchAlerts, triggerPipeline } from './services/api.js'
 
 const REFRESH_INTERVAL_MS = 15 * 60 * 1000  // 15 minutes
 const ALERT_POLL_INTERVAL_MS = 60 * 1000    // 60 seconds
@@ -76,6 +76,8 @@ export default function App() {
   const [error, setError] = useState(null)
   const [lastUpdated, setLastUpdated] = useState(null)
   const [refreshing, setRefreshing] = useState(false)
+  const [pipelineRunning, setPipelineRunning] = useState(false)
+  const [pipelineError, setPipelineError] = useState(null)
 
   // Date range filter (default: last 7 days)
   const [startDate, setStartDate] = useState(isoDate(-7))
@@ -187,6 +189,26 @@ export default function App() {
     return () => clearInterval(id)
   }, [selectedRegion, startDate, endDate, loadData])
 
+  const handlePipelineRefresh = useCallback(async () => {
+    setPipelineRunning(true)
+    setPipelineError(null)
+    try {
+      await triggerPipeline()
+      // Reload data after pipeline completes
+      setRefreshing(true)
+      await Promise.all([
+        loadData(selectedRegion, startDate, endDate, !selectedRegion),
+        loadAlerts(selectedRegion),
+      ])
+      setLastUpdated(new Date())
+    } catch (err) {
+      setPipelineError(err.message || 'Erreur pipeline')
+    } finally {
+      setPipelineRunning(false)
+      setRefreshing(false)
+    }
+  }, [selectedRegion, startDate, endDate, loadData, loadAlerts])
+
   // Story 5.2 — alert polling every 60 s (AC #1, Task 3.3)
   useEffect(() => {
     const id = setInterval(() => loadAlerts(selectedRegion), ALERT_POLL_INTERVAL_MS)
@@ -257,6 +279,21 @@ export default function App() {
               Màj {formatTime(lastUpdated)}
             </span>
           )}
+          {pipelineError && (
+            <span className="last-updated" style={{ color: 'var(--color-error, #f87171)' }} title={pipelineError}>
+              Erreur pipeline
+            </span>
+          )}
+          <button
+            className="btn btn-ghost"
+            onClick={handlePipelineRefresh}
+            disabled={pipelineRunning}
+            aria-label="Rafraîchir les données"
+            data-testid="pipeline-refresh"
+            title={pipelineRunning ? 'Pipeline en cours…' : 'Rafraîchir les données depuis RTE'}
+          >
+            {pipelineRunning ? '⏳' : '↻'}
+          </button>
           <button
             className="btn btn-ghost"
             onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}

@@ -102,6 +102,30 @@ export async function fetchAlerts({ regionCode, status = 'active', days = 7, lim
 }
 
 /**
+ * Trigger the full ETL pipeline: Bronze → Silver → Gold SQL.
+ * Returns when the pipeline completes (may take ~60 s if SQL was paused).
+ *
+ * @returns {Promise<{status: string, stages: object}>}
+ */
+export async function triggerPipeline() {
+  const url = `${API_BASE}/v1/pipeline/refresh`
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Api-Key': API_KEY },
+  })
+  if (!response.ok) {
+    let errorBody = {}
+    try { errorBody = await response.json() } catch (_) { /* ignore */ }
+    throw new ApiError(
+      errorBody.message || `HTTP ${response.status}`,
+      response.status,
+      errorBody.request_id,
+    )
+  }
+  return response.json()
+}
+
+/**
  * Fetch list of available regions from production data.
  * Derives unique regions from a broad production query.
  *
