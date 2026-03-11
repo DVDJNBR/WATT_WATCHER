@@ -1,3 +1,9 @@
+## [1.7.3](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.7.2...v1.7.3) (2026-03-11)
+
+### Bug Fixes
+
+* add PyJWT and bcrypt to requirements for auth_service ([7229c24](https://github.com/DVDJNBR/WATT_WATCHER/commit/7229c242191b7a6e4a198f75cfd2c90a26b3414b))
+
 ## [1.7.2](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.7.1...v1.7.2) (2026-03-11)
 
 ### Bug Fixes
