@@ -50,6 +50,8 @@ from shared.api.auth_service import (
 )
 from shared.api.email_service import EmailService
 from shared.api.subscription_service import get_subscriptions, update_subscriptions
+from shared.alerting.alert_dispatcher import dispatch_alerts
+from shared.alerting.rgpd_service import run_rgpd_cleanup
 
 logger = logging.getLogger(__name__)
 
@@ -102,6 +104,58 @@ if AZURE_FUNCTIONS_AVAILABLE:
         job_id = str(uuid.uuid4())
         logger.info("Starting RTE ingestion job: %s", job_id)
         run_ingestion(job_id=job_id, minutes=240)
+
+    # ── Story 5.3: Alert dispatch timer ──────────────────────────────────────
+
+    @app.timer_trigger(
+        schedule="0 0 * * * *",  # every hour
+        arg_name="timer",
+        run_on_startup=False,
+    )
+    def alert_dispatch_timer(timer: func.TimerRequest) -> None:
+        """Hourly alert dispatch: detect → match subscribers → dedup → send."""
+        job_id = str(uuid.uuid4())
+        logger.info("[%s] Alert dispatch starting", job_id)
+        conn = None
+        try:
+            conn = _get_db_connection()
+            svc = EmailService()
+            result = dispatch_alerts(conn, svc)
+            logger.info(
+                "[%s] Alert dispatch done: detected=%d sent=%d skipped=%d errors=%d",
+                job_id, result["detected"], result["sent"], result["skipped_dedup"], result["errors"],
+            )
+        except Exception as exc:
+            logger.error("[%s] Alert dispatch failed: %s", job_id, exc, exc_info=True)
+        finally:
+            if conn:
+                conn.close()
+
+    # ── Story 6.1: RGPD daily cleanup timer ──────────────────────────────────
+
+    @app.timer_trigger(
+        schedule="0 0 0 * * *",  # every day at midnight UTC
+        arg_name="timer",
+        run_on_startup=False,
+    )
+    def rgpd_cleanup_timer(timer: func.TimerRequest) -> None:
+        """Daily RGPD cleanup: warn inactive accounts (11 months) and delete (12 months)."""
+        job_id = str(uuid.uuid4())
+        logger.info("[%s] RGPD cleanup starting", job_id)
+        conn = None
+        try:
+            conn = _get_db_connection()
+            svc = EmailService()
+            result = run_rgpd_cleanup(conn, svc)
+            logger.info(
+                "[%s] RGPD cleanup done: warned=%d deleted=%d errors=%d",
+                job_id, result["warned"], result["deleted"], result["errors"],
+            )
+        except Exception as exc:
+            logger.error("[%s] RGPD cleanup failed: %s", job_id, exc, exc_info=True)
+        finally:
+            if conn:
+                conn.close()
 
     # ── Story 4.1: Production regional endpoint ──────────────────────────────
 
@@ -691,7 +745,11 @@ if AZURE_FUNCTIONS_AVAILABLE:
         try:
             body = req.get_json()
         except Exception:
-            body = []
+            return func.HttpResponse(
+                json.dumps(bad_request("Body must be valid JSON", request_id)),
+                status_code=400, mimetype="application/json",
+                headers={"X-Request-Id": request_id},
+            )
         if not isinstance(body, list):
             return func.HttpResponse(
                 json.dumps(bad_request("Body must be a JSON array", request_id)),
