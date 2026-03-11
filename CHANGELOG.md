@@ -1,3 +1,9 @@
+## [1.7.2](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.7.1...v1.7.2) (2026-03-11)
+
+### Bug Fixes
+
+* commit missing modules causing startup crash → 404 ([d528d3b](https://github.com/DVDJNBR/WATT_WATCHER/commit/d528d3b9245a4eb239c1d965a1edf1fb775f41a3))
+
 ## [1.7.1](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.7.0...v1.7.1) (2026-03-11)
 
 ### Bug Fixes
