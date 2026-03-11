@@ -1,4 +1,4 @@
-# GRID_POWER_STREAM
+# WATT_WATCHER
 
 Automated ETL pipeline for regional energy analysis using French Open Data (RTE, INSEE, Météo-France) to monitor grid load and power distribution.
 
