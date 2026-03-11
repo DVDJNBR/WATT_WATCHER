@@ -1,3 +1,9 @@
+## [1.7.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.6.0...v1.7.0) (2026-03-11)
+
+### Features
+
+* add user-triggered pipeline refresh button ([cd00cc4](https://github.com/DVDJNBR/WATT_WATCHER/commit/cd00cc46cdd8979a980d70c46448917ef1828d09))
+
 ## [1.6.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.5.2...v1.6.0) (2026-03-08)
 
 ### Features
