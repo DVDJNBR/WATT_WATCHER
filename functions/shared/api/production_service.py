@@ -77,7 +77,8 @@ def build_production_query(
                 t.horodatage,
                 s.source_name,
                 f.valeur_mw,
-                f.facteur_charge
+                f.facteur_charge,
+                f.consommation_mw
             FROM FACT_ENERGY_FLOW f
             JOIN DIM_REGION r ON f.id_region = r.id_region
             JOIN DIM_TIME t ON f.id_date = t.id_date
@@ -96,7 +97,8 @@ def build_production_query(
                 t.horodatage,
                 s.source_name,
                 f.valeur_mw,
-                f.facteur_charge
+                f.facteur_charge,
+                f.consommation_mw
             FROM FACT_ENERGY_FLOW f
             JOIN DIM_REGION r ON f.id_region = r.id_region
             JOIN DIM_TIME t ON f.id_date = t.id_date
@@ -130,8 +132,9 @@ def _aggregate_rows(rows: list, cols: list[str]) -> list[dict]:
     """
     Pivot flat SQL rows into region/timestamp records with source breakdown.
 
-    AC #3: {region, timestamp, sources: {eolien, ...}, facteur_charge}
+    AC #3: {region, timestamp, sources: {eolien, ...}, facteur_charge, consommation_mw}
     Converts pyodbc-specific types (datetime, Decimal) to JSON-serializable types.
+    consommation_mw is a region/timestamp-level field (not per source) — taken from first row.
     """
     aggregated: dict[tuple, dict] = {}
 
@@ -147,6 +150,7 @@ def _aggregate_rows(rows: list, cols: list[str]) -> list[dict]:
                 "timestamp": ts,
                 "sources": {},
                 "facteur_charge": _to_json_safe(r["facteur_charge"]),
+                "consommation_mw": _to_json_safe(r["consommation_mw"]),
             }
 
         source = r["source_name"]

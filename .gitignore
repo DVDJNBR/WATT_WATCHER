@@ -212,6 +212,8 @@ _bmad/
 .claude
 .gemini
 LIVRABLES/
+RESOURCES/
+
 # Terraform
 .cloud/.terraform/
 .cloud/.terraform.lock.hcl

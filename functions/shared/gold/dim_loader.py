@@ -64,6 +64,7 @@ class DimLoader:
                     facteur_charge REAL,
                     temperature_moyenne REAL,
                     prix_mwh REAL,
+                    consommation_mw REAL NULL,
                     UNIQUE(id_date, id_region, id_source)
                 );
             """)

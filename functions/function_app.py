@@ -38,7 +38,7 @@ from shared.api.routes import (
     ROUTE_PIPELINE_REFRESH,
     ROUTE_SUBSCRIPTIONS,
 )
-from shared.api.auth import require_auth
+from shared.api.auth import require_auth, require_jwt
 from shared.api.openapi_spec import build_spec, build_swagger_ui_html
 from shared.api.alert_service import query_alerts
 from shared.api.auth_service import (

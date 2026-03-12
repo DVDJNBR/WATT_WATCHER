@@ -16,6 +16,8 @@ import os
 import uuid
 from typing import Any, Callable, Optional
 
+import jwt
+
 logger = logging.getLogger(__name__)
 
 # Module-level cache — loaded once per cold start
@@ -103,8 +105,14 @@ def _secure_compare(a: str, b: str) -> bool:
     return hmac.compare_digest(a.encode(), b.encode())
 
 
-def _make_401(message: str, request_id: str) -> Any:
-    """Build a 401 response."""
+def _make_401(message: str, request_id: str, www_authenticate: str = 'ApiKey realm="watt-watcher"') -> Any:
+    """Build a 401 response.
+
+    Args:
+        www_authenticate: Value for the WWW-Authenticate header.
+            Defaults to ApiKey scheme (require_auth).
+            Pass 'Bearer realm="watt-watcher"' for JWT endpoints (require_jwt).
+    """
     body = json.dumps({
         "request_id": request_id,
         "status_code": 401,
@@ -114,7 +122,7 @@ def _make_401(message: str, request_id: str) -> Any:
     })
     headers = {
         "X-Request-Id": request_id,
-        "WWW-Authenticate": 'ApiKey realm="watt-watcher"',
+        "WWW-Authenticate": www_authenticate,
     }
 
     try:
@@ -137,3 +145,94 @@ class _Response:
 
     def get_body(self) -> bytes:
         return self._body.encode("utf-8") if isinstance(self._body, str) else self._body
+
+
+# ─── JWT Authentication ───────────────────────────────────────────────────────
+
+# Module-level cache — loaded once per cold start
+_jwt_secret: Optional[str] = None
+
+
+def _load_jwt_secret() -> str:
+    """
+    Load the JWT secret from Key Vault (production) or env var (local dev).
+    Cached after first load.
+    """
+    global _jwt_secret
+    if _jwt_secret is not None:
+        return _jwt_secret
+
+    # Try Key Vault first (production)
+    key_vault_url = os.environ.get("KEY_VAULT_URL")
+    if key_vault_url:
+        try:
+            from shared.keyvault import KeyVaultClient
+            kv = KeyVaultClient(vault_url=key_vault_url)
+            value = kv.get_secret("JWT_SECRET")
+            if value:
+                _jwt_secret = value
+                logger.info("JWT secret loaded from Key Vault")
+                return _jwt_secret
+        except Exception as exc:
+            logger.warning("Could not load JWT secret from Key Vault: %s", exc)
+
+    # Fallback: env var (local dev)
+    value = os.environ.get("JWT_SECRET", "")
+    if not value:
+        raise EnvironmentError("JWT secret not configured (Key Vault: JWT_SECRET or env: JWT_SECRET)")
+
+    _jwt_secret = value
+    logger.info("JWT secret loaded from environment variable")
+    return _jwt_secret
+
+
+def reset_jwt_secret() -> None:
+    """Clear cached secret — used in tests."""
+    global _jwt_secret
+    _jwt_secret = None
+
+
+def require_jwt(handler: Callable) -> Callable:
+    """
+    Decorator that enforces JWT authentication on HTTP trigger handlers.
+
+    Clients must send:  Authorization: Bearer <jwt_token>
+
+    If valid, calls handler(req, user={"user_id": ..., "email": ...})
+    Returns 401 for missing header, invalid format, expired or malformed token.
+    """
+    _JWT_WWW_AUTH = 'Bearer realm="watt-watcher"'
+
+    @functools.wraps(handler)
+    def wrapper(req: Any) -> Any:
+        request_id = str(uuid.uuid4())
+
+        auth_header = ""
+        if hasattr(req, "headers"):
+            auth_header = req.headers.get("Authorization", "")
+
+        if not auth_header:
+            return _make_401("Missing Authorization header", request_id, _JWT_WWW_AUTH)
+
+        if not auth_header.startswith("Bearer "):
+            return _make_401("Invalid Authorization header format", request_id, _JWT_WWW_AUTH)
+
+        token = auth_header.split(" ", 1)[1]
+
+        try:
+            secret = _load_jwt_secret()
+        except EnvironmentError as exc:
+            logger.error("JWT config error [%s]: %s", request_id, exc)
+            return _make_401("Authentication service misconfigured", request_id, _JWT_WWW_AUTH)
+
+        try:
+            payload = jwt.decode(token, secret, algorithms=["HS256"])
+        except jwt.ExpiredSignatureError:
+            return _make_401("Token has expired", request_id, _JWT_WWW_AUTH)
+        except jwt.InvalidTokenError:
+            return _make_401("Invalid token", request_id, _JWT_WWW_AUTH)
+
+        user = {"user_id": payload.get("user_id"), "email": payload.get("email")}
+        return handler(req, user=user)
+
+    return wrapper
