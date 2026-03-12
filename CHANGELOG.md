@@ -1,3 +1,9 @@
+## [1.8.1](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.8.0...v1.8.1) (2026-03-12)
+
+### Bug Fixes
+
+* add PyJWT, bcrypt, polars to requirements.txt for Azure deploy ([8682ca1](https://github.com/DVDJNBR/WATT_WATCHER/commit/8682ca1e4dfdb792aeea1b35dba177c6b3fca9fa))
+
 ## [1.8.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.7.3...v1.8.0) (2026-03-12)
 
 ### Features
