@@ -1,3 +1,9 @@
+## [1.8.3](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.8.2...v1.8.3) (2026-03-12)
+
+### Bug Fixes
+
+* **ci:** enable-oryx-build: true to actually run pip install on Azure ([d250695](https://github.com/DVDJNBR/WATT_WATCHER/commit/d2506951c833e642c1b58a6fa254d2e65d908bf9))
+
 ## [1.8.2](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.8.1...v1.8.2) (2026-03-12)
 
 ### Bug Fixes
