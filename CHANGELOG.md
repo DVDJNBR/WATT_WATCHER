@@ -1,3 +1,9 @@
+## [1.8.9](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.8.8...v1.8.9) (2026-03-12)
+
+### Bug Fixes
+
+* **ci:** target manylinux_2_28 wheels for Azure Functions glibc 2.31 compatibility ([a8e3687](https://github.com/DVDJNBR/WATT_WATCHER/commit/a8e36875843f52e23e9ca0ffd4c5894564a144ec))
+
 ## [1.8.8](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.8.7...v1.8.8) (2026-03-12)
 
 ### Bug Fixes
