@@ -1,3 +1,10 @@
+## [1.8.6](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.8.5...v1.8.6) (2026-03-12)
+
+### Bug Fixes
+
+* preserve handler __name__ in auth decorators for Azure Functions v2 ([4bdd9bc](https://github.com/DVDJNBR/WATT_WATCHER/commit/4bdd9bca4f0554d314df77c6fb37a996f47a78b1))
+* use getattr for handler __name__ to support mock objects in tests ([b9bc29a](https://github.com/DVDJNBR/WATT_WATCHER/commit/b9bc29a8b4b3cf2f6a7e127d68b7de02c3e5e87e))
+
 ## [1.8.5](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.8.4...v1.8.5) (2026-03-12)
 
 ### Bug Fixes
