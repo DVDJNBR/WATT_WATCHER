@@ -2,7 +2,7 @@
 OpenAPI Spec Generator — Story 4.3, Task 1
 
 Programmatically generates an OpenAPI 3.0.3 specification for the
-GRID_POWER_STREAM API.
+WATT_WATCHER API.
 
 AC #1: All endpoints documented (production/regional, export/csv, health).
 AC #2: Request params, response schemas, examples.
@@ -11,7 +11,7 @@ AC #3: ApiKeyAuth security scheme; protected endpoints marked.
 
 from __future__ import annotations
 
-API_TITLE = "GRID_POWER_STREAM API"
+API_TITLE = "WATT_WATCHER API"
 API_VERSION = "1.0.0"
 OPENAPI_VERSION = "3.0.3"
 
@@ -316,7 +316,7 @@ def build_spec() -> dict:
             "description": _API_DESCRIPTION,
             "version": API_VERSION,
             "contact": {
-                "name": "GRID_POWER_STREAM",
+                "name": "WATT_WATCHER",
             },
         },
         "servers": [

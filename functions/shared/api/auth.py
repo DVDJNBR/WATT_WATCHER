@@ -74,8 +74,7 @@ def require_auth(handler: Callable) -> Callable:
     AC #1: Missing or wrong key → 401.
     AC #2: Valid key → handler called.
     """
-    @functools.wraps(handler)
-    def wrapper(req: Any) -> Any:
+    def wrapper(req):
         request_id = str(uuid.uuid4())
 
         provided_key = ""
@@ -96,6 +95,7 @@ def require_auth(handler: Callable) -> Callable:
 
         return handler(req)
 
+    wrapper.__name__ = handler.__name__
     return wrapper
 
 
@@ -203,8 +203,7 @@ def require_jwt(handler: Callable) -> Callable:
     """
     _JWT_WWW_AUTH = 'Bearer realm="watt-watcher"'
 
-    @functools.wraps(handler)
-    def wrapper(req: Any) -> Any:
+    def wrapper(req):
         request_id = str(uuid.uuid4())
 
         auth_header = ""
@@ -235,4 +234,5 @@ def require_jwt(handler: Callable) -> Callable:
         user = {"user_id": payload.get("user_id"), "email": payload.get("email")}
         return handler(req, user=user)
 
+    wrapper.__name__ = handler.__name__
     return wrapper

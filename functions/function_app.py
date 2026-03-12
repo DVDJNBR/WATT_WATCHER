@@ -1,5 +1,5 @@
 """
-GRID_POWER_STREAM — Azure Function App Entry Point
+WATT_WATCHER — Azure Function App Entry Point
 
 Story 1.1: Timer trigger — RTE eCO2mix ingestion → Bronze layer.
 Story 4.1: HTTP triggers — /v1/production/regional, /v1/export/csv.
