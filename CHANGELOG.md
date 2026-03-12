@@ -1,3 +1,9 @@
+## [1.8.2](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.8.1...v1.8.2) (2026-03-12)
+
+### Bug Fixes
+
+* remove polars from requirements.txt (lazy import, ~100MB wheel causes deploy timeout) ([fb95cf3](https://github.com/DVDJNBR/WATT_WATCHER/commit/fb95cf3974705d0d37cba552ba83fad0125cb16c))
+
 ## [1.8.1](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.8.0...v1.8.1) (2026-03-12)
 
 ### Bug Fixes
