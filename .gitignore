@@ -208,11 +208,13 @@ __marimo__/
 
 # Repository scope
 _bmad/
+_bmad-output/
+CONTEXT/
+RESOURCES/
 .agent
 .claude
 .gemini
 LIVRABLES/
-RESOURCES/
 
 # Terraform
 .cloud/.terraform/
