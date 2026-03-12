@@ -1,3 +1,9 @@
+## [1.8.8](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.8.7...v1.8.8) (2026-03-12)
+
+### Bug Fixes
+
+* **deps:** pin cryptography <44.0.0 to avoid GLIBC_2.33 incompatibility on Azure Functions Linux (glibc 2.31) ([ced55e7](https://github.com/DVDJNBR/WATT_WATCHER/commit/ced55e788e359c6ef7d05c283188b55a3665b7f1))
+
 ## [1.8.7](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.8.6...v1.8.7) (2026-03-12)
 
 ### Bug Fixes
