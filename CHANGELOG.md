@@ -1,3 +1,9 @@
+## [1.8.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.7.3...v1.8.0) (2026-03-12)
+
+### Features
+
+* add JWT auth, subscriptions API, alerting and RGPD services ([360e09e](https://github.com/DVDJNBR/WATT_WATCHER/commit/360e09ebd246cc330320639a56e5c8cdf3c1afb4))
+
 ## [1.7.3](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.7.2...v1.7.3) (2026-03-11)
 
 ### Bug Fixes
