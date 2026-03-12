@@ -75,7 +75,13 @@ jobs:
       - name: Prepare deployment package
         run: |
           cp host.json functions/
-          pip install --target functions/.python_packages/lib/site-packages \
+          pip install \
+            --platform manylinux_2_28_x86_64 \
+            --python-version 3.11 \
+            --implementation cp \
+            --abi cp311 \
+            --only-binary=:all: \
+            --target functions/.python_packages/lib/site-packages \
             -r functions/requirements.txt
 
       - name: Deploy to Azure Functions
