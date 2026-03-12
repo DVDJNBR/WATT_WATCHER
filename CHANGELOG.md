@@ -1,3 +1,9 @@
+## [1.8.5](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.8.4...v1.8.5) (2026-03-12)
+
+### Bug Fixes
+
+* **ci:** use Python 3.11 for pip install to match Azure Functions runtime ([f2759e2](https://github.com/DVDJNBR/WATT_WATCHER/commit/f2759e28647807bed0774f4207f4156d5bdf1af4))
+
 ## [1.8.4](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.8.3...v1.8.4) (2026-03-12)
 
 ### Bug Fixes
