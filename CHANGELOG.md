@@ -1,3 +1,9 @@
+## [1.8.7](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.8.6...v1.8.7) (2026-03-12)
+
+### Bug Fixes
+
+* **deps:** pin bcrypt <5.0.0 to avoid manylinux_2_34 glibc incompatibility ([d71e8df](https://github.com/DVDJNBR/WATT_WATCHER/commit/d71e8dfeff9e4836c5d2e6aead8905f2d845fc2e))
+
 ## [1.8.6](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.8.5...v1.8.6) (2026-03-12)
 
 ### Bug Fixes
