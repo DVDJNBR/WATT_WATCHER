@@ -95,7 +95,7 @@ def require_auth(handler: Callable) -> Callable:
 
         return handler(req)
 
-    wrapper.__name__ = handler.__name__
+    wrapper.__name__ = getattr(handler, '__name__', repr(handler))
     return wrapper
 
 
@@ -234,5 +234,5 @@ def require_jwt(handler: Callable) -> Callable:
         user = {"user_id": payload.get("user_id"), "email": payload.get("email")}
         return handler(req, user=user)
 
-    wrapper.__name__ = handler.__name__
+    wrapper.__name__ = getattr(handler, '__name__', repr(handler))
     return wrapper
