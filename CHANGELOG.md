@@ -1,3 +1,9 @@
+## [1.8.4](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.8.3...v1.8.4) (2026-03-12)
+
+### Bug Fixes
+
+* **ci:** pre-install packages in CI instead of Oryx remote build ([5d39a16](https://github.com/DVDJNBR/WATT_WATCHER/commit/5d39a1682ae0ea444fe62632069b8977007044dc))
+
 ## [1.8.3](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.8.2...v1.8.3) (2026-03-12)
 
 ### Bug Fixes
