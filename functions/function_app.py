@@ -2,6 +2,8 @@
 WATT_WATCHER — Azure Function App Entry Point
 
 Story 1.1: Timer trigger — RTE eCO2mix ingestion → Bronze layer.
+Story 2.1: Timer trigger — Maintenance scraping → Bronze layer.
+Story 3.4: Timer trigger — SQL reference snapshot → Bronze layer.
 Story 4.1: HTTP triggers — /v1/production/regional, /v1/export/csv.
 Story 4.3: HTTP triggers — /health, /docs, /openapi.json.
 Story 5.2: HTTP trigger — /v1/alerts.
@@ -24,6 +26,7 @@ except ImportError:
 
 from shared.rte_client import RTEClient, RTEClientError
 from shared.bronze_storage import BronzeStorage
+from shared.maintenance_scraper import MaintenanceScraper
 from shared.audit_logger import AuditLogger
 from shared.api.models import parse_production_request, parse_export_request
 from shared.api.production_service import query_production
@@ -104,6 +107,59 @@ if AZURE_FUNCTIONS_AVAILABLE:
         job_id = str(uuid.uuid4())
         logger.info("Starting RTE ingestion job: %s", job_id)
         run_ingestion(job_id=job_id, minutes=240)
+
+    # ── Story 2.1: Maintenance scraping timer ────────────────────────────────
+
+    @app.timer_trigger(
+        schedule="0 0 6 * * *",  # every day at 06:00 UTC
+        arg_name="timer",
+        run_on_startup=False,
+    )
+    def maintenance_scraping_timer(timer: func.TimerRequest) -> None:
+        """Daily scraping of grid maintenance events → Bronze layer."""
+        job_id = str(uuid.uuid4())
+        logger.info("[%s] Maintenance scraping starting", job_id)
+        storage_account = os.environ.get("STORAGE_ACCOUNT_NAME")
+        bronze = BronzeStorage(storage_account_name=storage_account)
+        scraper = MaintenanceScraper(
+            base_url=os.environ.get("MAINTENANCE_SCRAPING_URL")
+        )
+        try:
+            records = scraper.scrape_from_url()
+            path = bronze.write_json(records, source="maintenance")
+            logger.info("[%s] Scraped %d maintenance events → %s", job_id, len(records), path)
+        except Exception as exc:
+            logger.error("[%s] Maintenance scraping failed: %s", job_id, exc, exc_info=True)
+
+    # ── Story 3.4: SQL reference snapshot timer ───────────────────────────────
+
+    @app.timer_trigger(
+        schedule="0 0 1 * * *",  # every day at 01:00 UTC
+        arg_name="timer",
+        run_on_startup=False,
+    )
+    def sql_reference_snapshot_timer(timer: func.TimerRequest) -> None:
+        """Daily snapshot of SQL reference tables (DIM_REGION, DIM_SOURCE) → Bronze layer."""
+        job_id = str(uuid.uuid4())
+        logger.info("[%s] SQL reference snapshot starting", job_id)
+        storage_account = os.environ.get("STORAGE_ACCOUNT_NAME")
+        bronze = BronzeStorage(storage_account_name=storage_account)
+        conn = None
+        try:
+            conn = _get_db_connection()
+            cursor = conn.cursor()
+            snapshot = {}
+            for table in ("DIM_REGION", "DIM_SOURCE"):
+                cursor.execute(f"SELECT * FROM {table}")  # noqa: S608
+                cols = [col[0] for col in cursor.description]
+                snapshot[table] = [dict(zip(cols, row)) for row in cursor.fetchall()]
+            path = bronze.write_json(snapshot, source="infra")
+            logger.info("[%s] SQL snapshot written → %s", job_id, path)
+        except Exception as exc:
+            logger.error("[%s] SQL snapshot failed: %s", job_id, exc, exc_info=True)
+        finally:
+            if conn:
+                conn.close()
 
     # ── Story 5.3: Alert dispatch timer ──────────────────────────────────────
 
