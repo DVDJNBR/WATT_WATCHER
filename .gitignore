@@ -230,5 +230,9 @@ silver/
 # Azure Functions
 local.settings.json
 
-# Node (semantic-release)
-node_modules/.cloud/*.backup
+# Node
+node_modules/
+
+# Terraform extra
+.cloud/tfplan
+.cloud/*.backup
