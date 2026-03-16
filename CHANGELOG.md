@@ -1,3 +1,9 @@
+## [1.9.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.8.9...v1.9.0) (2026-03-12)
+
+### Features
+
+* **c8:** wire maintenance scraping + SQL reference snapshot timers ([f317570](https://github.com/DVDJNBR/WATT_WATCHER/commit/f3175705df42cf67830a384555be39abee7ff9ce))
+
 ## [1.8.9](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.8.8...v1.8.9) (2026-03-12)
 
 ### Bug Fixes
