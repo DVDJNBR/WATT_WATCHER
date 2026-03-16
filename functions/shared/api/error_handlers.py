@@ -13,7 +13,9 @@ from typing import Optional
 _STATUS_LABELS = {
     400: "Bad Request",
     401: "Unauthorized",
+    403: "Forbidden",
     404: "Not Found",
+    409: "Conflict",
     500: "Internal Server Error",
 }
 
@@ -51,6 +53,16 @@ def unauthorized(request_id: Optional[str] = None) -> dict:
 def not_found(message: str = "No data found for the given parameters", request_id: Optional[str] = None) -> dict:
     """404 — query returned no results."""
     return error_response(404, message, request_id)
+
+
+def forbidden(message: str, request_id: Optional[str] = None) -> dict:
+    """403 — authenticated but not authorized (e.g., unconfirmed account)."""
+    return error_response(403, message, request_id)
+
+
+def conflict(message: str, request_id: Optional[str] = None) -> dict:
+    """409 — resource already exists."""
+    return error_response(409, message, request_id)
 
 
 def server_error(message: str = "An unexpected error occurred", request_id: Optional[str] = None) -> dict:

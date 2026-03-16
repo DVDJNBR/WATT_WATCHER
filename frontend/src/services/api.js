@@ -5,9 +5,9 @@
  * AC #1: Real-time data fetch with auth headers.
  * AC #3: Graceful error handling with typed errors.
  */
-import { acquireToken } from './auth.js'
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
+const API_KEY  = import.meta.env.VITE_API_KEY || ''
 
 export class ApiError extends Error {
   constructor(message, status, requestId) {
@@ -36,12 +36,13 @@ export function buildQueryString(params) {
  * @returns {Promise<any>}
  */
 async function authGet(path, params = {}) {
-  const token = await acquireToken()
   const qs = buildQueryString(params)
   const url = `${API_BASE}${path}${qs}`
 
-  const headers = { 'Content-Type': 'application/json' }
-  if (token) headers.Authorization = `Bearer ${token}`
+  const headers = {
+    'Content-Type': 'application/json',
+    'X-Api-Key': API_KEY,
+  }
 
   const response = await fetch(url, { headers })
 
@@ -82,6 +83,46 @@ export async function fetchProduction({ regionCode, startDate, endDate, sourceTy
     limit,
     offset,
   })
+}
+
+/**
+ * Fetch active alerts — Story 5.2, Task 3.3.
+ *
+ * AC #1: Polls /v1/alerts every 60 s to keep dashboard current.
+ *
+ * @param {Object} params
+ * @param {string} [params.regionCode]  filter by region
+ * @param {string} [params.status]      'active' | 'acknowledged' | undefined (all)
+ * @param {number} [params.days]        look-back window (default 7)
+ * @param {number} [params.limit]       max alerts (default 50)
+ * @returns {Promise<{alerts: Array, total: number}>}
+ */
+export async function fetchAlerts({ regionCode, status = 'active', days = 7, limit = 50 } = {}) {
+  return authGet('/v1/alerts', { region_code: regionCode, status, days, limit })
+}
+
+/**
+ * Trigger the full ETL pipeline: Bronze → Silver → Gold SQL.
+ * Returns when the pipeline completes (may take ~60 s if SQL was paused).
+ *
+ * @returns {Promise<{status: string, stages: object}>}
+ */
+export async function triggerPipeline() {
+  const url = `${API_BASE}/v1/pipeline/refresh`
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Api-Key': API_KEY },
+  })
+  if (!response.ok) {
+    let errorBody = {}
+    try { errorBody = await response.json() } catch (_) { /* ignore */ }
+    throw new ApiError(
+      errorBody.message || `HTTP ${response.status}`,
+      response.status,
+      errorBody.request_id,
+    )
+  }
+  return response.json()
 }
 
 /**

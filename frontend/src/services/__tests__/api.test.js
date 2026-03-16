@@ -4,11 +4,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { buildQueryString } from '../api.js'
 
-// vi.mock at top level — Vitest hoists this above static imports
-vi.mock('../auth.js', () => ({
-  acquireToken: vi.fn().mockResolvedValue('mock-token'),
-}))
-
 // ── buildQueryString ──────────────────────────────────────────────────────────
 
 describe('buildQueryString', () => {
@@ -62,7 +57,7 @@ describe('fetchProduction', () => {
     vi.restoreAllMocks()
   })
 
-  it('calls fetch with Authorization header', async () => {
+  it('calls fetch with X-Api-Key header', async () => {
     const { fetchProduction } = await import('../api.js')
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
@@ -74,17 +69,14 @@ describe('fetchProduction', () => {
     expect(global.fetch).toHaveBeenCalledOnce()
     const [url, options] = global.fetch.mock.calls[0]
     expect(url).toContain('/v1/production/regional')
-    expect(options.headers.Authorization).toBe('Bearer mock-token')
+    expect('X-Api-Key' in options.headers).toBe(true)
   })
 
-  it('omits Authorization header when token is empty', async () => {
-    const { acquireToken } = await import('../auth.js')
-    acquireToken.mockResolvedValueOnce('')
-
+  it('does not send Authorization header', async () => {
     const { fetchProduction } = await import('../api.js')
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
-      json: async () => ({ data: [], total_records: 0, request_id: 'req-empty' }),
+      json: async () => ({ data: [], total_records: 0, request_id: 'req-noauth' }),
     })
 
     await fetchProduction({ limit: 1 })
@@ -138,7 +130,6 @@ describe('fetchProduction', () => {
       json: async () => ({ message: 'Not found' }),
     })
 
-    // Use .catch(e => e) to guarantee the assertion runs even if no exception thrown
     const err = await fetchProduction().catch(e => e)
     expect(err).toBeInstanceOf(ApiError)
     expect(err.status).toBe(404)

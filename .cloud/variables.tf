@@ -2,18 +2,6 @@
 # GRID_POWER_STREAM — Input Variables
 # -----------------------------------------------------------------------------
 
-variable "project_name" {
-  description = "Project name used in resource naming"
-  type        = string
-  default     = "gps"
-}
-
-variable "environment" {
-  description = "Environment (dev, staging, prod)"
-  type        = string
-  default     = "dev"
-}
-
 variable "location" {
   description = "Azure region for all resources"
   type        = string
@@ -23,7 +11,7 @@ variable "location" {
 variable "sql_admin_login" {
   description = "SQL Server administrator login"
   type        = string
-  default     = "gpsadmin"
+  default     = "wwadmin"
 }
 
 variable "sql_admin_password" {
@@ -35,7 +23,7 @@ variable "sql_admin_password" {
 variable "sql_auto_pause_delay" {
   description = "Minutes of inactivity before SQL auto-pause (-1 to disable)"
   type        = number
-  default     = 60
+  default     = -1
 }
 
 variable "retention_bronze_days" {

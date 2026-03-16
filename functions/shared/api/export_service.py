@@ -12,7 +12,7 @@ import logging
 import uuid
 from typing import Any, Optional
 
-from functions.shared.api.production_service import build_production_query
+from shared.api.production_service import build_production_query
 
 logger = logging.getLogger(__name__)
 
@@ -67,10 +67,13 @@ def export_to_csv(
     """
     request_id = request_id or str(uuid.uuid4())
 
+    import sqlite3
+    is_sqlite = isinstance(conn, sqlite3.Connection)
+
     # Fetch all rows (no pagination for CSV — capped at 10 000 for safety)
     sql, params = build_production_query(
         region_code, start_date, end_date, source_type,
-        limit=10_000, offset=0,
+        limit=10_000, offset=0, is_sqlite=is_sqlite,
     )
 
     cursor = conn.cursor()

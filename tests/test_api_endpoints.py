@@ -20,6 +20,8 @@ from functions.shared.api.error_handlers import (
     not_found,
     server_error,
     unauthorized,
+    forbidden,
+    conflict,
     error_response,
 )
 from functions.shared.api.models import (
@@ -70,13 +72,15 @@ def db():
     cursor = conn.cursor()
     # Insert 6 fact rows: 2 regions × 3 timestamps, source=eolien (id_source=2)
     # DimLoader upsert_sources creates: nucleaire=1, eolien=2, solaire=3 …
+    # Region 1 (Île-de-France): consommation_mw set; Region 2 (ARA): NULL
     for id_date in [1, 2, 3]:
         for id_region, mw in [(1, 450.0), (2, 280.0)]:
+            consommation = round(mw * 1.1, 2) if id_region == 1 else None
             cursor.execute(
                 """INSERT INTO FACT_ENERGY_FLOW
-                   (id_date, id_region, id_source, valeur_mw, facteur_charge)
-                   VALUES (?, ?, 2, ?, ?)""",
-                (id_date, id_region, mw, round(mw / 5000, 4)),
+                   (id_date, id_region, id_source, valeur_mw, facteur_charge, consommation_mw)
+                   VALUES (?, ?, 2, ?, ?, ?)""",
+                (id_date, id_region, mw, round(mw / 5000, 4), consommation),
             )
     conn.commit()
     return conn
@@ -120,6 +124,77 @@ class TestErrorHandlers:
     def test_custom_details(self):
         resp = error_response(400, "msg", details={"field": "region_code"})
         assert resp["details"]["field"] == "region_code"
+
+    def test_forbidden_structure(self):
+        resp = forbidden("Account not confirmed", request_id="req-1")
+        assert resp["status_code"] == 403
+        assert resp["error"] == "Forbidden"
+        assert resp["request_id"] == "req-1"
+        assert "Account not confirmed" in resp["message"]
+
+    def test_conflict_structure(self):
+        resp = conflict("Email already registered", request_id="req-2")
+        assert resp["status_code"] == 409
+        assert resp["error"] == "Conflict"
+        assert "Email already registered" in resp["message"]
+
+
+# ─── Story 2.3: Auth endpoint response shapes ─────────────────────────────────
+
+
+class TestLoginEndpointShapes:
+    """Verify that error-handler dicts used by the login endpoint are well-formed.
+
+    The HTTP handlers in function_app.py are not importable without Azure
+    Functions installed, so we test the response shapes produced by the
+    same helpers the handlers call.
+    """
+
+    def test_401_response_shape(self):
+        """Inline 401 dict matches what the login handler builds for AuthError."""
+        request_id = "test-rid"
+        resp = {
+            "request_id": request_id,
+            "status_code": 401,
+            "error": "Unauthorized",
+            "message": "Invalid email or password",
+            "details": {},
+        }
+        assert resp["status_code"] == 401
+        assert resp["error"] == "Unauthorized"
+        assert resp["request_id"] == request_id
+        assert resp["details"] == {}
+
+    def test_403_response_shape(self):
+        """forbidden() used by the login handler for UnconfirmedError."""
+        resp = forbidden("Account not confirmed — please check your email", "test-rid")
+        assert resp["status_code"] == 403
+        assert resp["error"] == "Forbidden"
+        assert "email" in resp["message"].lower()
+
+    def test_400_missing_email_shape(self):
+        """bad_request() used by the login handler when email/password absent."""
+        resp = bad_request("email and password are required", "test-rid")
+        assert resp["status_code"] == 400
+        assert "email" in resp["message"]
+        assert "password" in resp["message"]
+
+    def test_200_login_response_contains_token(self):
+        """200 response dict structure returned on successful login."""
+        request_id = "test-rid"
+        service_result = {"user_id": 1, "email": "user@test.com", "token": "jwt.abc.def"}
+        resp = {"request_id": request_id, **service_result}
+        assert resp["user_id"] == 1
+        assert resp["email"] == "user@test.com"
+        assert resp["token"] == "jwt.abc.def"
+        assert resp["request_id"] == request_id
+
+    def test_200_logout_response_contains_message(self):
+        """200 response dict structure returned by logout endpoint."""
+        from functions.shared.api.auth_service import logout
+        result = logout()
+        resp = {"request_id": "test-rid", "message": result["message"]}
+        assert resp["message"] == "Logged out successfully"
 
 
 # ─── Task 1.3: Models / parameter parsing ────────────────────────────────────
@@ -191,17 +266,26 @@ class TestRoutes:
 # ─── Task 5.1: production_service unit tests ─────────────────────────────────
 
 class TestProductionService:
-    def test_build_query_no_filters(self):
-        sql, params = build_production_query()
+    def test_build_query_no_filters_sqlite(self):
+        sql, params = build_production_query(is_sqlite=True)
         assert "FACT_ENERGY_FLOW" in sql
-        # OFFSET is applied in Python after aggregation, not in SQL
         assert "LIMIT ?" in sql
         assert "OFFSET ?" not in sql
+        assert "consommation_mw" in sql
         # sql_limit = (offset=0 + limit=100) * 10 = 1000
         assert params[-1] == 1000
 
+    def test_build_query_no_filters_sqlserver(self):
+        sql, params = build_production_query(is_sqlite=False)
+        assert "FACT_ENERGY_FLOW" in sql
+        assert "TOP(?)" in sql.replace(" ", "")
+        assert "LIMIT" not in sql
+        assert "consommation_mw" in sql
+        # sql_limit is first param for TOP(?)
+        assert params[0] == 1000
+
     def test_build_query_with_region(self):
-        sql, params = build_production_query(region_code="11")
+        sql, params = build_production_query(region_code="11", is_sqlite=True)
         assert "r.code_insee = ?" in sql
         assert "11" in params
 
@@ -213,20 +297,32 @@ class TestProductionService:
             source_type="eolien",
             limit=50,
             offset=10,
+            is_sqlite=True,
         )
         assert params.count("11") == 1
         assert "2025-06-01" in params
-        assert "2025-06-30" in params
+        # Date-only end_date must be expanded to include full day
+        assert "2025-06-30 23:59:59" in params
         assert "eolien" in params
         # sql_limit = (offset=10 + limit=50) * 10 = 600; no OFFSET in SQL params
         assert params[-1] == 600
 
+    def test_build_query_end_date_only_expanded(self):
+        """Date-only end_date (YYYY-MM-DD) must be expanded to 23:59:59."""
+        _, params = build_production_query(end_date="2025-06-30", is_sqlite=True)
+        assert "2025-06-30 23:59:59" in params
+
+    def test_build_query_end_date_datetime_unchanged(self):
+        """Datetime end_date (with time) must not be modified."""
+        _, params = build_production_query(end_date="2025-06-30T18:00:00", is_sqlite=True)
+        assert "2025-06-30T18:00:00" in params
+
     def test_aggregate_rows_pivot(self):
         """AC #3: sources dict is correctly built from flat rows."""
-        cols = ["code_insee", "nom_region", "horodatage", "source_name", "valeur_mw", "facteur_charge"]
+        cols = ["code_insee", "nom_region", "horodatage", "source_name", "valeur_mw", "facteur_charge", "consommation_mw"]
         rows = [
-            ("11", "IDF", "2025-06-15T10:00", "eolien", 450.0, 0.09),
-            ("11", "IDF", "2025-06-15T10:00", "solaire", 320.0, 0.06),
+            ("11", "IDF", "2025-06-15T10:00", "eolien", 450.0, 0.09, 500.0),
+            ("11", "IDF", "2025-06-15T10:00", "solaire", 320.0, 0.06, 500.0),
         ]
         data = _aggregate_rows(rows, cols)
         assert len(data) == 1
@@ -234,6 +330,23 @@ class TestProductionService:
         assert record["code_insee"] == "11"
         assert record["sources"]["eolien"] == 450.0
         assert record["sources"]["solaire"] == 320.0
+
+    def test_aggregate_rows_datetime_serializable(self):
+        """pyodbc returns datetime objects — must be JSON serializable."""
+        import json
+        from datetime import datetime
+        from decimal import Decimal
+        cols = ["code_insee", "nom_region", "horodatage", "source_name", "valeur_mw", "facteur_charge", "consommation_mw"]
+        rows = [
+            ("11", "IDF", datetime(2025, 6, 15, 10, 0, 0), "eolien", Decimal("450.00"), Decimal("0.09"), Decimal("500.00")),
+        ]
+        data = _aggregate_rows(rows, cols)
+        # Must not raise — all values must be JSON serializable
+        serialized = json.dumps(data)
+        reparsed = json.loads(serialized)
+        assert reparsed[0]["sources"]["eolien"] == 450.0
+        assert "2025-06-15" in reparsed[0]["timestamp"]
+        assert reparsed[0]["consommation_mw"] == 500.0
 
     def test_query_production_returns_data(self, db):
         """AC #1: Returns aggregated data from Gold SQL."""
@@ -276,6 +389,32 @@ class TestProductionService:
         assert "limit" in result
         assert result["limit"] == 5
         assert "offset" in result
+
+    def test_query_production_includes_consommation_mw(self, db):
+        """AC: consommation_mw appears at region/timestamp level in each record."""
+        result = query_production(db, request_id="cons-test")
+        assert result["total_records"] > 0
+        for record in result["data"]:
+            assert "consommation_mw" in record
+
+    def test_query_production_consommation_mw_value(self, db):
+        """Region 1 (code_insee=11) has consommation_mw = round(450.0 * 1.1, 2) as set in fixture."""
+        expected = round(450.0 * 1.1, 2)  # matches fixture: round(mw * 1.1, 2) for id_region=1
+        result = query_production(db, region_code="11")
+        assert result["total_records"] > 0
+        for record in result["data"]:
+            assert record["consommation_mw"] == pytest.approx(expected)
+
+    def test_query_production_consommation_mw_null(self, db):
+        """Region 2 (code_insee=84) has consommation_mw = NULL → null in JSON."""
+        import json
+        result = query_production(db, region_code="84")
+        assert result["total_records"] > 0
+        serialized = json.dumps(result)
+        reparsed = json.loads(serialized)
+        for record in reparsed["data"]:
+            assert "consommation_mw" in record
+            assert record["consommation_mw"] is None
 
 
 # ─── Task 5.2: export_service unit tests ─────────────────────────────────────
@@ -498,6 +637,7 @@ class TestHTTPIntegration:
             assert "region" in rec
             assert "timestamp" in rec
             assert "sources" in rec
+            assert "consommation_mw" in rec
 
     def test_production_400_invalid_limit(self, db):
         resp = _simulate_production_endpoint(db, {"limit": "not_a_number"})

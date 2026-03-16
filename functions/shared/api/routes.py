@@ -18,9 +18,27 @@ EXPORT_CSV = f"{PREFIX}/export/csv"
 ROUTE_PRODUCTION = f"{API_VERSION}/production/regional"
 ROUTE_EXPORT = f"{API_VERSION}/export/csv"
 
+# Alerts endpoint
+ALERTS = f"{PREFIX}/alerts"
+ROUTE_ALERTS = f"{API_VERSION}/alerts"
+
 # Public endpoints — exempt from @require_auth
 ROUTE_HEALTH = "health"
 ROUTE_DOCS = "docs"
 ROUTE_OPENAPI_JSON = "openapi.json"
 
 PUBLIC_ROUTES = {ROUTE_HEALTH, ROUTE_DOCS, ROUTE_OPENAPI_JSON}
+
+# Pipeline refresh — protected, callable from frontend
+ROUTE_PIPELINE_REFRESH = "v1/pipeline/refresh"
+
+# Auth endpoints — public (no @require_auth, no @require_jwt)
+ROUTE_AUTH_REGISTER = "v1/auth/register"
+ROUTE_AUTH_CONFIRM = "v1/auth/confirm"
+ROUTE_AUTH_RESEND = "v1/auth/resend-confirmation"
+ROUTE_AUTH_LOGIN = "v1/auth/login"
+ROUTE_AUTH_LOGOUT = "v1/auth/logout"
+ROUTE_AUTH_RESET_REQUEST = "v1/auth/reset-password/request"
+ROUTE_AUTH_RESET_CONFIRM = "v1/auth/reset-password/confirm"
+ROUTE_AUTH_ACCOUNT = "v1/auth/account"
+ROUTE_SUBSCRIPTIONS = "v1/subscriptions"

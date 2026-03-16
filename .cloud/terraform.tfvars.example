@@ -1,12 +1,12 @@
 # GRID_POWER_STREAM — Terraform Variables
 # Copy this file to terraform.tfvars and fill in your values.
 
-project_name = "gps"
+project_name = "ww"
 environment  = "dev"
 location     = "francecentral"
 
 # SQL Server credentials
-sql_admin_login    = "gpsadmin"
+sql_admin_login    = "wwadmin"
 sql_admin_password = "CHANGE_ME_Str0ng!Pass"  # ⚠️ Change this!
 
 # Data retention (days)

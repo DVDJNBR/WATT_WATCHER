@@ -4,7 +4,7 @@ import json
 import sqlite3
 from pathlib import Path
 
-import polars as pl
+import pandas as pd
 import pytest
 
 from functions.shared.gold.dim_loader import DimLoader
@@ -28,7 +28,7 @@ def dim(db):
 @pytest.fixture
 def silver_parquet(tmp_path):
     """Create a Silver Parquet fixture for Gold loading."""
-    df = pl.DataFrame([
+    df = pd.DataFrame([
         {
             "code_insee_region": "11",
             "libelle_region": "Île-de-France",
@@ -41,6 +41,7 @@ def silver_parquet(tmp_path):
             "charbon_mw": 0.0,
             "fioul_mw": 0.0,
             "bioenergies_mw": 45.0,
+            "consommation_mw": 4100.0,
         },
         {
             "code_insee_region": "84",
@@ -54,10 +55,11 @@ def silver_parquet(tmp_path):
             "charbon_mw": 0.0,
             "fioul_mw": 0.0,
             "bioenergies_mw": 30.0,
+            "consommation_mw": 3500.0,
         },
     ])
     path = tmp_path / "silver.parquet"
-    df.write_parquet(path)
+    df.to_parquet(path, index=False)
     return path
 
 
@@ -98,6 +100,34 @@ class TestDimLoader:
         cursor = dim.conn.cursor()
         cursor.execute("SELECT est_weekend FROM DIM_TIME WHERE horodatage = '2025-06-15T10:00:00+00:00'")
         assert cursor.fetchone()[0] == 1
+
+    def test_upsert_time_skips_invalid_timestamps(self, dim):
+        """Malformed timestamps are silently skipped, valid ones still inserted."""
+        count = dim.upsert_time([
+            "not-a-date",
+            "2025-06-15T10:00:00+00:00",  # valid
+            "",
+            None,
+            "9999-99-99T99:99:99",
+        ])
+        # Only the valid timestamp is inserted
+        assert count == 1
+        assert dim.get_time_id("2025-06-15T10:00:00+00:00") is not None
+
+    def test_upsert_time_all_invalid_returns_zero(self, dim):
+        """All invalid timestamps → returns 0 without raising."""
+        count = dim.upsert_time(["garbage", "also-garbage"])
+        assert count == 0
+
+    def test_upsert_time_empty_list(self, dim):
+        """Empty list → returns 0."""
+        count = dim.upsert_time([])
+        assert count == 0
+
+    def test_upsert_regions_empty_list(self, dim):
+        """Empty regions list → returns 0 without error."""
+        count = dim.upsert_regions([])
+        assert count == 0
 
 
 # ─── Fact Loader Tests ───────────────────────────────────────────────────────
@@ -159,6 +189,24 @@ class TestFactLoader:
         loader.load_from_silver(silver_parquet)
         count2 = loader.get_fact_count()
         assert count1 == count2
+
+    def test_consommation_mw_written(self, db, silver_parquet):
+        """consommation_mw is persisted for every fact row of the region/time."""
+        loader = FactLoader(db)
+        loader.load_from_silver(silver_parquet)
+        cursor = db.cursor()
+        cursor.execute("""
+            SELECT COUNT(*) FROM FACT_ENERGY_FLOW f
+            JOIN DIM_REGION r ON f.id_region = r.id_region
+            WHERE r.code_insee = '11' AND f.consommation_mw IS NULL
+        """)
+        assert cursor.fetchone()[0] == 0, "consommation_mw should not be NULL for region 11"
+        cursor.execute("""
+            SELECT DISTINCT f.consommation_mw FROM FACT_ENERGY_FLOW f
+            JOIN DIM_REGION r ON f.id_region = r.id_region
+            WHERE r.code_insee = '11'
+        """)
+        assert cursor.fetchone()[0] == pytest.approx(4100.0)
 
     def test_fact_summary(self, db, silver_parquet):
         """Summary stats work correctly."""

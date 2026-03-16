@@ -1,21 +1,23 @@
-name: Deploy
+name: CI & Deploy
 
 on:
   push:
     branches: [main]
-  workflow_dispatch:  # allow manual trigger
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
 
 permissions:
-  contents: read
-  id-token: write  # for OIDC if needed
+  contents: write
+  issues: write
+  pull-requests: write
+  id-token: write
 
 jobs:
-  # ── Azure Functions deployment ──────────────────────────────────────────────
-  deploy-functions:
-    name: Deploy Azure Functions
+  # ── Tests (run once, gate everything) ───────────────────────────────────────
+  test:
+    name: Tests
     runs-on: ubuntu-latest
-    environment: production
-
     steps:
       - uses: actions/checkout@v4
 
@@ -28,25 +30,75 @@ jobs:
       - name: Install dependencies
         run: uv sync --all-extras
 
-      - name: Run tests before deploy
+      - name: Run tests
         run: uv run python -m pytest tests/ -q --tb=short
+
+  # ── Semantic release (version bump + changelog) ─────────────────────────────
+  release:
+    name: Release
+    needs: test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Semantic Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npx semantic-release
+
+  # ── Azure Functions deployment ───────────────────────────────────────────────
+  deploy-functions:
+    name: Deploy Azure Functions
+    needs: test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Prepare deployment package
+        run: |
+          cp host.json functions/
+          pip install \
+            --platform manylinux_2_28_x86_64 \
+            --python-version 3.11 \
+            --implementation cp \
+            --abi cp311 \
+            --only-binary=:all: \
+            --target functions/.python_packages/lib/site-packages \
+            -r functions/requirements.txt
 
       - name: Deploy to Azure Functions
         uses: Azure/functions-action@v1
         with:
           app-name: ${{ secrets.AZURE_FUNCTIONAPP_NAME }}
           publish-profile: ${{ secrets.AZURE_FUNCTIONAPP_PUBLISH_PROFILE }}
-          package: .
-          scm-do-build-during-deployment: true
-          enable-oryx-build: true
+          package: functions
+          scm-do-build-during-deployment: false
 
-  # ── Frontend build + Azure Static Web Apps deployment ──────────────────────
+  # ── Frontend build + Azure Storage Static Website deployment ────────────────
   deploy-frontend:
-    name: Deploy Frontend (Azure SWA)
-    runs-on: ubuntu-latest
+    name: Deploy Frontend
     needs: deploy-functions
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
     environment: production
-
     steps:
       - uses: actions/checkout@v4
 
@@ -65,17 +117,17 @@ jobs:
         working-directory: frontend
         env:
           VITE_API_BASE_URL: ${{ secrets.AZURE_FUNCTIONS_URL }}
-          VITE_AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-          VITE_AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-          VITE_SKIP_AUTH: "false"
+          VITE_API_KEY: ${{ secrets.VITE_API_KEY }}
         run: npm run build
 
-      - name: Deploy to Azure Static Web Apps
-        uses: Azure/static-web-apps-deploy@v1
+      - name: Deploy to Azure Storage Static Website
+        uses: azure/CLI@v2
         with:
-          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          action: upload
-          app_location: frontend
-          output_location: dist
-          skip_app_build: true  # already built above
+          azcliversion: latest
+          inlineScript: |
+            az storage blob upload-batch \
+              --account-name ${{ secrets.AZURE_FRONTEND_STORAGE_NAME }} \
+              --account-key "${{ secrets.AZURE_FRONTEND_STORAGE_KEY }}" \
+              --source frontend/dist \
+              --destination '$web' \
+              --overwrite true

@@ -25,6 +25,11 @@ output "key_vault_uri" {
   value       = azurerm_key_vault.main.vault_uri
 }
 
+output "key_vault_name" {
+  description = "Key Vault name (for az keyvault secret show)"
+  value       = azurerm_key_vault.main.name
+}
+
 output "function_app_name" {
   value = azurerm_linux_function_app.main.name
 }
@@ -39,14 +44,19 @@ output "application_insights_connection_string" {
   sensitive   = true
 }
 
-output "static_web_app_url" {
-  description = "Frontend URL — set as VITE_API_BASE_URL in GitHub Actions"
-  value       = "https://${azurerm_static_web_app.frontend.default_host_name}"
+output "frontend_url" {
+  description = "Frontend static website URL"
+  value       = azurerm_storage_account.frontend.primary_web_endpoint
 }
 
-output "static_web_app_api_token" {
-  description = "SWA deploy token — add as AZURE_STATIC_WEB_APPS_API_TOKEN in GitHub secrets"
-  value       = azurerm_static_web_app.frontend.api_key
+output "frontend_storage_name" {
+  description = "Storage account name for frontend deploy (az storage blob upload-batch)"
+  value       = azurerm_storage_account.frontend.name
+}
+
+output "frontend_storage_key" {
+  description = "Storage key for GitHub Actions frontend deploy"
+  value       = azurerm_storage_account.frontend.primary_access_key
   sensitive   = true
 }
 
@@ -54,3 +64,4 @@ output "function_app_url" {
   description = "Azure Functions base URL — use as VITE_API_BASE_URL in frontend"
   value       = "https://${azurerm_linux_function_app.main.default_hostname}"
 }
+

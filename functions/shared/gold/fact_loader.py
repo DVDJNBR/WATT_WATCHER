@@ -6,13 +6,13 @@ calculates facteur_charge, and INSERTs into FACT_ENERGY_FLOW.
 """
 
 import logging
-import sqlite3
+from datetime import datetime as _dt
 from pathlib import Path
 from typing import Any
 
-import polars as pl
+import pandas as pd
 
-from functions.shared.gold.dim_loader import DimLoader
+from shared.gold.dim_loader import DimLoader
 
 logger = logging.getLogger(__name__)
 
@@ -61,16 +61,16 @@ class FactLoader:
 
         # Read Silver data
         if silver_path.is_file():
-            df = pl.read_parquet(silver_path)
+            df = pd.read_parquet(silver_path)
         elif silver_path.is_dir():
             parquets = sorted(silver_path.rglob("*.parquet"))
             if not parquets:
                 return {"status": "empty", "rows_loaded": 0}
-            df = pl.concat([pl.read_parquet(f) for f in parquets])
+            df = pd.concat([pd.read_parquet(f) for f in parquets], ignore_index=True)
         else:
             raise FileNotFoundError(f"Silver path not found: {silver_path}")
 
-        if df.is_empty():
+        if df.empty:
             return {"status": "empty", "rows_loaded": 0}
 
         # Ensure DIM_SOURCE is populated
@@ -79,9 +79,9 @@ class FactLoader:
         # Auto-populate DIM_REGION from Silver data
         if "code_insee_region" in df.columns and "libelle_region" in df.columns:
             regions = (
-                df.select(["code_insee_region", "libelle_region"])
-                .unique()
-                .to_dicts()
+                df[["code_insee_region", "libelle_region"]]
+                .drop_duplicates()
+                .to_dict("records")  # type: ignore[call-overload]
             )
             self.dim.upsert_regions([
                 {"code_insee": r["code_insee_region"], "nom_region": r["libelle_region"]}
@@ -90,81 +90,125 @@ class FactLoader:
 
         # Auto-populate DIM_TIME from Silver timestamps
         if "date_heure" in df.columns:
-            timestamps = df["date_heure"].cast(pl.Utf8).unique().to_list()
+            timestamps = df["date_heure"].astype(str).unique().tolist()
             self.dim.upsert_time(timestamps)
 
-        # Pivot: unpivot wide format (one row per region/time) to long format
-        # (one row per region/time/source)
-        rows_loaded = 0
-        cursor = self.conn.cursor()
-
-        # Pre-compute timestamp strings in Polars Utf8 format to match what
-        # DIM_TIME.horodatage stores (avoids Python datetime str() format mismatch).
-        df = df.with_columns(
-            pl.col("date_heure").cast(pl.Utf8).alias("_ts_str")
+        # Unpivot: wide (one row per region/time) → long (one row per region/time/source)
+        source_cols = [c for c in SOURCE_COLUMN_MAP if c in df.columns]
+        id_cols = [c for c in ["date_heure", "code_insee_region", "temperature_c",
+                                "temperature_moyenne", "consommation_mw"] if c in df.columns]
+        long_df = (
+            df[id_cols + source_cols]
+            .melt(
+                id_vars=id_cols,
+                value_vars=source_cols,
+                var_name="source_col",
+                value_name="valeur_mw",
+            )
+            .dropna(subset=["valeur_mw"])
         )
 
-        for row in df.iter_rows(named=True):
-            region_code = str(row.get("code_insee_region", ""))
-            timestamp = row.get("_ts_str", "")
+        # Handle date_heure → horodatage (naive datetime for SQLite lookup)
+        ts = pd.to_datetime(long_df["date_heure"], utc=True, errors="coerce")
+        long_df["horodatage"] = ts.dt.tz_localize(None) if ts.dt.tz is None else ts.dt.tz_convert(None)
+        long_df["source_name"] = long_df["source_col"].map(SOURCE_COLUMN_MAP)  # type: ignore[arg-type]
+        long_df["valeur_mw"] = pd.to_numeric(long_df["valeur_mw"], errors="coerce")
 
-            id_region = self.dim.get_region_id(region_code)
-            id_date = self.dim.get_time_id(timestamp)
+        temp_col = "temperature_c" if "temperature_c" in long_df.columns else \
+                   ("temperature_moyenne" if "temperature_moyenne" in long_df.columns else None)
 
-            if not id_region or not id_date:
-                continue
+        rows_loaded = len(long_df)
+        logger.info("Unpivoted to %d long rows", rows_loaded)
+        cursor = self.conn.cursor()
 
-            for col, source_name in SOURCE_COLUMN_MAP.items():
-                if col not in row or row[col] is None:
+        if self.dim._is_sqlite:
+            # SQLite: row-by-row with cache
+            cursor0 = self.conn.cursor()
+            cursor0.execute("SELECT id_region, code_insee FROM DIM_REGION")
+            region_map = {r[1]: r[0] for r in cursor0.fetchall()}
+            cursor0.execute("SELECT id_date, horodatage FROM DIM_TIME")
+            time_map = {}
+            for id_date, ts_str in cursor0.fetchall():
+                time_map[ts_str] = id_date
+                try:
+                    ts = _dt.fromisoformat(str(ts_str).replace("Z", "+00:00").replace(" UTC", "+00:00"))
+                    time_map[ts.replace(tzinfo=None)] = id_date
+                except Exception as e:
+                    logger.debug("Could not parse timestamp %r for time_map: %s", ts_str, e)
+            cursor0.execute("SELECT id_source, source_name FROM DIM_SOURCE")
+            source_map = {r[1]: r[0] for r in cursor0.fetchall()}
+            params = []
+            for row in long_df.to_dict("records"):
+                id_r = region_map.get(str(row["code_insee_region"]))
+                id_d = time_map.get(row["horodatage"])
+                id_s = source_map.get(row["source_name"])
+                if not (id_r and id_d and id_s):
                     continue
-
-                valeur_mw = float(row[col])
-                id_source = self.dim.get_source_id(source_name)
-                if not id_source:
-                    continue
-
-                # AC: Calculate facteur_charge
-                facteur_charge = None
-                installed = self.capacity.get(source_name)
-                if installed and installed > 0:
-                    facteur_charge = round(valeur_mw / installed, 4)
-
-                # Temperature from ERA5 if available
                 temp = row.get("temperature_c") or row.get("temperature_moyenne")
-
-                params = (id_date, id_region, id_source, valeur_mw, facteur_charge, temp)
-                if self.dim._is_sqlite:
-                    cursor.execute(
-                        """INSERT INTO FACT_ENERGY_FLOW
-                           (id_date, id_region, id_source, valeur_mw, facteur_charge, temperature_moyenne)
-                           VALUES (?, ?, ?, ?, ?, ?)
-                           ON CONFLICT(id_date, id_region, id_source) DO UPDATE SET
-                               valeur_mw = excluded.valeur_mw,
-                               facteur_charge = excluded.facteur_charge,
-                               temperature_moyenne = excluded.temperature_moyenne""",
-                        params,
-                    )
-                else:
-                    cursor.execute(
-                        """MERGE FACT_ENERGY_FLOW AS t
-                           USING (VALUES (?, ?, ?, ?, ?, ?))
-                               AS s(id_date, id_region, id_source,
-                                    valeur_mw, facteur_charge, temperature_moyenne)
-                           ON t.id_date = s.id_date
-                              AND t.id_region = s.id_region
-                              AND t.id_source = s.id_source
-                           WHEN MATCHED THEN UPDATE SET
-                               valeur_mw = s.valeur_mw,
-                               facteur_charge = s.facteur_charge,
-                               temperature_moyenne = s.temperature_moyenne
-                           WHEN NOT MATCHED THEN INSERT
-                               (id_date, id_region, id_source,
-                                valeur_mw, facteur_charge, temperature_moyenne)
-                               VALUES (s.id_date, s.id_region, s.id_source,
-                                       s.valeur_mw, s.facteur_charge, s.temperature_moyenne);""",
-                        params,
-                    )
-                rows_loaded += 1
+                facteur = (
+                    row["valeur_mw"] / self.capacity[row["source_name"]]
+                    if row["source_name"] in self.capacity else None
+                )
+                conso = row.get("consommation_mw")
+                params.append((id_d, id_r, id_s, row["valeur_mw"], facteur, temp, conso))
+            cursor.executemany(
+                """INSERT INTO FACT_ENERGY_FLOW
+                   (id_date, id_region, id_source, valeur_mw, facteur_charge, temperature_moyenne, consommation_mw)
+                   VALUES (?, ?, ?, ?, ?, ?, ?)
+                   ON CONFLICT(id_date, id_region, id_source) DO UPDATE SET
+                       valeur_mw = excluded.valeur_mw,
+                       temperature_moyenne = excluded.temperature_moyenne,
+                       consommation_mw = excluded.consommation_mw""",
+                params,
+            )
+            rows_loaded = len(params)
+        else:
+            # Azure SQL: staging table + JOIN-based MERGE (no Python FK resolution)
+            cursor.execute("""
+                CREATE TABLE #stg (
+                    horodatage      DATETIME2,
+                    code_insee      NVARCHAR(10),
+                    source_name     NVARCHAR(50),
+                    valeur_mw       FLOAT,
+                    temperature_moy FLOAT,
+                    consommation_mw FLOAT
+                )
+            """)
+            cursor.fast_executemany = True
+            stg_rows = [
+                (
+                    row["horodatage"],
+                    str(row["code_insee_region"]),
+                    row["source_name"],
+                    row["valeur_mw"],
+                    row.get(temp_col) if temp_col else None,
+                    row.get("consommation_mw"),
+                )
+                for row in long_df.to_dict("records")
+            ]
+            BATCH = 5000
+            for i in range(0, len(stg_rows), BATCH):
+                cursor.executemany("INSERT INTO #stg VALUES (?,?,?,?,?,?)", stg_rows[i:i+BATCH])
+                logger.info("Staged %d / %d", min(i+BATCH, len(stg_rows)), len(stg_rows))
+            cursor.execute("""
+                MERGE FACT_ENERGY_FLOW AS t
+                USING (
+                    SELECT dt.id_date, dr.id_region, ds.id_source,
+                           s.valeur_mw, s.temperature_moy, s.consommation_mw
+                    FROM #stg s
+                    JOIN DIM_TIME   dt ON dt.horodatage  = s.horodatage
+                    JOIN DIM_REGION dr ON dr.code_insee  = s.code_insee
+                    JOIN DIM_SOURCE ds ON ds.source_name = s.source_name
+                ) AS src
+                ON t.id_date=src.id_date AND t.id_region=src.id_region AND t.id_source=src.id_source
+                WHEN MATCHED THEN UPDATE SET
+                    valeur_mw=src.valeur_mw, temperature_moyenne=src.temperature_moy,
+                    consommation_mw=src.consommation_mw
+                WHEN NOT MATCHED THEN INSERT
+                    (id_date,id_region,id_source,valeur_mw,facteur_charge,temperature_moyenne,consommation_mw)
+                VALUES (src.id_date,src.id_region,src.id_source,src.valeur_mw,NULL,src.temperature_moy,src.consommation_mw);
+            """)
+            cursor.execute("DROP TABLE #stg")
 
         self.conn.commit()
 

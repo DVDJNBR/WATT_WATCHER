@@ -25,6 +25,7 @@ def build_production_query(
     source_type: Optional[str] = None,
     limit: int = 100,
     offset: int = 0,
+    is_sqlite: bool = False,
 ) -> tuple[str, list]:
     """
     Build parameterized SQL query for production data.
@@ -35,6 +36,9 @@ def build_production_query(
     Note: LIMIT is applied on raw rows (one per source). Multiply by 10 to
     ensure enough rows are fetched before aggregation into (region, timestamp)
     records. Final pagination is applied in query_production() after aggregation.
+
+    Args:
+        is_sqlite: Use LIMIT syntax (SQLite) vs TOP syntax (SQL Server).
     """
     where_clauses: list[str] = []
     params: list[Any] = []
@@ -49,6 +53,9 @@ def build_production_query(
 
     if end_date:
         where_clauses.append("t.horodatage <= ?")
+        # Date-only string (YYYY-MM-DD) → include the whole day up to 23:59:59
+        if len(end_date) == 10:
+            end_date = end_date + " 23:59:59"
         params.append(end_date)
 
     if source_type:
@@ -61,49 +68,93 @@ def build_production_query(
     # enough raw rows are fetched to build `limit` aggregated records after pivot.
     sql_limit = (offset + limit) * 10
 
-    sql = f"""
-        SELECT
-            r.code_insee,
-            r.nom_region,
-            t.horodatage,
-            s.source_name,
-            f.valeur_mw,
-            f.facteur_charge
-        FROM FACT_ENERGY_FLOW f
-        JOIN DIM_REGION r ON f.id_region = r.id_region
-        JOIN DIM_TIME t ON f.id_date = t.id_date
-        JOIN DIM_SOURCE s ON f.id_source = s.id_source
-        {where}
-        ORDER BY t.horodatage ASC, r.code_insee
-        LIMIT ?
-    """
-    params.append(sql_limit)
+    if is_sqlite:
+        # SQLite: LIMIT clause at end
+        sql = f"""
+            SELECT
+                r.code_insee,
+                r.nom_region,
+                t.horodatage,
+                s.source_name,
+                f.valeur_mw,
+                f.facteur_charge,
+                f.consommation_mw
+            FROM FACT_ENERGY_FLOW f
+            JOIN DIM_REGION r ON f.id_region = r.id_region
+            JOIN DIM_TIME t ON f.id_date = t.id_date
+            JOIN DIM_SOURCE s ON f.id_source = s.id_source
+            {where}
+            ORDER BY t.horodatage ASC, r.code_insee
+            LIMIT ?
+        """
+        params.append(sql_limit)
+    else:
+        # SQL Server: TOP clause at top of SELECT (? placeholder before WHERE params)
+        sql = f"""
+            SELECT TOP(?)
+                r.code_insee,
+                r.nom_region,
+                t.horodatage,
+                s.source_name,
+                f.valeur_mw,
+                f.facteur_charge,
+                f.consommation_mw
+            FROM FACT_ENERGY_FLOW f
+            JOIN DIM_REGION r ON f.id_region = r.id_region
+            JOIN DIM_TIME t ON f.id_date = t.id_date
+            JOIN DIM_SOURCE s ON f.id_source = s.id_source
+            {where}
+            ORDER BY t.horodatage ASC, r.code_insee
+        """
+        params.insert(0, sql_limit)
+
     return sql, params
+
+
+def _to_json_safe(value):
+    """Convert pyodbc non-JSON-serializable types (datetime, Decimal) to native Python."""
+    if value is None:
+        return None
+    # datetime / date → ISO string
+    if hasattr(value, "isoformat"):
+        return value.isoformat()
+    # Decimal → float
+    try:
+        from decimal import Decimal
+        if isinstance(value, Decimal):
+            return float(value)
+    except ImportError:
+        pass
+    return value
 
 
 def _aggregate_rows(rows: list, cols: list[str]) -> list[dict]:
     """
     Pivot flat SQL rows into region/timestamp records with source breakdown.
 
-    AC #3: {region, timestamp, sources: {eolien, ...}, facteur_charge}
+    AC #3: {region, timestamp, sources: {eolien, ...}, facteur_charge, consommation_mw}
+    Converts pyodbc-specific types (datetime, Decimal) to JSON-serializable types.
+    consommation_mw is a region/timestamp-level field (not per source) — taken from first row.
     """
     aggregated: dict[tuple, dict] = {}
 
     for row in rows:
         r = dict(zip(cols, row))
-        key = (r["code_insee"], r["horodatage"])
+        ts = _to_json_safe(r["horodatage"])
+        key = (r["code_insee"], ts)
 
         if key not in aggregated:
             aggregated[key] = {
                 "code_insee": r["code_insee"],
                 "region": r["nom_region"],
-                "timestamp": r["horodatage"],
+                "timestamp": ts,
                 "sources": {},
-                "facteur_charge": r["facteur_charge"],
+                "facteur_charge": _to_json_safe(r["facteur_charge"]),
+                "consommation_mw": _to_json_safe(r["consommation_mw"]),
             }
 
         source = r["source_name"]
-        aggregated[key]["sources"][source] = r["valeur_mw"]
+        aggregated[key]["sources"][source] = _to_json_safe(r["valeur_mw"])
 
     return list(aggregated.values())
 
@@ -133,8 +184,12 @@ def query_production(
     """
     request_id = request_id or str(uuid.uuid4())
 
+    import sqlite3
+    is_sqlite = isinstance(conn, sqlite3.Connection)
+
     sql, params = build_production_query(
-        region_code, start_date, end_date, source_type, limit, offset
+        region_code, start_date, end_date, source_type, limit, offset,
+        is_sqlite=is_sqlite,
     )
 
     cursor = conn.cursor()

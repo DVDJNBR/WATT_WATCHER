@@ -11,7 +11,7 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from functions.shared.quality.checks import (  # type: ignore
+from shared.quality.checks import (  # type: ignore
     CheckStatus,
     Severity,
     fk_integrity_check,
