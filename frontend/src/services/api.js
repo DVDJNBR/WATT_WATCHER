@@ -42,6 +42,8 @@ async function authGet(path, params = {}) {
 
   const headers = { 'Content-Type': 'application/json' }
   if (token) headers.Authorization = `Bearer ${token}`
+  const apiKey = import.meta.env.VITE_API_KEY
+  if (apiKey) headers['X-Api-Key'] = apiKey
 
   const response = await fetch(url, { headers })
 
