@@ -106,23 +106,38 @@ body {
 /* ── Layout ───────────────────────────────────────────────────────────────── */
 .app-layout {
   display: grid;
-  grid-template-rows: 64px 1fr;
-  grid-template-columns: 240px 1fr;
+  grid-template-rows: 64px auto 1fr;
+  grid-template-columns: 1fr;
   grid-template-areas:
-    "header header"
-    "sidebar main";
+    "header"
+    "alert"
+    "main";
   min-height: 100vh;
 }
 
-@media (max-width: 768px) {
-  .app-layout {
-    grid-template-columns: 1fr;
-    grid-template-rows: 64px auto 1fr;
-    grid-template-areas:
-      "header"
-      "sidebar"
-      "main";
-  }
+/* ── Hero grid : carte 50% + chart 50% ───────────────────────────────────── */
+.hero-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  align-items: start;
+}
+
+@media (max-width: 1024px) {
+  .hero-grid { grid-template-columns: 1fr; }
+}
+
+/* ── Date bar ─────────────────────────────────────────────────────────────── */
+.date-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.date-bar__input {
+  width: auto;
+  min-width: 130px;
 }
 
 /* ── Header ───────────────────────────────────────────────────────────────── */
@@ -608,17 +623,7 @@ input[type="date"] {
   padding-top: 8px;
 }
 
-.map-legend__label {
+.map-legend__item {
   font-size: 0.72rem;
-  color: var(--color-text-muted);
-  min-width: 70px;
-}
-
-.map-legend__label:last-child { text-align: right; }
-
-.map-legend__bar {
-  flex: 1;
-  height: 8px;
-  border-radius: 4px;
-  background: linear-gradient(to right, rgb(28,37,56), rgb(79,142,247));
+  font-weight: 500;
 }

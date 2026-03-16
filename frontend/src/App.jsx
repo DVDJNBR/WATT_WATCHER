@@ -18,6 +18,7 @@ import { CarbonGauge, computeCarbonIntensity } from './components/CarbonGauge.js
 import { AlertBanner } from './components/AlertBanner.jsx'
 import { AlertHistory } from './components/AlertHistory.jsx'
 import { fetchProduction, fetchRegions, fetchAlerts, triggerPipeline } from './services/api.js'
+import { ProdConsChart } from './components/ProdConsChart.jsx'
 
 const REFRESH_INTERVAL_MS = 15 * 60 * 1000  // 15 minutes
 const ALERT_POLL_INTERVAL_MS = 60 * 1000    // 60 seconds
@@ -217,8 +218,8 @@ export default function App() {
     return () => clearInterval(id)
   }, [selectedRegion, loadAlerts])
 
-  // Compute per-region total production for choropleth (latest point per region)
-  const regionTotals = useMemo(() => {
+  // Compute per-region totals for choropleth (latest point per region)
+  const { regionTotals, regionConsommation } = useMemo(() => {
     const latest = {}
     for (const r of globalData) {
       if (!latest[r.code_insee] || r.timestamp > latest[r.code_insee].timestamp) {
@@ -226,10 +227,12 @@ export default function App() {
       }
     }
     const totals = {}
+    const conso  = {}
     for (const [code, rec] of Object.entries(latest)) {
       totals[code] = Object.values(rec.sources).reduce((s, v) => s + (v > 0 ? v : 0), 0)
+      if (rec.consommation_mw != null) conso[code] = rec.consommation_mw
     }
-    return totals
+    return { regionTotals: totals, regionConsommation: conso }
   }, [globalData])
 
   // Derive KPIs from current data (region-specific or global)
@@ -271,6 +274,13 @@ export default function App() {
         </span>
 
         <div className="header-actions">
+          {/* Region selector inline dans le header */}
+          <RegionSelector
+            regions={regions}
+            selected={selectedRegion}
+            onChange={handleRegionChange}
+            loading={loading}
+          />
           {(loading || refreshing) && (
             <span
               className="refresh-dot"
@@ -310,14 +320,14 @@ export default function App() {
         </div>
       </header>
 
-      {/* ── Alert banner (Story 5.2, Task 3.1) ───────────────────── */}
+      {/* ── Alert banner ──────────────────────────────────────────── */}
       <AlertBanner
         alert={topAlert}
         onDismiss={() => topAlert && setDismissedAlertId(topAlert.alert_id)}
       />
 
-      {/* ── Sidebar ───────────────────────────────────────────────── */}
-      <aside className="app-sidebar">
+      {/* sidebar supprimée — contenu déplacé dans app-main */}
+      {false && <aside className="app-sidebar">
         {/* Date range picker */}
         <div className="date-range" data-testid="date-range">
           <p className="selector-label">Plage de dates</p>
@@ -373,31 +383,54 @@ export default function App() {
           </div>
         </div>
 
-        {/* Story 5.2, Task 3.2 — alert history */}
-        <AlertHistory alerts={alerts} loading={alertsLoading} />
-      </aside>
+      </aside>}
 
       {/* ── Main ──────────────────────────────────────────────────── */}
       <main id="main-content" className="app-main">
-        {/* KPI widgets — show totals for selected region or all France */}
+
+        {/* Date range bar */}
+        <div className="date-bar" data-testid="date-range">
+          <span className="selector-label">Période :</span>
+          <input id="date-start" type="date" className="selector-input date-bar__input"
+            value={startDate} max={endDate} aria-label="Date de début" data-testid="date-start"
+            onChange={e => { setStartDate(e.target.value); handleDateChange(e.target.value, endDate) }} />
+          <span className="selector-label" aria-hidden="true">→</span>
+          <input id="date-end" type="date" className="selector-input date-bar__input"
+            value={endDate} min={startDate} max={isoDate(0)} aria-label="Date de fin" data-testid="date-end"
+            onChange={e => { setEndDate(e.target.value); handleDateChange(startDate, e.target.value) }} />
+          {[{ label: '24h', days: -1 }, { label: '7j', days: -7 }, { label: '30j', days: -30 }].map(({ label, days }) => (
+            <button key={label} className="btn btn-ghost btn-xs" onClick={() => {
+              const s = isoDate(days); const e = isoDate(0)
+              setStartDate(s); setEndDate(e); handleDateChange(s, e)
+            }}>{label}</button>
+          ))}
+        </div>
+
+        {/* ── Hero : carte + prod/conso ─────────────────────────── */}
+        <div className="hero-grid">
+          <FranceMap
+            regions={regions}
+            regionTotals={regionTotals}
+            regionConsommation={regionConsommation}
+            selectedCode={selectedRegion}
+            onSelect={handleRegionChange}
+            loading={loading}
+          />
+          <ProdConsChart
+            data={selectedRegion ? productionData : globalData}
+            region={selectedRegionName}
+            loading={loading || refreshing}
+          />
+        </div>
+
+        {/* ── KPI strip ────────────────────────────────────────── */}
         <div className="kpi-grid" data-testid="kpi-grid">
           <KPICard
             title={selectedRegionName ? `Production — ${selectedRegionName}` : 'Production France'}
-            value={totalMw.toLocaleString('fr-FR')}
-            unit="MW"
-            loading={loading}
+            value={totalMw.toLocaleString('fr-FR')} unit="MW" loading={loading}
           />
-          <KPICard
-            title="Source dominante"
-            value={dominantSource}
-            loading={loading}
-          />
-          <KPICard
-            title="Intensité carbone"
-            value={carbonIntensity}
-            unit="gCO₂/kWh"
-            loading={loading}
-          />
+          <KPICard title="Source dominante" value={dominantSource} loading={loading} />
+          <KPICard title="Intensité carbone" value={carbonIntensity} unit="gCO₂/kWh" loading={loading} />
           <KPICard
             title={selectedRegion ? 'Points de données' : 'Régions actives'}
             value={selectedRegion ? productionData.length : Object.keys(regionTotals).length}
@@ -405,35 +438,23 @@ export default function App() {
           />
         </div>
 
-        {/* Choropleth map — always visible */}
-        <FranceMap
-          regions={regions}
-          regionTotals={regionTotals}
-          selectedCode={selectedRegion}
-          onSelect={handleRegionChange}
-          loading={loading}
-        />
-
-        {/* Drill-down: shown when a region is selected */}
+        {/* ── Détail région (drill-down) ────────────────────────── */}
         {error ? (
           <div className="glass-card chart-card chart-error" data-testid="app-error">
             <p>Erreur : {error}</p>
           </div>
         ) : selectedRegion ? (
           <div data-testid="charts-grid">
-            <HistoryChart
-              data={productionData}
-              region={selectedRegionName}
-              loading={loading || refreshing}
-            />
+            <HistoryChart data={productionData} region={selectedRegionName} loading={loading || refreshing} />
             <div style={{ marginTop: '24px' }}>
-              <CarbonGauge
-                sources={lastSources}
-                loading={loading}
-              />
+              <CarbonGauge sources={lastSources} loading={loading} />
             </div>
           </div>
         ) : null}
+
+        {/* ── Historique alertes ────────────────────────────────── */}
+        <AlertHistory alerts={alerts} loading={alertsLoading} />
+
       </main>
     </div>
   )

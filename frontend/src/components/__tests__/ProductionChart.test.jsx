@@ -66,8 +66,9 @@ describe('ProductionChart', () => {
     expect(screen.getByText('Production par source (MW)')).toBeInTheDocument()
   })
 
-  it('renders with empty data without crashing', () => {
+  it('shows empty state when data is empty', () => {
     render(<ProductionChart data={[]} />)
-    expect(screen.getByTestId('production-chart')).toBeInTheDocument()
+    expect(screen.getByTestId('production-chart-empty')).toBeInTheDocument()
+    expect(screen.getByText(/Aucune donnée disponible/i)).toBeInTheDocument()
   })
 })

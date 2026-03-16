@@ -78,6 +78,22 @@ export function ProductionChart({ data, loading = false, error = null }) {
     )
   }
 
+  if (!data.length) {
+    return (
+      <section className="glass-card chart-card chart-empty" data-testid="production-chart-empty">
+        <h2 className="chart-title">Production par source (MW)</h2>
+        <div className="empty-state">
+          <span className="empty-state__icon" aria-hidden="true">📊</span>
+          <p className="empty-state__title">Aucune donnée disponible</p>
+          <p className="empty-state__hint">
+            Le pipeline se lance toutes les 15 min.<br />
+            Modifiez la plage de dates ou attendez le prochain cycle.
+          </p>
+        </div>
+      </section>
+    )
+  }
+
   const chartData = transformProductionData(data)
   const sources = deriveAllSources(chartData)
 
