@@ -12,25 +12,29 @@ const GEO_URL = '/france-regions.geojson'
 
 const PROJECTION_CONFIG = { center: [2.5, 46.5], scale: 2200 }
 
-/** Linear interpolation between two RGB colours based on t ∈ [0, 1]. */
-function lerpColor(r1, g1, b1, r2, g2, b2, t) {
-  return `rgb(${Math.round(r1 + (r2 - r1) * t)},${Math.round(g1 + (g2 - g1) * t)},${Math.round(b1 + (b2 - b1) * t)})`
-}
-
 /**
- * Map a production value to a fill colour on a blue scale.
- * Low → #1c2538 (surface-2), High → #4f8ef7 (accent).
+ * Map delta (prod - conso) / conso to a semantic colour.
+ *   > +15% → rouge   (sur-production, risque prix négatifs)
+ *   ±15%   → vert    (équilibre)
+ *   < -15% → orange  (sous-production, dépendance import)
+ *   no data → gris
  */
-function productionColor(value, minVal, maxVal) {
-  if (!value || minVal === maxVal) return '#1c2538'
-  const t = Math.max(0, Math.min(1, (value - minVal) / (maxVal - minVal)))
-  return lerpColor(28, 37, 56, 79, 142, 247, t)
+function deltaColor(prod, conso) {
+  if (conso == null || conso === 0) {
+    // No consumption data — fall back to neutral blue gradient hint
+    return prod > 0 ? '#2d6bcd' : '#1c2538'
+  }
+  const ratio = (prod - conso) / conso
+  if (ratio > 0.15)  return '#ef4444'  // sur-production — rouge
+  if (ratio < -0.15) return '#f59e0b'  // sous-production — orange
+  return '#10b981'                      // équilibre — vert
 }
 
 /**
  * @param {{
  *   regions: Array<{code_insee:string, region:string}>,
- *   regionTotals: Object,   // { [code_insee]: totalMW }
+ *   regionTotals: Object,       // { [code_insee]: totalMW }
+ *   regionConsommation: Object, // { [code_insee]: consoMW }
  *   selectedCode: string,
  *   onSelect: Function,
  *   loading?: boolean,
@@ -39,20 +43,16 @@ function productionColor(value, minVal, maxVal) {
 export const FranceMap = memo(function FranceMap({
   regions = [],
   regionTotals = {},
+  regionConsommation = {},
   selectedCode,
   onSelect,
   loading = false,
 }) {
-  const [hovered, setHovered] = useState(null)   // { name, value, x, y }
+  const [hovered, setHovered] = useState(null)   // { name, prod, conso, x, y }
   const [position, setPosition] = useState({ coordinates: [2.5, 46.5], zoom: 1 })
 
   const availableCodes = useMemo(() => new Set(regions.map(r => r.code_insee)), [regions])
   const selectedRegionName = regions.find(r => r.code_insee === selectedCode)?.region
-
-  // Choropleth scale bounds
-  const totalsArr = Object.values(regionTotals).filter(Boolean)
-  const minVal = totalsArr.length ? Math.min(...totalsArr) : 0
-  const maxVal = totalsArr.length ? Math.max(...totalsArr) : 1
 
   return (
     <section className="glass-card map-card" data-testid="france-map">
@@ -99,12 +99,13 @@ export const FranceMap = memo(function FranceMap({
                   const nom      = geo.properties.nom
                   const isSelected = code === selectedCode
                   const hasData    = availableCodes.has(code)
-                  const total      = regionTotals[code]
+                  const prod       = regionTotals[code] ?? 0
+                  const conso      = regionConsommation[code] ?? null
                   const fill       = isSelected
                     ? '#4f8ef7'
                     : hasData
-                    ? productionColor(total, minVal, maxVal)
-                    : '#111827'
+                    ? deltaColor(prod, conso)
+                    : '#1c2538'
 
                   return (
                     <Geography
@@ -113,8 +114,7 @@ export const FranceMap = memo(function FranceMap({
                       onClick={() => hasData && onSelect(code)}
                       onMouseEnter={e => {
                         if (!hasData) return
-                        const val = total ? `${Math.round(total).toLocaleString('fr-FR')} MW` : '—'
-                        setHovered({ name: nom, value: val, x: e.clientX, y: e.clientY })
+                        setHovered({ name: nom, prod, conso, x: e.clientX, y: e.clientY })
                       }}
                       onMouseMove={e => {
                         if (hovered) setHovered(h => ({ ...h, x: e.clientX, y: e.clientY }))
@@ -150,21 +150,29 @@ export const FranceMap = memo(function FranceMap({
           {hovered && (
             <div
               className="map-tooltip"
-              style={{ position: 'fixed', left: hovered.x + 14, top: hovered.y - 38 }}
+              style={{ position: 'fixed', left: hovered.x + 14, top: hovered.y - 52 }}
             >
               <strong>{hovered.name}</strong>
-              <span className="map-tooltip__value">{hovered.value}</span>
+              <span className="map-tooltip__value">
+                ⚡ {Math.round(hovered.prod).toLocaleString('fr-FR')} MW prod.
+              </span>
+              {hovered.conso != null && (
+                <span style={{ color: '#f59e0b', fontSize: '0.75rem' }}>
+                  🏠 {Math.round(hovered.conso).toLocaleString('fr-FR')} MW conso.
+                </span>
+              )}
             </div>
           )}
         </div>
       )}
 
-      {/* Colour legend */}
-      {!loading && totalsArr.length > 0 && (
+      {/* Semantic legend */}
+      {!loading && (
         <div className="map-legend">
-          <span className="map-legend__label">{Math.round(minVal).toLocaleString('fr-FR')} MW</span>
-          <div className="map-legend__bar" />
-          <span className="map-legend__label">{Math.round(maxVal).toLocaleString('fr-FR')} MW</span>
+          <span className="map-legend__item" style={{ color: '#10b981' }}>● Équilibre</span>
+          <span className="map-legend__item" style={{ color: '#ef4444' }}>● Sur-production</span>
+          <span className="map-legend__item" style={{ color: '#f59e0b' }}>● Sous-production</span>
+          <span className="map-legend__item" style={{ color: '#4a5568' }}>● Pas de données</span>
         </div>
       )}
 
