@@ -14,7 +14,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { KPICard } from './components/KPICard.jsx'
 import { FranceMap } from './components/FranceMap.jsx'
 import { HistoryChart } from './components/HistoryChart.jsx'
-import { CarbonGauge, computeCarbonIntensity } from './components/CarbonGauge.jsx'
+import { CarbonBadge, computeCarbonIntensity } from './components/CarbonBadge.jsx'
 import { AlertBanner } from './components/AlertBanner.jsx'
 import { AlertHistory } from './components/AlertHistory.jsx'
 import { fetchProduction, fetchRegions, fetchAlerts, triggerPipeline } from './services/api.js'
@@ -245,6 +245,15 @@ export default function App() {
   const dominantSource = computeDominantSource(displayData)
   const carbonIntensity = computeCarbonIntensity(lastSources)
 
+  // Sparkline data: carbon intensity per time point (last 96 points max)
+  const sparkData = useMemo(() =>
+    displayData.slice(-96).map(r => ({
+      t: r.timestamp,
+      v: computeCarbonIntensity(r.sources || {}),
+    })),
+    [displayData]
+  )
+
   // Top alert to display in banner (highest severity, not dismissed)
   const severityOrder = { CRITICAL: 0, WARNING: 1, INFO: 2 }
   const topAlert = alerts
@@ -431,7 +440,7 @@ export default function App() {
             value={totalMw.toLocaleString('fr-FR')} unit="MW" loading={loading}
           />
           <KPICard title="Source dominante" value={dominantSource} loading={loading} />
-          <KPICard title="Intensité carbone" value={carbonIntensity} unit="gCO₂/kWh" loading={loading} />
+          <CarbonBadge intensity={carbonIntensity} sparkData={sparkData} loading={loading} />
           <KPICard
             title={selectedRegion ? 'Points de données' : 'Régions actives'}
             value={selectedRegion ? productionData.length : Object.keys(regionTotals).length}
@@ -447,9 +456,6 @@ export default function App() {
         ) : selectedRegion ? (
           <div data-testid="charts-grid">
             <HistoryChart data={productionData} region={selectedRegionName} loading={loading || refreshing} />
-            <div style={{ marginTop: '24px' }}>
-              <CarbonGauge sources={lastSources} loading={loading} />
-            </div>
           </div>
         ) : null}
 

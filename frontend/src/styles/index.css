@@ -400,30 +400,48 @@ input[type="date"] {
   color-scheme: light;
 }
 
-/* ── Carbon gauge labels ──────────────────────────────────────────────────── */
-.carbon-label {
-  text-align: center;
-  margin-top: -32px;
-  padding-bottom: 8px;
+/* ── Carbon badge (replaces radial gauge) ─────────────────────────────────── */
+.carbon-badge-card {
+  padding: 14px 16px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
 }
 
-.carbon-number {
+.carbon-badge__label {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin: 0;
+}
+
+.carbon-badge__row {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.carbon-badge__number {
   font-family: var(--font-display);
-  font-size: 2.25rem;
+  font-size: 1.75rem;
   font-weight: 700;
   line-height: 1;
 }
 
-.carbon-unit {
-  font-size: 0.875rem;
+.carbon-badge__unit {
+  font-size: 0.8rem;
   color: var(--color-text-muted);
-  margin-left: 2px;
 }
 
-.carbon-badge {
-  font-size: 0.875rem;
+.carbon-badge__tag {
+  font-size: 0.7rem;
   font-weight: 600;
-  margin-top: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
   letter-spacing: 0.04em;
 }
 
