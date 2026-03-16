@@ -19,6 +19,48 @@ function formatTs(ts) {
   return d.toLocaleString('fr-FR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
 
+/**
+ * Compute a dynamic insight title from the latest data.
+ * e.g. "Sur-production depuis 14h45" or "Équilibre prod/conso"
+ */
+function buildInsightTitle(chartData, region) {
+  const base = region ? `Production — ${region}` : 'Production — France'
+  if (!chartData.length) return base
+
+  const last = chartData[chartData.length - 1]
+  if (last.conso == null || last.conso === 0) return base
+
+  const THRESHOLD = 0.05  // ±5% = équilibre
+  const ratio = (last.prod - last.conso) / last.conso
+
+  let state  // 'surplus' | 'deficit' | 'balanced'
+  if (ratio > THRESHOLD)       state = 'surplus'
+  else if (ratio < -THRESHOLD) state = 'deficit'
+  else                         state = 'balanced'
+
+  if (state === 'balanced') return `Équilibre prod/conso${region ? ` — ${region}` : ' — France'}`
+
+  // Walk backwards to find when the current state started
+  let sinceIdx = chartData.length - 1
+  for (let i = chartData.length - 2; i >= 0; i--) {
+    const r = chartData[i]
+    if (r.conso == null || r.conso === 0) break
+    const rRatio = (r.prod - r.conso) / r.conso
+    const rState = rRatio > THRESHOLD ? 'surplus' : rRatio < -THRESHOLD ? 'deficit' : 'balanced'
+    if (rState !== state) break
+    sinceIdx = i
+  }
+
+  const sinceTs = chartData[sinceIdx].rawTs
+  const sinceTime = sinceTs
+    ? new Date(sinceTs).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+    : null
+
+  const label = state === 'surplus' ? 'Sur-production' : 'Sous-production'
+  const suffix = sinceTime ? ` depuis ${sinceTime}` : ''
+  return `${label}${suffix}${region ? ` — ${region}` : ' — France'}`
+}
+
 function buildChartData(data) {
   return data.map(r => {
     const prod = Math.round(
@@ -27,7 +69,7 @@ function buildChartData(data) {
     const conso = r.consommation_mw != null ? Math.round(r.consommation_mw) : null
     // surplusZone: zone rouge quand prod > conso
     const surplusZone = (conso != null && prod > conso) ? prod : null
-    return { timestamp: formatTs(r.timestamp), prod, conso, surplusZone }
+    return { timestamp: formatTs(r.timestamp), rawTs: r.timestamp, prod, conso, surplusZone }
   })
 }
 
@@ -55,10 +97,7 @@ function CustomLegend() {
 export function ProdConsChart({ data = [], region, loading = false }) {
   const chartData = useMemo(() => buildChartData(data), [data])
   const hasConsommation = chartData.some(r => r.conso != null)
-
-  const title = region
-    ? `Production vs Consommation — ${region}`
-    : 'Production vs Consommation — France'
+  const title = useMemo(() => buildInsightTitle(chartData, region), [chartData, region])
 
   if (loading) {
     return (
