@@ -1,3 +1,9 @@
+## [1.9.1](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.9.0...v1.9.1) (2026-03-16)
+
+### Bug Fixes
+
+* **gold:** write consommation_mw to FACT_ENERGY_FLOW ([2acadcc](https://github.com/DVDJNBR/WATT_WATCHER/commit/2acadcca9348d4d05beb4765f5896a67d28b9321))
+
 ## [1.9.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.8.9...v1.9.0) (2026-03-12)
 
 ### Features
