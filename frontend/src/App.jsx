@@ -11,6 +11,9 @@
  * Story 5.2 AC #3: Pulsing icon in header when active alerts exist.
  */
 import { useState, useEffect, useCallback, useMemo } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
+import { useAuth } from './context/AuthContext.jsx'
+import { logout as apiLogout } from './services/api.js'
 import { KPICard } from './components/KPICard.jsx'
 import { FranceMap } from './components/FranceMap.jsx'
 import { HistoryChart } from './components/HistoryChart.jsx'
@@ -65,6 +68,15 @@ function isoDate(offsetDays = 0) {
 }
 
 export default function App() {
+  const { user, logout } = useAuth()
+  const navigate = useNavigate()
+
+  const handleLogout = useCallback(async () => {
+    await apiLogout()
+    logout()
+    navigate('/login')
+  }, [logout, navigate])
+
   const [theme, setTheme] = useState(
     () => window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
   )
@@ -327,6 +339,14 @@ export default function App() {
           >
             {theme === 'dark' ? '☀' : '⏾'}
           </button>
+          <Link to="/subscriptions" className="btn btn-ghost" title="Gérer mes alertes email">
+            🔔
+          </Link>
+          {user && (
+            <button className="btn btn-ghost" onClick={handleLogout} title={`Déconnexion (${user.email})`}>
+              ⎋
+            </button>
+          )}
         </div>
       </header>
 

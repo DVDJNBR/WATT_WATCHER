@@ -9,6 +9,9 @@
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
 const API_KEY  = import.meta.env.VITE_API_KEY || ''
 
+/** Read the JWT stored by AuthContext. */
+function getToken() { return localStorage.getItem('ww_token') || '' }
+
 export class ApiError extends Error {
   constructor(message, status, requestId) {
     super(message)
@@ -39,9 +42,11 @@ async function authGet(path, params = {}) {
   const qs = buildQueryString(params)
   const url = `${API_BASE}${path}${qs}`
 
+  const jwt = getToken()
   const headers = {
     'Content-Type': 'application/json',
     'X-Api-Key': API_KEY,
+    ...(jwt ? { Authorization: `Bearer ${jwt}` } : {}),
   }
 
   const response = await fetch(url, { headers })
@@ -140,4 +145,93 @@ export async function fetchRegions() {
     }
   }
   return Array.from(seen.values()).sort((a, b) => a.region.localeCompare(b.region))
+}
+
+// ─── Auth endpoints ──────────────────────────────────────────────────────────
+
+async function authPost(path, body) {
+  const response = await fetch(`${API_BASE}${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Api-Key': API_KEY },
+    body: JSON.stringify(body),
+  })
+  let json = {}
+  try { json = await response.json() } catch (_) { /* ignore */ }
+  if (!response.ok) throw new ApiError(json.message || `HTTP ${response.status}`, response.status)
+  return json
+}
+
+/**
+ * Register a new account.
+ * @param {string} email
+ * @param {string} password
+ * @returns {Promise<{message: string}>}
+ */
+export async function register(email, password) {
+  return authPost('/v1/auth/register', { email, password })
+}
+
+/**
+ * Resend email confirmation.
+ * @param {string} email
+ */
+export async function resendConfirmation(email) {
+  return authPost('/v1/auth/resend-confirmation', { email })
+}
+
+/**
+ * Login — returns JWT token + user info.
+ * @param {string} email
+ * @param {string} password
+ * @returns {Promise<{token: string, user: {email: string, user_id: string}}>}
+ */
+export async function login(email, password) {
+  return authPost('/v1/auth/login', { email, password })
+}
+
+/**
+ * Logout — revoke server-side token.
+ */
+export async function logout() {
+  const jwt = getToken()
+  if (!jwt) return
+  await fetch(`${API_BASE}/v1/auth/logout`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Api-Key': API_KEY,
+      Authorization: `Bearer ${jwt}`,
+    },
+  }).catch(() => {})
+}
+
+// ─── Subscriptions endpoints ─────────────────────────────────────────────────
+
+/**
+ * Get current user's alert subscriptions.
+ * @returns {Promise<{subscriptions: Array<{region_code:string, alert_type:string, active:boolean}>}>}
+ */
+export async function fetchSubscriptions() {
+  return authGet('/v1/subscriptions', {})
+}
+
+/**
+ * Update alert subscriptions (full replace).
+ * @param {Array<{region_code:string, alert_type:string, active:boolean}>} subscriptions
+ */
+export async function updateSubscriptions(subscriptions) {
+  const jwt = getToken()
+  const response = await fetch(`${API_BASE}/v1/subscriptions`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Api-Key': API_KEY,
+      ...(jwt ? { Authorization: `Bearer ${jwt}` } : {}),
+    },
+    body: JSON.stringify({ subscriptions }),
+  })
+  let json = {}
+  try { json = await response.json() } catch (_) { /* ignore */ }
+  if (!response.ok) throw new ApiError(json.message || `HTTP ${response.status}`, response.status)
+  return json
 }
