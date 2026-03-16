@@ -19,6 +19,7 @@ import { AlertBanner } from './components/AlertBanner.jsx'
 import { AlertHistory } from './components/AlertHistory.jsx'
 import { fetchProduction, fetchRegions, fetchAlerts, triggerPipeline } from './services/api.js'
 import { ProdConsChart } from './components/ProdConsChart.jsx'
+import { RegionSelector } from './components/RegionSelector.jsx'
 
 const REFRESH_INTERVAL_MS = 15 * 60 * 1000  // 15 minutes
 const ALERT_POLL_INTERVAL_MS = 60 * 1000    // 60 seconds
