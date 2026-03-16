@@ -41,6 +41,7 @@ def silver_parquet(tmp_path):
             "charbon_mw": 0.0,
             "fioul_mw": 0.0,
             "bioenergies_mw": 45.0,
+            "consommation_mw": 4100.0,
         },
         {
             "code_insee_region": "84",
@@ -54,6 +55,7 @@ def silver_parquet(tmp_path):
             "charbon_mw": 0.0,
             "fioul_mw": 0.0,
             "bioenergies_mw": 30.0,
+            "consommation_mw": 3500.0,
         },
     ])
     path = tmp_path / "silver.parquet"
@@ -187,6 +189,24 @@ class TestFactLoader:
         loader.load_from_silver(silver_parquet)
         count2 = loader.get_fact_count()
         assert count1 == count2
+
+    def test_consommation_mw_written(self, db, silver_parquet):
+        """consommation_mw is persisted for every fact row of the region/time."""
+        loader = FactLoader(db)
+        loader.load_from_silver(silver_parquet)
+        cursor = db.cursor()
+        cursor.execute("""
+            SELECT COUNT(*) FROM FACT_ENERGY_FLOW f
+            JOIN DIM_REGION r ON f.id_region = r.id_region
+            WHERE r.code_insee = '11' AND f.consommation_mw IS NULL
+        """)
+        assert cursor.fetchone()[0] == 0, "consommation_mw should not be NULL for region 11"
+        cursor.execute("""
+            SELECT DISTINCT f.consommation_mw FROM FACT_ENERGY_FLOW f
+            JOIN DIM_REGION r ON f.id_region = r.id_region
+            WHERE r.code_insee = '11'
+        """)
+        assert cursor.fetchone()[0] == pytest.approx(4100.0)
 
     def test_fact_summary(self, db, silver_parquet):
         """Summary stats work correctly."""

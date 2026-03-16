@@ -96,7 +96,7 @@ class FactLoader:
         # Unpivot: wide (one row per region/time) → long (one row per region/time/source)
         source_cols = [c for c in SOURCE_COLUMN_MAP if c in df.columns]
         id_cols = [c for c in ["date_heure", "code_insee_region", "temperature_c",
-                                "temperature_moyenne"] if c in df.columns]
+                                "temperature_moyenne", "consommation_mw"] if c in df.columns]
         long_df = (
             df[id_cols + source_cols]
             .melt(
@@ -149,14 +149,16 @@ class FactLoader:
                     row["valeur_mw"] / self.capacity[row["source_name"]]
                     if row["source_name"] in self.capacity else None
                 )
-                params.append((id_d, id_r, id_s, row["valeur_mw"], facteur, temp))
+                conso = row.get("consommation_mw")
+                params.append((id_d, id_r, id_s, row["valeur_mw"], facteur, temp, conso))
             cursor.executemany(
                 """INSERT INTO FACT_ENERGY_FLOW
-                   (id_date, id_region, id_source, valeur_mw, facteur_charge, temperature_moyenne)
-                   VALUES (?, ?, ?, ?, ?, ?)
+                   (id_date, id_region, id_source, valeur_mw, facteur_charge, temperature_moyenne, consommation_mw)
+                   VALUES (?, ?, ?, ?, ?, ?, ?)
                    ON CONFLICT(id_date, id_region, id_source) DO UPDATE SET
                        valeur_mw = excluded.valeur_mw,
-                       temperature_moyenne = excluded.temperature_moyenne""",
+                       temperature_moyenne = excluded.temperature_moyenne,
+                       consommation_mw = excluded.consommation_mw""",
                 params,
             )
             rows_loaded = len(params)
@@ -168,7 +170,8 @@ class FactLoader:
                     code_insee      NVARCHAR(10),
                     source_name     NVARCHAR(50),
                     valeur_mw       FLOAT,
-                    temperature_moy FLOAT
+                    temperature_moy FLOAT,
+                    consommation_mw FLOAT
                 )
             """)
             cursor.fast_executemany = True
@@ -179,18 +182,19 @@ class FactLoader:
                     row["source_name"],
                     row["valeur_mw"],
                     row.get(temp_col) if temp_col else None,
+                    row.get("consommation_mw"),
                 )
                 for row in long_df.to_dict("records")
             ]
             BATCH = 5000
             for i in range(0, len(stg_rows), BATCH):
-                cursor.executemany("INSERT INTO #stg VALUES (?,?,?,?,?)", stg_rows[i:i+BATCH])
+                cursor.executemany("INSERT INTO #stg VALUES (?,?,?,?,?,?)", stg_rows[i:i+BATCH])
                 logger.info("Staged %d / %d", min(i+BATCH, len(stg_rows)), len(stg_rows))
             cursor.execute("""
                 MERGE FACT_ENERGY_FLOW AS t
                 USING (
                     SELECT dt.id_date, dr.id_region, ds.id_source,
-                           s.valeur_mw, s.temperature_moy
+                           s.valeur_mw, s.temperature_moy, s.consommation_mw
                     FROM #stg s
                     JOIN DIM_TIME   dt ON dt.horodatage  = s.horodatage
                     JOIN DIM_REGION dr ON dr.code_insee  = s.code_insee
@@ -198,10 +202,11 @@ class FactLoader:
                 ) AS src
                 ON t.id_date=src.id_date AND t.id_region=src.id_region AND t.id_source=src.id_source
                 WHEN MATCHED THEN UPDATE SET
-                    valeur_mw=src.valeur_mw, temperature_moyenne=src.temperature_moy
+                    valeur_mw=src.valeur_mw, temperature_moyenne=src.temperature_moy,
+                    consommation_mw=src.consommation_mw
                 WHEN NOT MATCHED THEN INSERT
-                    (id_date,id_region,id_source,valeur_mw,facteur_charge,temperature_moyenne)
-                VALUES (src.id_date,src.id_region,src.id_source,src.valeur_mw,NULL,src.temperature_moy);
+                    (id_date,id_region,id_source,valeur_mw,facteur_charge,temperature_moyenne,consommation_mw)
+                VALUES (src.id_date,src.id_region,src.id_source,src.valeur_mw,NULL,src.temperature_moy,src.consommation_mw);
             """)
             cursor.execute("DROP TABLE #stg")
 
