@@ -15,10 +15,20 @@ def get_db_connection():
         return sqlite3.connect(os.environ.get('SQLITE_PATH', ':memory:'))
 
     import psycopg2
+    from urllib.parse import urlparse, unquote
     db_url = os.environ.get('SUPABASE_CONNECTION_STRING')
     if not db_url:
         raise RuntimeError('SUPABASE_CONNECTION_STRING environment variable is required for PostgreSQL')
-    return psycopg2.connect(db_url)
+    # Parse manually — libpq truncates usernames containing dots (Supabase pooler issue)
+    p = urlparse(db_url)
+    return psycopg2.connect(
+        host=p.hostname,
+        port=p.port or 5432,
+        dbname=(p.path or '/postgres').lstrip('/'),
+        user=unquote(p.username or ''),
+        password=unquote(p.password or ''),
+        sslmode='require',
+    )
 
 def is_sqlite(conn):
     return isinstance(conn, sqlite3.Connection)

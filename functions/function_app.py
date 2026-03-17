@@ -74,7 +74,17 @@ def _get_db_connection() -> Any:
     if db_url:
         try:
             import psycopg2  # type: ignore[import]
-            return psycopg2.connect(db_url)
+            from urllib.parse import urlparse, unquote
+            # Parse manually — libpq truncates usernames containing dots (Supabase pooler issue)
+            p = urlparse(db_url)
+            return psycopg2.connect(
+                host=p.hostname,
+                port=p.port or 5432,
+                dbname=(p.path or '/postgres').lstrip('/'),
+                user=unquote(p.username or ''),
+                password=unquote(p.password or ''),
+                sslmode='require',
+            )
         except ImportError as e:
             raise RuntimeError("psycopg2 not available — install psycopg2-binary") from e
 
