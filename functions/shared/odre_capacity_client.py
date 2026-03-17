@@ -14,11 +14,13 @@ import requests
 
 logger = logging.getLogger(__name__)
 
-# CSV export without use_labels to get machine-readable column names
+# CSV export — individual installations, aggregated in fetch_capacity()
 ODRE_URL = (
     "https://odre.opendatasoft.com/api/explore/v2.1/catalog/datasets/"
-    "registre-national-installation-production-stockage-electricite-agrege-region"
+    "registre-national-installation-production-stockage-electricite-agrege"
     "/exports/csv?lang=fr&timezone=Europe%2FParis&delimiter=%3B"
+    "&select=coderegion,region,filiere,puismaxinstallee"
+    "&limit=-1"
 )
 
 # Map ODRE filière values → our dim_source source_name
@@ -49,11 +51,11 @@ FILIERE_MAP = {
 }
 
 # Known column name variants in the ODRE dataset
-_REGION_CODE_CANDIDATES = ["code_insee_region", "code_region", "code_insee", "codeinsee"]
-_REGION_NAME_CANDIDATES = ["nom_region", "region", "libelle_region", "nomreg"]
+_REGION_CODE_CANDIDATES = ["coderegion", "code_insee_region", "code_region", "code_insee", "codeinsee"]
+_REGION_NAME_CANDIDATES = ["region", "nom_region", "libelle_region", "nomreg"]
 _FILIERE_CANDIDATES = ["filiere", "filière", "source_energie"]
 _PUISSANCE_CANDIDATES = [
-    "puissance_installee", "puiss_installee", "puissance_installee_mw",
+    "puismaxinstallee", "puissance_installee", "puiss_installee", "puissance_installee_mw",
     "puiss_mw", "puissance_mw", "puissance",
 ]
 _ANNEE_CANDIDATES = ["annee", "année", "year", "an"]
@@ -102,33 +104,46 @@ def fetch_capacity() -> list[dict]:
         col_code, col_name, col_fil, col_puiss, col_annee,
     )
 
-    records = []
+    # Aggregate by region_code + source_name (sum installed capacity)
+    from collections import defaultdict
+    agg: dict = defaultdict(lambda: {"region_code": None, "region_name": None, "puissance": 0.0})
+
     for _, row in df.iterrows():
         filiere_raw = str(row.get(col_fil, "") or "").strip().lower() if col_fil else ""
         source_name = FILIERE_MAP.get(filiere_raw)
         if not source_name:
-            continue  # skip unknown sources
+            continue
 
         region_code = str(row.get(col_code, "") or "").strip() if col_code else None
         region_name = str(row.get(col_name, "") or "").strip() if col_name else None
+        if not region_code:
+            continue
 
         try:
-            puissance = float(str(row.get(col_puiss, "") or "").replace(",", "."))
+            puissance = float(str(row.get(col_puiss, 0) or 0).replace(",", "."))
         except (ValueError, TypeError):
-            puissance = None
+            puissance = 0.0
 
-        try:
-            annee = int(float(str(row.get(col_annee, "") or "").replace(",", ".")))
-        except (ValueError, TypeError):
-            annee = None
+        key = (region_code, source_name)
+        agg[key]["region_code"] = region_code
+        agg[key]["region_name"] = region_name
+        agg[key]["puissance"] += puissance
 
-        records.append({
-            "region_code": region_code,
-            "region_name": region_name,
-            "source_name": source_name,
-            "puissance_installee_mw": puissance,
-            "annee": annee,
-        })
+    # Use current year as annee (the registre is updated annually)
+    from datetime import datetime
+    current_year = datetime.now().year
 
-    logger.info("Parsed %d capacity records from ODRE (%d total rows)", len(records), len(df))
+    records = [
+        {
+            "region_code": v["region_code"],
+            "region_name": v["region_name"],
+            "source_name": k[1],
+            "puissance_installee_mw": round(v["puissance"], 2),
+            "annee": current_year,
+        }
+        for k, v in agg.items()
+        if v["puissance"] > 0
+    ]
+
+    logger.info("Aggregated to %d capacity records from ODRE (%d raw rows)", len(records), len(df))
     return records
