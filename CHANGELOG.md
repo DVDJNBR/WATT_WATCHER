@@ -1,3 +1,9 @@
+## [1.15.6](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.15.5...v1.15.6) (2026-03-17)
+
+### Bug Fixes
+
+* **build:** lazy-load all recharts components to prevent TDZ init crash ([bb9288e](https://github.com/DVDJNBR/WATT_WATCHER/commit/bb9288ee1a7ac2852393d0571d8c5297a7943ec6))
+
 ## [1.15.5](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.15.4...v1.15.5) (2026-03-17)
 
 ### Bug Fixes
