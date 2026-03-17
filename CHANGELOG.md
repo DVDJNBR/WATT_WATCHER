@@ -1,3 +1,9 @@
+## [1.15.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.14.0...v1.15.0) (2026-03-17)
+
+### Features
+
+* **meteo:** add cloud cover (cloudcover_pct) to meteo pipeline + chart ([bee5d17](https://github.com/DVDJNBR/WATT_WATCHER/commit/bee5d17e0cd535741e4aa3e9fe8e11990a9600b7))
+
 ## [1.14.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.13.4...v1.14.0) (2026-03-17)
 
 ### Features
