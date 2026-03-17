@@ -1,3 +1,9 @@
+## [1.15.2](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.15.1...v1.15.2) (2026-03-17)
+
+### Bug Fixes
+
+* **app:** merge duplicate api.js imports — fixes lexical init crash in prod bundle ([61d749e](https://github.com/DVDJNBR/WATT_WATCHER/commit/61d749e826f2f68fc63f44c76e6882d53b13b713))
+
 ## [1.15.1](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.15.0...v1.15.1) (2026-03-17)
 
 ### Bug Fixes
