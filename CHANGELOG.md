@@ -1,3 +1,9 @@
+## [1.11.5](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.11.4...v1.11.5) (2026-03-17)
+
+### Bug Fixes
+
+* **db:** parse Supabase pooler URL manually to preserve dot-username ([e7d0e3f](https://github.com/DVDJNBR/WATT_WATCHER/commit/e7d0e3f0601beb4343cc2c99f0d9bb59eb08e071))
+
 ## [1.11.4](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.11.3...v1.11.4) (2026-03-17)
 
 ### Bug Fixes
