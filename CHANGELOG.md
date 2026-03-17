@@ -1,3 +1,9 @@
+## [1.15.4](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.15.3...v1.15.4) (2026-03-17)
+
+### Bug Fixes
+
+* **build:** hoistTransitiveImports=false + merge recharts+d3 in one chunk ([3016bf2](https://github.com/DVDJNBR/WATT_WATCHER/commit/3016bf28e688a4161f02ca269179f94c0b65b6aa))
+
 ## [1.15.3](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.15.2...v1.15.3) (2026-03-17)
 
 ### Bug Fixes
