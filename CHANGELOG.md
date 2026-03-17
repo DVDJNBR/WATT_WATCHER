@@ -1,3 +1,9 @@
+## [1.13.4](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.13.3...v1.13.4) (2026-03-17)
+
+### Bug Fixes
+
+* **subscriptions:** align alert_type keys with backend expected values ([2a0c8cc](https://github.com/DVDJNBR/WATT_WATCHER/commit/2a0c8cca0fa4c2721482961ecbce03e086c0ca43))
+
 ## [1.13.3](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.13.2...v1.13.3) (2026-03-17)
 
 ### Bug Fixes
