@@ -1,3 +1,9 @@
+## [1.15.5](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.15.4...v1.15.5) (2026-03-17)
+
+### Bug Fixes
+
+* **build:** force recharts side-effect import first in main.jsx ([8559cb9](https://github.com/DVDJNBR/WATT_WATCHER/commit/8559cb9245ceea31f703050c9ad955ce033c90e3))
+
 ## [1.15.4](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.15.3...v1.15.4) (2026-03-17)
 
 ### Bug Fixes
