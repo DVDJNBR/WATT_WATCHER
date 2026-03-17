@@ -13,8 +13,8 @@ import { useAuth } from '../context/AuthContext.jsx'
 import { fetchRegions, fetchSubscriptions, updateSubscriptions, logout as apiLogout } from '../services/api.js'
 
 const ALERT_TYPES = [
-  { key: 'sous_production', label: 'Sous-production', color: '#f59e0b' },
-  { key: 'sur_production',  label: 'Sur-production',  color: '#ef4444' },
+  { key: 'under_production', label: 'Sous-production', color: '#f59e0b' },
+  { key: 'over_production',  label: 'Sur-production',  color: '#ef4444' },
 ]
 
 export default function SubscriptionsPage() {
@@ -22,7 +22,7 @@ export default function SubscriptionsPage() {
   const navigate = useNavigate()
 
   const [regions, setRegions]   = useState([])
-  const [subs,    setSubs]      = useState({})   // { [code_insee]: { sous_production: bool, sur_production: bool } }
+  const [subs,    setSubs]      = useState({})   // { [code_insee]: { under_production: bool, over_production: bool } }
   const [loading, setLoading]   = useState(true)
   const [saving,  setSaving]    = useState(false)
   const [saved,   setSaved]     = useState(false)
@@ -40,7 +40,7 @@ export default function SubscriptionsPage() {
         // Build subs map from API response
         const map = {}
         for (const r of regs) {
-          map[r.code_insee] = { sous_production: false, sur_production: false }
+          map[r.code_insee] = { under_production: false, over_production: false }
         }
         for (const s of (subsResult.subscriptions || [])) {
           if (map[s.region_code]) {
