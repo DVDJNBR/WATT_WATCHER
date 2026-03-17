@@ -1,3 +1,9 @@
+## [1.11.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.10.0...v1.11.0) (2026-03-17)
+
+### Features
+
+* **db:** migrate Azure SQL → Supabase/PostgreSQL ([9bf390a](https://github.com/DVDJNBR/WATT_WATCHER/commit/9bf390a83b668b721df0bc2515946c642db68eac)), closes [#stg](https://github.com/DVDJNBR/WATT_WATCHER/issues/stg)
+
 ## [1.10.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.9.1...v1.10.0) (2026-03-16)
 
 ### Features
