@@ -1,3 +1,9 @@
+## [1.17.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.16.1...v1.17.0) (2026-03-17)
+
+### Features
+
+* **dashboard:** show stacked-by-source chart (HistoryChart) always visible ([2696365](https://github.com/DVDJNBR/WATT_WATCHER/commit/2696365c1f2ce9d9a03d58fd445f3bc911b6942c))
+
 ## [1.16.1](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.16.0...v1.16.1) (2026-03-17)
 
 ### Bug Fixes
