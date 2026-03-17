@@ -75,14 +75,25 @@ jobs:
       - name: Prepare deployment package
         run: |
           cp host.json functions/
+          TARGET=functions/.python_packages/lib/site-packages
+          # Most packages: manylinux_2_28 avoids glibc 2.33/2.34 incompatibility on Azure
           pip install \
             --platform manylinux_2_28_x86_64 \
             --python-version 3.11 \
             --implementation cp \
             --abi cp311 \
             --only-binary=:all: \
-            --target functions/.python_packages/lib/site-packages \
-            -r functions/requirements.txt
+            --target $TARGET \
+            $(grep -v 'psycopg2' functions/requirements.txt | grep -v '^#' | grep -v '^$' | tr '\n' ' ')
+          # psycopg2-binary ships manylinux_2_17 wheels (glibc 2.17, fine on Azure glibc 2.31)
+          pip install \
+            --platform manylinux_2_17_x86_64 \
+            --python-version 3.11 \
+            --implementation cp \
+            --abi cp311 \
+            --only-binary=:all: \
+            --target $TARGET \
+            "psycopg2-binary>=2.9.0"
 
       - name: Deploy to Azure Functions
         uses: Azure/functions-action@v1
