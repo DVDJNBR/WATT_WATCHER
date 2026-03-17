@@ -10,18 +10,21 @@
  * Story 5.2 AC #1: Alert polling every 60 s + AlertBanner + AlertHistory.
  * Story 5.2 AC #3: Pulsing icon in header when active alerts exist.
  */
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, lazy, Suspense } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from './context/AuthContext.jsx'
 import { logout as apiLogout, fetchProduction, fetchRegions, fetchAlerts, triggerPipeline, fetchMeteo } from './services/api.js'
 import { KPICard } from './components/KPICard.jsx'
 import { FranceMap } from './components/FranceMap.jsx'
-import { CarbonBadge, computeCarbonIntensity } from './components/CarbonBadge.jsx'
+import { computeCarbonIntensity } from './components/CarbonGauge.jsx'
 import { AlertBanner } from './components/AlertBanner.jsx'
 import { AlertHistory } from './components/AlertHistory.jsx'
-import { ProdConsChart } from './components/ProdConsChart.jsx'
 import { RegionSelector } from './components/RegionSelector.jsx'
-import { MeteoChart } from './components/MeteoChart.jsx'
+
+// Lazy-load recharts-based components to avoid circular-dep TDZ crash in prod bundle
+const CarbonBadge   = lazy(() => import('./components/CarbonBadge.jsx').then(m => ({ default: m.CarbonBadge })))
+const ProdConsChart = lazy(() => import('./components/ProdConsChart.jsx').then(m => ({ default: m.ProdConsChart })))
+const MeteoChart    = lazy(() => import('./components/MeteoChart.jsx').then(m => ({ default: m.MeteoChart })))
 
 const REFRESH_INTERVAL_MS = 15 * 60 * 1000  // 15 minutes
 const ALERT_POLL_INTERVAL_MS = 60 * 1000    // 60 seconds
@@ -528,7 +531,9 @@ export default function App() {
             title={selectedRegionName ? `Production — ${selectedRegionName}` : 'Production France'}
             value={totalMw.toLocaleString('fr-FR')} unit="MW" loading={loading}
           />
-          <CarbonBadge intensity={carbonIntensity} sparkData={sparkData} loading={loading} />
+          <Suspense fallback={<div className="glass-card kpi-card"><div className="skeleton" style={{height:88}}/></div>}>
+            <CarbonBadge intensity={carbonIntensity} sparkData={sparkData} loading={loading} />
+          </Suspense>
           <KPICard
             title={selectedRegion ? 'Points de données' : 'Régions actives'}
             value={selectedRegion ? productionData.length : Object.keys(regionTotals).length}
@@ -551,11 +556,13 @@ export default function App() {
             onSelect={handleRegionChange}
             loading={loading}
           />
-          <ProdConsChart
-            data={aggregatedProdData}
-            region={selectedRegionName}
-            loading={loading || refreshing}
-          />
+          <Suspense fallback={<div className="glass-card chart-card"><div className="skeleton" style={{height:320}}/></div>}>
+            <ProdConsChart
+              data={aggregatedProdData}
+              region={selectedRegionName}
+              loading={loading || refreshing}
+            />
+          </Suspense>
         </div>
 
         {/* ── Météo (France ou région) ──────────────────────────── */}
@@ -564,11 +571,13 @@ export default function App() {
             <p>Erreur : {error}</p>
           </div>
         ) : (
-          <MeteoChart
-            data={aggregatedMeteoData}
-            region={selectedRegionName || 'France'}
-            loading={drillLoading}
-          />
+          <Suspense fallback={<div className="glass-card chart-card"><div className="skeleton" style={{height:260}}/></div>}>
+            <MeteoChart
+              data={aggregatedMeteoData}
+              region={selectedRegionName || 'France'}
+              loading={drillLoading}
+            />
+          </Suspense>
         )}
 
         {/* ── Historique alertes ────────────────────────────────── */}
