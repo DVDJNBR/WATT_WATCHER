@@ -1,5 +1,5 @@
 /**
- * MeteoChart — temperature, wind speed, and cloud cover over time.
+ * MeteoChart — temperature and wind speed over time for a region.
  *
  * Data comes from GET /v1/meteo/regional (fact_meteo Gold table,
  * sourced from Open-Meteo free API).
@@ -32,10 +32,10 @@ export function MeteoChart({ data = [], region, loading = false }) {
     [...data]
       .sort((a, b) => a.timestamp < b.timestamp ? -1 : 1)
       .map(r => ({
-        timestamp:      formatTs(r.timestamp),
+        timestamp: formatTs(r.timestamp),
         temperature_c:  r.temperature_c  != null ? +r.temperature_c.toFixed(1)  : null,
         wind_speed_10m: r.wind_speed_10m != null ? +r.wind_speed_10m.toFixed(1) : null,
-        cloudcover_pct: r.cloudcover_pct != null ? +r.cloudcover_pct.toFixed(0) : null,
+        cloudcover_pct: r.cloudcover_pct != null ? Math.round(r.cloudcover_pct) : null,
       })),
     [data]
   )
@@ -43,7 +43,7 @@ export function MeteoChart({ data = [], region, loading = false }) {
   if (loading) {
     return (
       <section className="glass-card chart-card" data-testid="meteo-chart-loading">
-        <h2 className="chart-title">Météo — {region || 'Région'}</h2>
+        <h2 className="chart-title">Météo — {region || 'France'}</h2>
         <div className="skeleton" style={{ height: 240 }} />
       </section>
     )
@@ -52,7 +52,7 @@ export function MeteoChart({ data = [], region, loading = false }) {
   if (!chartData.length) {
     return (
       <section className="glass-card chart-card" data-testid="meteo-chart-empty">
-        <h2 className="chart-title">Météo — {region || 'Région'}</h2>
+        <h2 className="chart-title">Météo — {region || 'France'}</h2>
         <div className="empty-state">
           <span className="empty-state__icon" aria-hidden="true">🌡️</span>
           <p className="empty-state__title">Pas encore de données météo</p>
@@ -63,21 +63,14 @@ export function MeteoChart({ data = [], region, loading = false }) {
   }
 
   const hasWind  = chartData.some(r => r.wind_speed_10m != null)
-  const hasCloud = chartData.some(r => r.cloudcover_pct != null)
+  const hasCloud = chartData.some(r => r.cloudcover_pct  != null)
 
   return (
     <section className="glass-card chart-card" data-testid="meteo-chart">
-      <h2 className="chart-title">Météo — {region || 'Région'}</h2>
+      <h2 className="chart-title">Météo — {region || 'France'}</h2>
 
-      <ResponsiveContainer width="100%" height={260}>
-        <ComposedChart data={chartData} margin={{ top: 8, right: 56, left: 0, bottom: 0 }}>
-          <defs>
-            <linearGradient id="cloudGrad" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%"  stopColor="#94a3b8" stopOpacity={0.35} />
-              <stop offset="95%" stopColor="#94a3b8" stopOpacity={0.05} />
-            </linearGradient>
-          </defs>
-
+      <ResponsiveContainer width="100%" height={240}>
+        <ComposedChart data={chartData} margin={{ top: 8, right: 60, left: 0, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#888" strokeOpacity={0.15} />
           <XAxis
             dataKey="timestamp"
@@ -91,31 +84,25 @@ export function MeteoChart({ data = [], region, loading = false }) {
             unit="°C"
             width={50}
           />
-          {/* Right Y-axis: wind (km/h) + cloud cover (%) share same 0–100 scale */}
+          {/* Right Y-axis: wind speed + cloudcover (0–100) */}
           <YAxis
             yAxisId="right"
             orientation="right"
             tick={{ fill: 'var(--color-text-muted)', fontSize: 11 }}
+            width={60}
             domain={[0, 100]}
-            width={56}
           />
-          <Tooltip
-            {...tooltipStyle}
-            formatter={(value, name) => {
-              if (name === 'Nébulosité (%)') return [`${value} %`, name]
-              if (name === 'Vent 10m (km/h)') return [`${value} km/h`, name]
-              return [`${value} °C`, name]
-            }}
-          />
+          <Tooltip {...tooltipStyle} />
           <Legend />
 
-          {/* Cloud cover area — behind everything */}
+          {/* Cloudcover area (background, behind wind) */}
           {hasCloud && (
             <Area
               yAxisId="right"
               type="monotone"
               dataKey="cloudcover_pct"
-              fill="url(#cloudGrad)"
+              fill="#94a3b8"
+              fillOpacity={0.15}
               stroke="#94a3b8"
               strokeWidth={1}
               dot={false}
@@ -131,17 +118,17 @@ export function MeteoChart({ data = [], region, loading = false }) {
               fill="#60a5fa"
               fillOpacity={0.4}
               name="Vent 10m (km/h)"
-              maxBarSize={6}
+              maxBarSize={8}
             />
           )}
 
-          {/* Temperature line — on top */}
+          {/* Temperature line (on top) */}
           <Line
             yAxisId="temp"
             type="monotone"
             dataKey="temperature_c"
             stroke="#f97316"
-            strokeWidth={2.5}
+            strokeWidth={2}
             dot={false}
             name="Température (°C)"
           />

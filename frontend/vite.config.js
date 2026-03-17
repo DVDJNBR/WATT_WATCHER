@@ -5,19 +5,10 @@ export default defineConfig({
   plugins: [react()],
   server: {
     proxy: {
+      // Proxy /api to the local dev server (scripts/dev_server.py)
       '/api': {
         target: 'http://localhost:8765',
         changeOrigin: true,
-      },
-    },
-  },
-  optimizeDeps: {
-    include: ['recharts'],
-  },
-  build: {
-    rollupOptions: {
-      output: {
-        hoistTransitiveImports: false,
       },
     },
   },

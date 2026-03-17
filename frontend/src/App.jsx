@@ -10,21 +10,25 @@
  * Story 5.2 AC #1: Alert polling every 60 s + AlertBanner + AlertHistory.
  * Story 5.2 AC #3: Pulsing icon in header when active alerts exist.
  */
-import { useState, useEffect, useCallback, useMemo, lazy, Suspense } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from './context/AuthContext.jsx'
-import { logout as apiLogout, fetchProduction, fetchRegions, fetchAlerts, triggerPipeline, fetchMeteo } from './services/api.js'
+import { logout as apiLogout } from './services/api.js'
 import { KPICard } from './components/KPICard.jsx'
 import { FranceMap } from './components/FranceMap.jsx'
-import { computeCarbonIntensity } from './components/CarbonGauge.jsx'
+import { HistoryChart } from './components/HistoryChart.jsx'
+import { CarbonBadge, computeCarbonIntensity } from './components/CarbonBadge.jsx'
 import { AlertBanner } from './components/AlertBanner.jsx'
 import { AlertHistory } from './components/AlertHistory.jsx'
+import { fetchProduction, fetchRegions, fetchAlerts, triggerPipeline, fetchMeteo, fetchCapacity } from './services/api.js'
+import { ProdConsChart } from './components/ProdConsChart.jsx'
 import { RegionSelector } from './components/RegionSelector.jsx'
+import { MeteoChart } from './components/MeteoChart.jsx'
+import { CapacityChart } from './components/CapacityChart.jsx'
 
-// Lazy-load recharts-based components to avoid circular-dep TDZ crash in prod bundle
-const CarbonBadge   = lazy(() => import('./components/CarbonBadge.jsx').then(m => ({ default: m.CarbonBadge })))
-const ProdConsChart = lazy(() => import('./components/ProdConsChart.jsx').then(m => ({ default: m.ProdConsChart })))
-const MeteoChart    = lazy(() => import('./components/MeteoChart.jsx').then(m => ({ default: m.MeteoChart })))
+// HistoryChart and CapacityChart are kept imported (even if not rendered) to preserve
+// recharts module evaluation order in the production bundle — removing them shifts
+// the circular-dep resolution and causes a TDZ crash.
 
 const REFRESH_INTERVAL_MS = 15 * 60 * 1000  // 15 minutes
 const ALERT_POLL_INTERVAL_MS = 60 * 1000    // 60 seconds
@@ -51,7 +55,7 @@ const SOURCE_COLORS = {
   fioul:       '#f97316',
 }
 
-/** Aggregate multi-region data by timestamp (sum sources, sum conso). */
+/** Aggregate multi-region data by timestamp (sum sources + conso). */
 function aggregateByTimestamp(data) {
   const map = new Map()
   for (const r of data) {
@@ -81,14 +85,14 @@ function aggregateMeteoByTimestamp(data) {
   return Array.from(map.values())
     .sort((a, b) => (a.timestamp < b.timestamp ? -1 : 1))
     .map(r => ({
-      timestamp:       r.timestamp,
-      temperature_c:   r.n ? Math.round((r.temp  / r.n) * 10) / 10 : null,
-      wind_speed_10m:  r.n ? Math.round((r.wind  / r.n) * 10) / 10 : null,
-      cloudcover_pct:  r.n ? Math.round( r.cloud / r.n)            : null,
+      timestamp:      r.timestamp,
+      temperature_c:  r.n ? Math.round((r.temp  / r.n) * 10) / 10 : null,
+      wind_speed_10m: r.n ? Math.round((r.wind  / r.n) * 10) / 10 : null,
+      cloudcover_pct: r.n ? Math.round( r.cloud / r.n)            : null,
     }))
 }
 
-/** Inline colored chips showing current MW per source. */
+/** Colored chips showing current MW per source. */
 function SourceChips({ sources }) {
   const entries = Object.entries(sources)
     .filter(([, v]) => v > 0)
@@ -119,6 +123,15 @@ function computeTotalMw(data) {
   return Math.round(Object.values(sources).reduce((sum, mw) => sum + (mw > 0 ? mw : 0), 0))
 }
 
+/** Return human-readable label of the dominant source at the last point. */
+function computeDominantSource(data) {
+  if (!data.length) return '—'
+  const sources = data[data.length - 1].sources || {}
+  const entries = Object.entries(sources).filter(([, v]) => v > 0)
+  if (!entries.length) return '—'
+  const [source] = entries.sort(([, a], [, b]) => b - a)[0]
+  return SOURCE_LABELS[source] || source
+}
 
 function formatTime(date) {
   if (!date) return '—'
@@ -164,8 +177,9 @@ export default function App() {
   const [startDate, setStartDate] = useState(isoDate(-7))
   const [endDate, setEndDate] = useState(isoDate(0))
 
-  // Meteo data (France or region)
+  // Meteo + capacity data for drill-down
   const [meteoData, setMeteoData] = useState([])
+  const [capacityData, setCapacityData] = useState([])
   const [drillLoading, setDrillLoading] = useState(false)
 
   // Story 5.2 — alert state
@@ -220,27 +234,29 @@ export default function App() {
       const regsResult = await fetchRegions().catch(() => [])
       if (!cancelled) {
         setRegions(regsResult)
-        await Promise.all([
-          loadData('', startDate, endDate, true),
-          loadAlerts(''),
-          loadDrillData('', startDate, endDate),
-        ])
+        // Load ALL regions data for the choropleth (no region filter)
+        await loadData('', startDate, endDate, true)
+        await Promise.all([loadAlerts(''), loadDrillData('', startDate, endDate)])
         setLoading(false)
       }
     })()
     return () => { cancelled = true }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loadData, loadAlerts, loadDrillData])
+  }, [loadData, loadAlerts])
 
-  // Load meteo (+ capacity when region selected)
+  // Load meteo + capacity; when code is '' fetch France-level meteo (no region filter)
   const loadDrillData = useCallback(async (code, start, end) => {
     setDrillLoading(true)
     try {
       const meteoParams = code
         ? { regionCode: code, startDate: start, endDate: end }
         : { startDate: start, endDate: end }
-      const [meteoRes] = await Promise.allSettled([fetchMeteo(meteoParams)])
+      const [meteoRes, capacityRes] = await Promise.allSettled([
+        fetchMeteo(meteoParams),
+        code ? fetchCapacity({ regionCode: code }) : Promise.resolve({ data: [] }),
+      ])
       setMeteoData(meteoRes.status === 'fulfilled' ? (meteoRes.value?.data || []) : [])
+      setCapacityData(capacityRes.status === 'fulfilled' ? (capacityRes.value?.data || []) : [])
     } finally {
       setDrillLoading(false)
     }
@@ -251,22 +267,29 @@ export default function App() {
     setSelectedRegion(code)
     setRefreshing(true)
     setDismissedAlertId(null)
-    await Promise.all([
-      loadData(code || '', startDate, endDate, !code),
-      loadAlerts(code || ''),
-      loadDrillData(code || '', startDate, endDate),
-    ])
+    if (code) {
+      // Drill-down: load selected region only
+      await Promise.all([loadData(code, startDate, endDate), loadAlerts(code), loadDrillData(code, startDate, endDate)])
+    } else {
+      // Back to global view: reload all-regions data + France meteo
+      await Promise.all([loadData('', startDate, endDate, true), loadAlerts(''), loadDrillData('', startDate, endDate)])
+    }
     setRefreshing(false)
   }, [loadData, loadAlerts, loadDrillData, startDate, endDate])
 
   // Date range change: reload data (preserve region selection)
   const handleDateChange = useCallback(async (newStart, newEnd) => {
     setRefreshing(true)
-    await Promise.all([
-      loadData(selectedRegion || '', newStart, newEnd, !selectedRegion),
-      selectedRegion ? loadData('', newStart, newEnd, true) : Promise.resolve(),
-      loadDrillData(selectedRegion || '', newStart, newEnd),
-    ])
+    if (selectedRegion) {
+      // Keep choropleth up to date too
+      await Promise.all([
+        loadData(selectedRegion, newStart, newEnd),
+        loadData('', newStart, newEnd, true).then(() => {}),
+        loadDrillData(selectedRegion, newStart, newEnd),
+      ])
+    } else {
+      await Promise.all([loadData('', newStart, newEnd, true), loadDrillData('', newStart, newEnd)])
+    }
     setRefreshing(false)
   }, [loadData, loadDrillData, selectedRegion])
 
@@ -289,11 +312,12 @@ export default function App() {
     setPipelineError(null)
     try {
       await triggerPipeline()
+      // Reload data after pipeline completes
       setRefreshing(true)
       await Promise.all([
-        loadData(selectedRegion || '', startDate, endDate, !selectedRegion),
-        loadAlerts(selectedRegion || ''),
-        loadDrillData(selectedRegion || '', startDate, endDate),
+        loadData(selectedRegion, startDate, endDate, !selectedRegion),
+        loadAlerts(selectedRegion),
+        loadDrillData(selectedRegion, startDate, endDate),
       ])
       setLastUpdated(new Date())
     } catch (err) {
@@ -327,12 +351,23 @@ export default function App() {
     return { regionTotals: totals, regionConsommation: conso }
   }, [globalData])
 
+  // Aggregated data for charts (sum/average across all regions when no region selected)
+  const aggregatedProdData = useMemo(
+    () => selectedRegion ? productionData : aggregateByTimestamp(globalData),
+    [selectedRegion, productionData, globalData]
+  )
+  const aggregatedMeteoData = useMemo(
+    () => selectedRegion ? meteoData : aggregateMeteoByTimestamp(meteoData),
+    [selectedRegion, meteoData]
+  )
+
   // Derive KPIs from current data (region-specific or global)
   const displayData = selectedRegion ? productionData : globalData
   const lastSources = displayData.length
     ? (displayData[displayData.length - 1].sources || {})
     : {}
   const totalMw = computeTotalMw(displayData)
+  const dominantSource = computeDominantSource(displayData)
   const carbonIntensity = computeCarbonIntensity(lastSources)
 
   // Sparkline data: carbon intensity per time point (last 96 points max)
@@ -342,17 +377,6 @@ export default function App() {
       v: computeCarbonIntensity(r.sources || {}),
     })),
     [displayData]
-  )
-
-  // Aggregated data for national view (memoized to avoid recompute on every render)
-  const aggregatedProdData = useMemo(() =>
-    selectedRegion ? productionData : aggregateByTimestamp(globalData),
-    [selectedRegion, productionData, globalData]
-  )
-
-  const aggregatedMeteoData = useMemo(() =>
-    selectedRegion ? meteoData : aggregateMeteoByTimestamp(meteoData),
-    [selectedRegion, meteoData]
   )
 
   // Top alert to display in banner (highest severity, not dismissed)
@@ -531,19 +555,16 @@ export default function App() {
             title={selectedRegionName ? `Production — ${selectedRegionName}` : 'Production France'}
             value={totalMw.toLocaleString('fr-FR')} unit="MW" loading={loading}
           />
-          <Suspense fallback={<div className="glass-card kpi-card"><div className="skeleton" style={{height:88}}/></div>}>
-            <CarbonBadge intensity={carbonIntensity} sparkData={sparkData} loading={loading} />
-          </Suspense>
+          <div className="glass-card kpi-card">
+            <p className="kpi-title">Mix énergétique</p>
+            {loading ? <p className="kpi-value">—</p> : <SourceChips sources={lastSources} />}
+          </div>
+          <CarbonBadge intensity={carbonIntensity} sparkData={sparkData} loading={loading} />
           <KPICard
             title={selectedRegion ? 'Points de données' : 'Régions actives'}
             value={selectedRegion ? productionData.length : Object.keys(regionTotals).length}
             loading={loading}
           />
-          {/* Mix énergétique actuel */}
-          <div className="glass-card kpi-card" style={{ gridColumn: 'span 1' }}>
-            <p className="kpi-title">Mix énergétique actuel</p>
-            <SourceChips sources={lastSources} />
-          </div>
         </div>
 
         {/* ── Hero : carte + prod/conso ─────────────────────────── */}
@@ -556,29 +577,31 @@ export default function App() {
             onSelect={handleRegionChange}
             loading={loading}
           />
-          <Suspense fallback={<div className="glass-card chart-card"><div className="skeleton" style={{height:320}}/></div>}>
-            <ProdConsChart
-              data={aggregatedProdData}
-              region={selectedRegionName}
-              loading={loading || refreshing}
-            />
-          </Suspense>
+          <ProdConsChart
+            data={aggregatedProdData}
+            region={selectedRegionName}
+            loading={loading || refreshing}
+          />
         </div>
 
-        {/* ── Météo (France ou région) ──────────────────────────── */}
+        {/* ── Météo (always visible: France by default, region on drill-down) ── */}
         {error ? (
           <div className="glass-card chart-card chart-error" data-testid="app-error">
             <p>Erreur : {error}</p>
           </div>
         ) : (
-          <Suspense fallback={<div className="glass-card chart-card"><div className="skeleton" style={{height:260}}/></div>}>
-            <MeteoChart
-              data={aggregatedMeteoData}
-              region={selectedRegionName || 'France'}
-              loading={drillLoading}
-            />
-          </Suspense>
+          <MeteoChart
+            data={aggregatedMeteoData}
+            region={selectedRegionName}
+            loading={drillLoading}
+          />
         )}
+
+        {/* Hidden — kept mounted to preserve recharts bundle evaluation order */}
+        <div style={{ display: 'none' }} aria-hidden="true">
+          <HistoryChart data={[]} region="" loading={false} />
+          <CapacityChart data={[]} region="" loading={false} />
+        </div>
 
         {/* ── Historique alertes ────────────────────────────────── */}
         <AlertHistory alerts={alerts} loading={alertsLoading} />
