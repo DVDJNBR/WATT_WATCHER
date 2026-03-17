@@ -1,3 +1,9 @@
+## [1.11.4](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.11.3...v1.11.4) (2026-03-17)
+
+### Bug Fixes
+
+* **ci:** use service principal for azure/login@v1 (publish-profile dropped in v2) ([836c833](https://github.com/DVDJNBR/WATT_WATCHER/commit/836c83324023c9cfaeec3bdb000e436df6285f3a))
+
 ## [1.11.3](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.11.2...v1.11.3) (2026-03-17)
 
 ### Bug Fixes
