@@ -1,3 +1,9 @@
+## [1.13.2](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.13.1...v1.13.2) (2026-03-17)
+
+### Bug Fixes
+
+* cast NUMERIC→float before json.dumps (psycopg2 returns Decimal) ([42a94a7](https://github.com/DVDJNBR/WATT_WATCHER/commit/42a94a721b66964697260d04e8f50770e8d7e558))
+
 ## [1.13.1](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.13.0...v1.13.1) (2026-03-17)
 
 ### Bug Fixes
