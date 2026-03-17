@@ -1,3 +1,9 @@
+## [1.12.1](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.12.0...v1.12.1) (2026-03-17)
+
+### Bug Fixes
+
+* **db:** use Python bool True/False for is_green in dim_source (PostgreSQL boolean) ([5373292](https://github.com/DVDJNBR/WATT_WATCHER/commit/537329277b96a8246de4d5609ad1af2afc6e7042))
+
 ## [1.12.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.11.6...v1.12.0) (2026-03-17)
 
 ### Features
