@@ -1,3 +1,9 @@
+## [1.11.1](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.11.0...v1.11.1) (2026-03-17)
+
+### Bug Fixes
+
+* **db:** rename DATABASE_URL → SUPABASE_CONNECTION_STRING ([461ff9e](https://github.com/DVDJNBR/WATT_WATCHER/commit/461ff9e8a90b8f094c8027366bb9071901d138ae))
+
 ## [1.11.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.10.0...v1.11.0) (2026-03-17)
 
 ### Features
