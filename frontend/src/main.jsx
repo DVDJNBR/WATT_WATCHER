@@ -1,3 +1,4 @@
+import 'recharts'  // force recharts to initialise before any component that uses it
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
