@@ -342,6 +342,17 @@ export default function App() {
     [displayData]
   )
 
+  // Aggregated data for national view (memoized to avoid recompute on every render)
+  const aggregatedProdData = useMemo(() =>
+    selectedRegion ? productionData : aggregateByTimestamp(globalData),
+    [selectedRegion, productionData, globalData]
+  )
+
+  const aggregatedMeteoData = useMemo(() =>
+    selectedRegion ? meteoData : aggregateMeteoByTimestamp(meteoData),
+    [selectedRegion, meteoData]
+  )
+
   // Top alert to display in banner (highest severity, not dismissed)
   const severityOrder = { CRITICAL: 0, WARNING: 1, INFO: 2 }
   const topAlert = alerts
@@ -524,9 +535,9 @@ export default function App() {
             value={selectedRegion ? productionData.length : Object.keys(regionTotals).length}
             loading={loading}
           />
-          {/* Mix énergétique actuel — spans remaining columns */}
+          {/* Mix énergétique actuel */}
           <div className="glass-card kpi-card" style={{ gridColumn: 'span 1' }}>
-            <p className="kpi-label">Mix énergétique actuel</p>
+            <p className="kpi-title">Mix énergétique actuel</p>
             <SourceChips sources={lastSources} />
           </div>
         </div>
@@ -542,7 +553,7 @@ export default function App() {
             loading={loading}
           />
           <ProdConsChart
-            data={selectedRegion ? productionData : aggregateByTimestamp(globalData)}
+            data={aggregatedProdData}
             region={selectedRegionName}
             loading={loading || refreshing}
           />
@@ -555,7 +566,7 @@ export default function App() {
           </div>
         ) : (
           <MeteoChart
-            data={selectedRegion ? meteoData : aggregateMeteoByTimestamp(meteoData)}
+            data={aggregatedMeteoData}
             region={selectedRegionName || 'France'}
             loading={drillLoading}
           />
