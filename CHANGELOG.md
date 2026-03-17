@@ -1,3 +1,9 @@
+## [1.11.3](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.11.2...v1.11.3) (2026-03-17)
+
+### Bug Fixes
+
+* **ci:** replace functions-action ZipDeploy with az config-zip (Linux Consumption plan) ([aabc2f2](https://github.com/DVDJNBR/WATT_WATCHER/commit/aabc2f2f00a82afef93c9fd1ddf31c4382573f6c))
+
 ## [1.11.2](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.11.1...v1.11.2) (2026-03-17)
 
 ### Bug Fixes
