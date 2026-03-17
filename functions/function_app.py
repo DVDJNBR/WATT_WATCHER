@@ -945,8 +945,8 @@ if AZURE_FUNCTIONS_AVAILABLE:
                     "timestamp": str(row[0]),
                     "code_insee": row[1],
                     "region": row[2],
-                    "temperature_c": row[3],
-                    "wind_speed_10m": row[4],
+                    "temperature_c": float(row[3]) if row[3] is not None else None,
+                    "wind_speed_10m": float(row[4]) if row[4] is not None else None,
                 }
                 for row in rows
             ]
@@ -1014,7 +1014,7 @@ if AZURE_FUNCTIONS_AVAILABLE:
                     "code_insee": row[0],
                     "region": row[1],
                     "source": row[2],
-                    "puissance_installee_mw": row[3],
+                    "puissance_installee_mw": float(row[3]) if row[3] is not None else None,
                     "annee": row[4],
                 }
                 for row in rows
@@ -1090,7 +1090,7 @@ if AZURE_FUNCTIONS_AVAILABLE:
                     "event_type": row[4],
                     "start_date": str(row[5]) if row[5] else None,
                     "end_date": str(row[6]) if row[6] else None,
-                    "unavailable_mw": row[7],
+                    "unavailable_mw": float(row[7]) if row[7] is not None else None,
                 }
                 for row in rows
             ]
