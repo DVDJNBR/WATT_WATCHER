@@ -1,3 +1,9 @@
+## [1.11.6](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.11.5...v1.11.6) (2026-03-17)
+
+### Bug Fixes
+
+* **db:** replace boolean integer literals (0/1) with FALSE/TRUE for PostgreSQL ([3237299](https://github.com/DVDJNBR/WATT_WATCHER/commit/323729922fbf96fd0778d876ce196a3ae658ba8a))
+
 ## [1.11.5](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.11.4...v1.11.5) (2026-03-17)
 
 ### Bug Fixes
