@@ -67,6 +67,36 @@ class DimLoader:
                     consommation_mw REAL NULL,
                     UNIQUE(id_date, id_region, id_source)
                 );
+
+                CREATE TABLE IF NOT EXISTS FACT_METEO (
+                    id_fact INTEGER PRIMARY KEY AUTOINCREMENT,
+                    id_date INTEGER NOT NULL REFERENCES DIM_TIME(id_date),
+                    id_region INTEGER NOT NULL REFERENCES DIM_REGION(id_region),
+                    temperature_c REAL,
+                    wind_speed_10m REAL,
+                    UNIQUE(id_date, id_region)
+                );
+
+                CREATE TABLE IF NOT EXISTS FACT_CAPACITY (
+                    id_fact INTEGER PRIMARY KEY AUTOINCREMENT,
+                    id_region INTEGER NOT NULL REFERENCES DIM_REGION(id_region),
+                    id_source INTEGER NOT NULL REFERENCES DIM_SOURCE(id_source),
+                    puissance_installee_mw REAL,
+                    annee INTEGER,
+                    UNIQUE(id_region, id_source, annee)
+                );
+
+                CREATE TABLE IF NOT EXISTS FACT_MAINTENANCE (
+                    id_fact INTEGER PRIMARY KEY AUTOINCREMENT,
+                    event_id TEXT NOT NULL UNIQUE,
+                    id_region INTEGER REFERENCES DIM_REGION(id_region),
+                    unit_name TEXT,
+                    event_type TEXT,
+                    start_date TEXT,
+                    end_date TEXT,
+                    unavailable_mw REAL,
+                    scraped_at TEXT
+                );
             """)
             self.conn.commit()
             logger.info("Gold schema ensured (SQLite)")
@@ -118,6 +148,34 @@ class DimLoader:
                 "CREATE INDEX IF NOT EXISTS ix_fact_region_date ON fact_energy_flow (id_region, id_date)",
                 "CREATE INDEX IF NOT EXISTS ix_dim_time_horodatage ON dim_time (horodatage)",
                 "CREATE INDEX IF NOT EXISTS ix_dim_region_insee ON dim_region (code_insee)",
+                """CREATE TABLE IF NOT EXISTS fact_meteo (
+                       id_fact             BIGSERIAL       PRIMARY KEY,
+                       id_date             INT             NOT NULL REFERENCES dim_time(id_date),
+                       id_region           INT             NOT NULL REFERENCES dim_region(id_region),
+                       temperature_c       NUMERIC(5,2)    NULL,
+                       wind_speed_10m      NUMERIC(6,2)    NULL,
+                       UNIQUE (id_date, id_region)
+                   )""",
+                "CREATE INDEX IF NOT EXISTS ix_fact_meteo_region_date ON fact_meteo (id_region, id_date)",
+                """CREATE TABLE IF NOT EXISTS fact_capacity (
+                       id_fact                 BIGSERIAL       PRIMARY KEY,
+                       id_region               INT             NOT NULL REFERENCES dim_region(id_region),
+                       id_source               INT             NOT NULL REFERENCES dim_source(id_source),
+                       puissance_installee_mw  NUMERIC(10,2)   NULL,
+                       annee                   INT             NULL,
+                       UNIQUE (id_region, id_source, annee)
+                   )""",
+                """CREATE TABLE IF NOT EXISTS fact_maintenance (
+                       id_fact         BIGSERIAL       PRIMARY KEY,
+                       event_id        VARCHAR(100)    NOT NULL UNIQUE,
+                       id_region       INT             REFERENCES dim_region(id_region),
+                       unit_name       VARCHAR(200),
+                       event_type      VARCHAR(100),
+                       start_date      TIMESTAMPTZ,
+                       end_date        TIMESTAMPTZ,
+                       unavailable_mw  NUMERIC(10,2),
+                       scraped_at      TIMESTAMPTZ     NOT NULL DEFAULT NOW()
+                   )""",
             ]
             for stmt in statements:
                 cursor.execute(stmt)

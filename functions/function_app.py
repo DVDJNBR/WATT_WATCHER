@@ -40,6 +40,9 @@ from shared.api.routes import (
     ROUTE_AUTH_ACCOUNT,
     ROUTE_PIPELINE_REFRESH,
     ROUTE_SUBSCRIPTIONS,
+    ROUTE_METEO,
+    ROUTE_CAPACITY,
+    ROUTE_MAINTENANCE,
 )
 from shared.api.auth import require_auth, require_jwt
 from shared.api.openapi_spec import build_spec, build_swagger_ui_html
@@ -466,10 +469,9 @@ if AZURE_FUNCTIONS_AVAILABLE:
                 headers={"X-Request-Id": request_id},
             )
         except Exception as exc:
-            import traceback
             logger.error("register error [%s]: %s", request_id, exc, exc_info=True)
             return func.HttpResponse(
-                json.dumps({**server_error(request_id=request_id), "debug": str(exc), "trace": traceback.format_exc()}),
+                json.dumps(server_error(request_id=request_id)),
                 status_code=500, mimetype="application/json",
                 headers={"X-Request-Id": request_id},
             )
@@ -888,6 +890,226 @@ if AZURE_FUNCTIONS_AVAILABLE:
                 headers={"X-Request-Id": request_id},
             )
 
+    # ── Météo endpoint ────────────────────────────────────────────────────────
+
+    @app.route(route=ROUTE_METEO, methods=["GET"], auth_level=func.AuthLevel.ANONYMOUS)
+    @require_auth
+    def get_meteo_regional(req: func.HttpRequest) -> func.HttpResponse:
+        """GET /v1/meteo/regional — hourly temperature + wind per region from fact_meteo."""
+        request_id = str(uuid.uuid4())
+        region_code = req.params.get("region_code") or None
+        start_date  = req.params.get("start_date") or None
+        end_date    = req.params.get("end_date") or None
+        limit = min(int(req.params.get("limit", 500)), 5000)
+
+        conn = None
+        try:
+            conn = _get_db_connection()
+            import sqlite3 as _sqlite3
+            is_sqlite = isinstance(conn, _sqlite3.Connection)
+            ph = "?" if is_sqlite else "%s"
+            tbl_meteo = "FACT_METEO" if is_sqlite else "fact_meteo"
+            tbl_time  = "DIM_TIME"   if is_sqlite else "dim_time"
+            tbl_reg   = "DIM_REGION" if is_sqlite else "dim_region"
+
+            conditions = []
+            params: list = []
+            if region_code:
+                conditions.append(f"r.code_insee = {ph}")
+                params.append(region_code)
+            if start_date:
+                conditions.append(f"t.horodatage >= {ph}")
+                params.append(start_date)
+            if end_date:
+                conditions.append(f"t.horodatage <= {ph}")
+                params.append(end_date)
+
+            where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
+            query = f"""
+                SELECT t.horodatage, r.code_insee, r.nom_region,
+                       m.temperature_c, m.wind_speed_10m
+                FROM {tbl_meteo} m
+                JOIN {tbl_time} t   ON t.id_date   = m.id_date
+                JOIN {tbl_reg}  r   ON r.id_region = m.id_region
+                {where}
+                ORDER BY t.horodatage DESC
+                LIMIT {ph}
+            """
+            params.append(limit)
+
+            cursor = conn.cursor()
+            cursor.execute(query, params)
+            rows = cursor.fetchall()
+            data = [
+                {
+                    "timestamp": str(row[0]),
+                    "code_insee": row[1],
+                    "region": row[2],
+                    "temperature_c": row[3],
+                    "wind_speed_10m": row[4],
+                }
+                for row in rows
+            ]
+            return func.HttpResponse(
+                json.dumps({"data": data, "total_records": len(data), "request_id": request_id}),
+                status_code=200, mimetype="application/json",
+                headers={"X-Request-Id": request_id},
+            )
+        except Exception as exc:
+            logger.error("meteo endpoint error [%s]: %s", request_id, exc, exc_info=True)
+            return func.HttpResponse(
+                json.dumps(server_error(request_id=request_id)),
+                status_code=500, mimetype="application/json",
+                headers={"X-Request-Id": request_id},
+            )
+        finally:
+            if conn:
+                conn.close()
+
+    # ── Capacity endpoint ─────────────────────────────────────────────────────
+
+    @app.route(route=ROUTE_CAPACITY, methods=["GET"], auth_level=func.AuthLevel.ANONYMOUS)
+    @require_auth
+    def get_capacity_regional(req: func.HttpRequest) -> func.HttpResponse:
+        """GET /v1/capacity/regional — installed capacity per region+source from fact_capacity."""
+        request_id = str(uuid.uuid4())
+        region_code = req.params.get("region_code") or None
+        annee = req.params.get("annee") or None
+
+        conn = None
+        try:
+            conn = _get_db_connection()
+            import sqlite3 as _sqlite3
+            is_sqlite = isinstance(conn, _sqlite3.Connection)
+            ph = "?" if is_sqlite else "%s"
+            tbl_cap  = "FACT_CAPACITY" if is_sqlite else "fact_capacity"
+            tbl_reg  = "DIM_REGION"    if is_sqlite else "dim_region"
+            tbl_src  = "DIM_SOURCE"    if is_sqlite else "dim_source"
+
+            conditions = []
+            params: list = []
+            if region_code:
+                conditions.append(f"r.code_insee = {ph}")
+                params.append(region_code)
+            if annee:
+                conditions.append(f"c.annee = {ph}")
+                params.append(int(annee))
+
+            where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
+            query = f"""
+                SELECT r.code_insee, r.nom_region, s.source_name,
+                       c.puissance_installee_mw, c.annee
+                FROM {tbl_cap} c
+                JOIN {tbl_reg} r ON r.id_region = c.id_region
+                JOIN {tbl_src} s ON s.id_source = c.id_source
+                {where}
+                ORDER BY r.code_insee, c.annee DESC, s.source_name
+            """
+
+            cursor = conn.cursor()
+            cursor.execute(query, params)
+            rows = cursor.fetchall()
+            data = [
+                {
+                    "code_insee": row[0],
+                    "region": row[1],
+                    "source": row[2],
+                    "puissance_installee_mw": row[3],
+                    "annee": row[4],
+                }
+                for row in rows
+            ]
+            return func.HttpResponse(
+                json.dumps({"data": data, "total_records": len(data), "request_id": request_id}),
+                status_code=200, mimetype="application/json",
+                headers={"X-Request-Id": request_id},
+            )
+        except Exception as exc:
+            logger.error("capacity endpoint error [%s]: %s", request_id, exc, exc_info=True)
+            return func.HttpResponse(
+                json.dumps(server_error(request_id=request_id)),
+                status_code=500, mimetype="application/json",
+                headers={"X-Request-Id": request_id},
+            )
+        finally:
+            if conn:
+                conn.close()
+
+    # ── Maintenance endpoint ──────────────────────────────────────────────────
+
+    @app.route(route=ROUTE_MAINTENANCE, methods=["GET"], auth_level=func.AuthLevel.ANONYMOUS)
+    @require_auth
+    def get_maintenance(req: func.HttpRequest) -> func.HttpResponse:
+        """GET /v1/maintenance — grid maintenance events from fact_maintenance."""
+        request_id = str(uuid.uuid4())
+        region_code = req.params.get("region_code") or None
+        limit = min(int(req.params.get("limit", 100)), 500)
+
+        conn = None
+        try:
+            conn = _get_db_connection()
+            import sqlite3 as _sqlite3
+            is_sqlite = isinstance(conn, _sqlite3.Connection)
+            ph = "?" if is_sqlite else "%s"
+            tbl_mnt = "FACT_MAINTENANCE" if is_sqlite else "fact_maintenance"
+            tbl_reg = "DIM_REGION"       if is_sqlite else "dim_region"
+
+            if region_code:
+                query = f"""
+                    SELECT m.event_id, r.code_insee, r.nom_region,
+                           m.unit_name, m.event_type,
+                           m.start_date, m.end_date, m.unavailable_mw
+                    FROM {tbl_mnt} m
+                    LEFT JOIN {tbl_reg} r ON r.id_region = m.id_region
+                    WHERE r.code_insee = {ph}
+                    ORDER BY m.start_date DESC
+                    LIMIT {ph}
+                """
+                params = [region_code, limit]
+            else:
+                query = f"""
+                    SELECT m.event_id, r.code_insee, r.nom_region,
+                           m.unit_name, m.event_type,
+                           m.start_date, m.end_date, m.unavailable_mw
+                    FROM {tbl_mnt} m
+                    LEFT JOIN {tbl_reg} r ON r.id_region = m.id_region
+                    ORDER BY m.start_date DESC
+                    LIMIT {ph}
+                """
+                params = [limit]
+
+            cursor = conn.cursor()
+            cursor.execute(query, params)
+            rows = cursor.fetchall()
+            data = [
+                {
+                    "event_id": row[0],
+                    "code_insee": row[1],
+                    "region": row[2],
+                    "unit_name": row[3],
+                    "event_type": row[4],
+                    "start_date": str(row[5]) if row[5] else None,
+                    "end_date": str(row[6]) if row[6] else None,
+                    "unavailable_mw": row[7],
+                }
+                for row in rows
+            ]
+            return func.HttpResponse(
+                json.dumps({"data": data, "total_records": len(data), "request_id": request_id}),
+                status_code=200, mimetype="application/json",
+                headers={"X-Request-Id": request_id},
+            )
+        except Exception as exc:
+            logger.error("maintenance endpoint error [%s]: %s", request_id, exc, exc_info=True)
+            return func.HttpResponse(
+                json.dumps(server_error(request_id=request_id)),
+                status_code=500, mimetype="application/json",
+                headers={"X-Request-Id": request_id},
+            )
+        finally:
+            if conn:
+                conn.close()
+
 
 def run_ingestion(
     job_id: str | None = None,
@@ -1076,6 +1298,263 @@ def run_full_pipeline(
         return results
 
     results["status"] = "success"
+
+    # ── Stage 4: Météo (Open-Meteo) — non-fatal ───────────────────────────────
+    logger.info("[%s] Stage 4: Météo ingestion", job_id)
+    try:
+        from shared.open_meteo_client import fetch_meteo_all_regions, REGION_CENTROIDS
+        from shared.transformations.meteo_silver import transform_meteo_to_silver
+        from shared.gold.dim_loader import DimLoader as _DimLoader
+
+        meteo_records = fetch_meteo_all_regions(past_days=3)
+        df_meteo = transform_meteo_to_silver(meteo_records)
+
+        if df_meteo.empty:
+            results["stages"]["meteo"] = {"status": "empty", "rows": 0}
+        else:
+            conn_m = _get_db_connection()
+            try:
+                dim_m = _DimLoader(conn_m)
+                dim_m.ensure_schema()
+                # Upsert regions from centroids
+                dim_m.upsert_regions([
+                    {"code_insee": code, "nom_region": info["name"]}
+                    for code, info in REGION_CENTROIDS.items()
+                ])
+                # Upsert timestamps
+                timestamps_m = df_meteo["timestamp"].dt.strftime("%Y-%m-%dT%H:%M:00").tolist()
+                dim_m.upsert_time(timestamps_m)
+
+                import sqlite3 as _sqlite3_m
+                is_sqlite_m = isinstance(conn_m, _sqlite3_m.Connection)
+                ph_m = "?" if is_sqlite_m else "%s"
+                tbl_mt = "FACT_METEO" if is_sqlite_m else "fact_meteo"
+                tbl_dt = "DIM_TIME"   if is_sqlite_m else "dim_time"
+                tbl_dr = "DIM_REGION" if is_sqlite_m else "dim_region"
+
+                cursor_m = conn_m.cursor()
+                rows_loaded_m = 0
+                for _, row in df_meteo.iterrows():
+                    ts_str = row["timestamp"].strftime("%Y-%m-%dT%H:%M:00")
+                    cursor_m.execute(
+                        f"SELECT id_date FROM {tbl_dt} WHERE horodatage = {ph_m}", (ts_str,)
+                    )
+                    id_date_r = cursor_m.fetchone()
+                    cursor_m.execute(
+                        f"SELECT id_region FROM {tbl_dr} WHERE code_insee = {ph_m}", (row["region_code"],)
+                    )
+                    id_region_r = cursor_m.fetchone()
+                    if not id_date_r or not id_region_r:
+                        continue
+                    if is_sqlite_m:
+                        cursor_m.execute(
+                            f"""INSERT INTO {tbl_mt} (id_date, id_region, temperature_c, wind_speed_10m)
+                                VALUES (?, ?, ?, ?)
+                                ON CONFLICT(id_date, id_region) DO UPDATE SET
+                                    temperature_c  = excluded.temperature_c,
+                                    wind_speed_10m = excluded.wind_speed_10m""",
+                            (id_date_r[0], id_region_r[0], row["temperature_c"], row.get("wind_speed_10m")),
+                        )
+                    else:
+                        cursor_m.execute(
+                            f"""INSERT INTO {tbl_mt} (id_date, id_region, temperature_c, wind_speed_10m)
+                                VALUES (%s, %s, %s, %s)
+                                ON CONFLICT (id_date, id_region) DO UPDATE SET
+                                    temperature_c  = EXCLUDED.temperature_c,
+                                    wind_speed_10m = EXCLUDED.wind_speed_10m""",
+                            (id_date_r[0], id_region_r[0], row["temperature_c"], row.get("wind_speed_10m")),
+                        )
+                    rows_loaded_m += 1
+                    if rows_loaded_m % 500 == 0:
+                        conn_m.commit()
+                conn_m.commit()
+                results["stages"]["meteo"] = {"status": "success", "rows": rows_loaded_m}
+                logger.info("[%s] Météo: %d rows loaded", job_id, rows_loaded_m)
+            finally:
+                conn_m.close()
+
+    except Exception as exc:
+        logger.error("[%s] Météo stage failed: %s", job_id, exc, exc_info=True)
+        results["stages"]["meteo"] = {"status": "failure", "error": str(exc)}
+
+    # ── Stage 5: Capacité installée (ODRE) — non-fatal ────────────────────────
+    logger.info("[%s] Stage 5: Capacity ingestion (ODRE)", job_id)
+    try:
+        from shared.odre_capacity_client import fetch_capacity
+        from shared.gold.dim_loader import DimLoader as _DimLoader2
+
+        capacity_records = fetch_capacity()
+
+        if not capacity_records:
+            results["stages"]["capacity"] = {"status": "empty", "rows": 0}
+        else:
+            conn_c = _get_db_connection()
+            try:
+                dim_c = _DimLoader2(conn_c)
+                dim_c.ensure_schema()
+                dim_c.upsert_sources()
+
+                # Upsert regions from capacity records
+                regions_c = {}
+                for rec in capacity_records:
+                    code = rec.get("region_code")
+                    name = rec.get("region_name")
+                    if code and name and code not in regions_c:
+                        regions_c[code] = name
+                if regions_c:
+                    dim_c.upsert_regions([
+                        {"code_insee": code, "nom_region": name}
+                        for code, name in regions_c.items()
+                    ])
+
+                import sqlite3 as _sqlite3_c
+                is_sqlite_c = isinstance(conn_c, _sqlite3_c.Connection)
+                ph_c = "?" if is_sqlite_c else "%s"
+                tbl_cap = "FACT_CAPACITY" if is_sqlite_c else "fact_capacity"
+                tbl_reg = "DIM_REGION"    if is_sqlite_c else "dim_region"
+                tbl_src = "DIM_SOURCE"    if is_sqlite_c else "dim_source"
+
+                cursor_c = conn_c.cursor()
+                rows_loaded_c = 0
+                for rec in capacity_records:
+                    code = rec.get("region_code")
+                    source = rec.get("source_name")
+                    puissance = rec.get("puissance_installee_mw")
+                    annee = rec.get("annee")
+                    if not code or not source:
+                        continue
+                    cursor_c.execute(
+                        f"SELECT id_region FROM {tbl_reg} WHERE code_insee = {ph_c}", (code,)
+                    )
+                    id_reg_r = cursor_c.fetchone()
+                    cursor_c.execute(
+                        f"SELECT id_source FROM {tbl_src} WHERE source_name = {ph_c}", (source,)
+                    )
+                    id_src_r = cursor_c.fetchone()
+                    if not id_reg_r or not id_src_r:
+                        continue
+                    if is_sqlite_c:
+                        cursor_c.execute(
+                            f"""INSERT INTO {tbl_cap}
+                                    (id_region, id_source, puissance_installee_mw, annee)
+                                VALUES (?, ?, ?, ?)
+                                ON CONFLICT(id_region, id_source, annee) DO UPDATE SET
+                                    puissance_installee_mw = excluded.puissance_installee_mw""",
+                            (id_reg_r[0], id_src_r[0], puissance, annee),
+                        )
+                    else:
+                        cursor_c.execute(
+                            f"""INSERT INTO {tbl_cap}
+                                    (id_region, id_source, puissance_installee_mw, annee)
+                                VALUES (%s, %s, %s, %s)
+                                ON CONFLICT (id_region, id_source, annee) DO UPDATE SET
+                                    puissance_installee_mw = EXCLUDED.puissance_installee_mw""",
+                            (id_reg_r[0], id_src_r[0], puissance, annee),
+                        )
+                    rows_loaded_c += 1
+                conn_c.commit()
+                results["stages"]["capacity"] = {"status": "success", "rows": rows_loaded_c}
+                logger.info("[%s] Capacity: %d rows loaded", job_id, rows_loaded_c)
+            finally:
+                conn_c.close()
+
+    except Exception as exc:
+        logger.error("[%s] Capacity stage failed: %s", job_id, exc, exc_info=True)
+        results["stages"]["capacity"] = {"status": "failure", "error": str(exc)}
+
+    # ── Stage 6: Maintenance (scraper) — non-fatal ─────────────────────────────
+    logger.info("[%s] Stage 6: Maintenance ingestion", job_id)
+    try:
+        from shared.gold.dim_loader import DimLoader as _DimLoader3
+        from datetime import datetime as _datetime, timezone as _tz
+
+        maintenance_url = os.environ.get("MAINTENANCE_SCRAPING_URL", "")
+        maintenance_events: list[dict] = []
+
+        if maintenance_url:
+            try:
+                scraper = MaintenanceScraper(base_url=maintenance_url)
+                maintenance_events = scraper.scrape_from_url()
+            except Exception as scrape_exc:
+                logger.warning("[%s] Maintenance scraping failed (non-fatal): %s", job_id, scrape_exc)
+
+        if not maintenance_events:
+            results["stages"]["maintenance"] = {"status": "empty", "rows": 0}
+        else:
+            conn_mn = _get_db_connection()
+            try:
+                dim_mn = _DimLoader3(conn_mn)
+                dim_mn.ensure_schema()
+
+                import sqlite3 as _sqlite3_mn
+                is_sqlite_mn = isinstance(conn_mn, _sqlite3_mn.Connection)
+                ph_mn = "?" if is_sqlite_mn else "%s"
+                tbl_mnt = "FACT_MAINTENANCE" if is_sqlite_mn else "fact_maintenance"
+                now_str = _datetime.now(_tz.utc).isoformat()
+
+                cursor_mn = conn_mn.cursor()
+                rows_loaded_mn = 0
+                for evt in maintenance_events:
+                    event_id = evt.get("event_id", "").strip()
+                    if not event_id:
+                        continue
+                    if is_sqlite_mn:
+                        cursor_mn.execute(
+                            f"""INSERT INTO {tbl_mnt}
+                                    (event_id, unit_name, event_type,
+                                     start_date, end_date, unavailable_mw, scraped_at)
+                                VALUES (?, ?, ?, ?, ?, ?, ?)
+                                ON CONFLICT(event_id) DO UPDATE SET
+                                    unit_name      = excluded.unit_name,
+                                    event_type     = excluded.event_type,
+                                    start_date     = excluded.start_date,
+                                    end_date       = excluded.end_date,
+                                    unavailable_mw = excluded.unavailable_mw,
+                                    scraped_at     = excluded.scraped_at""",
+                            (
+                                event_id,
+                                evt.get("unit_name"),
+                                evt.get("event_type"),
+                                evt.get("start_date"),
+                                evt.get("end_date"),
+                                evt.get("unavailable_mw"),
+                                now_str,
+                            ),
+                        )
+                    else:
+                        cursor_mn.execute(
+                            f"""INSERT INTO {tbl_mnt}
+                                    (event_id, unit_name, event_type,
+                                     start_date, end_date, unavailable_mw, scraped_at)
+                                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                                ON CONFLICT (event_id) DO UPDATE SET
+                                    unit_name      = EXCLUDED.unit_name,
+                                    event_type     = EXCLUDED.event_type,
+                                    start_date     = EXCLUDED.start_date,
+                                    end_date       = EXCLUDED.end_date,
+                                    unavailable_mw = EXCLUDED.unavailable_mw,
+                                    scraped_at     = EXCLUDED.scraped_at""",
+                            (
+                                event_id,
+                                evt.get("unit_name"),
+                                evt.get("event_type"),
+                                evt.get("start_date"),
+                                evt.get("end_date"),
+                                evt.get("unavailable_mw"),
+                                now_str,
+                            ),
+                        )
+                    rows_loaded_mn += 1
+                conn_mn.commit()
+                results["stages"]["maintenance"] = {"status": "success", "rows": rows_loaded_mn}
+                logger.info("[%s] Maintenance: %d rows loaded", job_id, rows_loaded_mn)
+            finally:
+                conn_mn.close()
+
+    except Exception as exc:
+        logger.error("[%s] Maintenance stage failed: %s", job_id, exc, exc_info=True)
+        results["stages"]["maintenance"] = {"status": "failure", "error": str(exc)}
+
     return results
 
 

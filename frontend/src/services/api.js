@@ -216,6 +216,46 @@ export async function fetchSubscriptions() {
 }
 
 /**
+ * Fetch météo data (temperature + wind) from fact_meteo.
+ * @param {Object} params
+ * @param {string} [params.regionCode]
+ * @param {string} [params.startDate]
+ * @param {string} [params.endDate]
+ * @param {number} [params.limit]
+ * @returns {Promise<{data: Array, total_records: number}>}
+ */
+export async function fetchMeteo({ regionCode, startDate, endDate, limit = 500 } = {}) {
+  return authGet('/v1/meteo/regional', {
+    region_code: regionCode,
+    start_date:  startDate,
+    end_date:    endDate,
+    limit,
+  })
+}
+
+/**
+ * Fetch installed capacity per region+source from fact_capacity.
+ * @param {Object} params
+ * @param {string} [params.regionCode]
+ * @param {number} [params.annee]
+ * @returns {Promise<{data: Array, total_records: number}>}
+ */
+export async function fetchCapacity({ regionCode, annee } = {}) {
+  return authGet('/v1/capacity/regional', { region_code: regionCode, annee })
+}
+
+/**
+ * Fetch grid maintenance events from fact_maintenance.
+ * @param {Object} params
+ * @param {string} [params.regionCode]
+ * @param {number} [params.limit]
+ * @returns {Promise<{data: Array, total_records: number}>}
+ */
+export async function fetchMaintenance({ regionCode, limit = 100 } = {}) {
+  return authGet('/v1/maintenance', { region_code: regionCode, limit })
+}
+
+/**
  * Update alert subscriptions (full replace).
  * @param {Array<{region_code:string, alert_type:string, active:boolean}>} subscriptions
  */

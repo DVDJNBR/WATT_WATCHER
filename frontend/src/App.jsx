@@ -20,9 +20,11 @@ import { HistoryChart } from './components/HistoryChart.jsx'
 import { CarbonBadge, computeCarbonIntensity } from './components/CarbonBadge.jsx'
 import { AlertBanner } from './components/AlertBanner.jsx'
 import { AlertHistory } from './components/AlertHistory.jsx'
-import { fetchProduction, fetchRegions, fetchAlerts, triggerPipeline } from './services/api.js'
+import { fetchProduction, fetchRegions, fetchAlerts, triggerPipeline, fetchMeteo, fetchCapacity } from './services/api.js'
 import { ProdConsChart } from './components/ProdConsChart.jsx'
 import { RegionSelector } from './components/RegionSelector.jsx'
+import { MeteoChart } from './components/MeteoChart.jsx'
+import { CapacityChart } from './components/CapacityChart.jsx'
 
 const REFRESH_INTERVAL_MS = 15 * 60 * 1000  // 15 minutes
 const ALERT_POLL_INTERVAL_MS = 60 * 1000    // 60 seconds
@@ -99,6 +101,11 @@ export default function App() {
   const [startDate, setStartDate] = useState(isoDate(-7))
   const [endDate, setEndDate] = useState(isoDate(0))
 
+  // Meteo + capacity data for drill-down
+  const [meteoData, setMeteoData] = useState([])
+  const [capacityData, setCapacityData] = useState([])
+  const [drillLoading, setDrillLoading] = useState(false)
+
   // Story 5.2 — alert state
   const [alerts, setAlerts] = useState([])
   const [alertsLoading, setAlertsLoading] = useState(false)
@@ -161,6 +168,26 @@ export default function App() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadData, loadAlerts])
 
+  // Load meteo + capacity for a region
+  const loadDrillData = useCallback(async (code, start, end) => {
+    if (!code) {
+      setMeteoData([])
+      setCapacityData([])
+      return
+    }
+    setDrillLoading(true)
+    try {
+      const [meteoRes, capacityRes] = await Promise.allSettled([
+        fetchMeteo({ regionCode: code, startDate: start, endDate: end }),
+        fetchCapacity({ regionCode: code }),
+      ])
+      setMeteoData(meteoRes.status === 'fulfilled' ? (meteoRes.value?.data || []) : [])
+      setCapacityData(capacityRes.status === 'fulfilled' ? (capacityRes.value?.data || []) : [])
+    } finally {
+      setDrillLoading(false)
+    }
+  }, [])
+
   // Region change: drill down into a specific region (or reset to global view)
   const handleRegionChange = useCallback(async (code) => {
     setSelectedRegion(code)
@@ -168,13 +195,15 @@ export default function App() {
     setDismissedAlertId(null)
     if (code) {
       // Drill-down: load selected region only
-      await Promise.all([loadData(code, startDate, endDate), loadAlerts(code)])
+      await Promise.all([loadData(code, startDate, endDate), loadAlerts(code), loadDrillData(code, startDate, endDate)])
     } else {
       // Back to global view: reload all-regions data
+      setMeteoData([])
+      setCapacityData([])
       await Promise.all([loadData('', startDate, endDate, true), loadAlerts('')])
     }
     setRefreshing(false)
-  }, [loadData, loadAlerts, startDate, endDate])
+  }, [loadData, loadAlerts, loadDrillData, startDate, endDate])
 
   // Date range change: reload data (preserve region selection)
   const handleDateChange = useCallback(async (newStart, newEnd) => {
@@ -184,12 +213,13 @@ export default function App() {
       await Promise.all([
         loadData(selectedRegion, newStart, newEnd),
         loadData('', newStart, newEnd, true).then(() => {}),
+        loadDrillData(selectedRegion, newStart, newEnd),
       ])
     } else {
       await loadData('', newStart, newEnd, true)
     }
     setRefreshing(false)
-  }, [loadData, selectedRegion])
+  }, [loadData, loadDrillData, selectedRegion])
 
   // Auto-refresh every 15 min (AC #1 — "real-time")
   useEffect(() => {
@@ -215,6 +245,7 @@ export default function App() {
       await Promise.all([
         loadData(selectedRegion, startDate, endDate, !selectedRegion),
         loadAlerts(selectedRegion),
+        loadDrillData(selectedRegion, startDate, endDate),
       ])
       setLastUpdated(new Date())
     } catch (err) {
@@ -223,7 +254,7 @@ export default function App() {
       setPipelineRunning(false)
       setRefreshing(false)
     }
-  }, [selectedRegion, startDate, endDate, loadData, loadAlerts])
+  }, [selectedRegion, startDate, endDate, loadData, loadAlerts, loadDrillData])
 
   // Story 5.2 — alert polling every 60 s (AC #1, Task 3.3)
   useEffect(() => {
@@ -476,6 +507,8 @@ export default function App() {
         ) : selectedRegion ? (
           <div data-testid="charts-grid">
             <HistoryChart data={productionData} region={selectedRegionName} loading={loading || refreshing} />
+            <MeteoChart data={meteoData} region={selectedRegionName} loading={drillLoading} />
+            <CapacityChart data={capacityData} region={selectedRegionName} loading={drillLoading} />
           </div>
         ) : null}
 

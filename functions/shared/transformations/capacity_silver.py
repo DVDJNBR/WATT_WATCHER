@@ -30,12 +30,12 @@ def transform_capacity_to_silver(
     output_dir = Path(output_dir)
 
     if bronze_path.is_file():
-        df = pd.read_csv(bronze_path)
+        df = pd.read_csv(bronze_path, sep=";")
     elif bronze_path.is_dir():
         csvs = sorted(bronze_path.rglob("*.csv"))
         if not csvs:
             return {"status": "empty", "rows": 0}
-        df = pd.concat([pd.read_csv(f) for f in csvs], ignore_index=True)
+        df = pd.concat([pd.read_csv(f, sep=";") for f in csvs], ignore_index=True)
     else:
         raise FileNotFoundError(f"Bronze path not found: {bronze_path}")
 

@@ -42,3 +42,8 @@ ROUTE_AUTH_RESET_REQUEST = "v1/auth/reset-password/request"
 ROUTE_AUTH_RESET_CONFIRM = "v1/auth/reset-password/confirm"
 ROUTE_AUTH_ACCOUNT = "v1/auth/account"
 ROUTE_SUBSCRIPTIONS = "v1/subscriptions"
+
+# New data-source endpoints
+ROUTE_METEO = "v1/meteo/regional"
+ROUTE_CAPACITY = "v1/capacity/regional"
+ROUTE_MAINTENANCE = "v1/maintenance"
