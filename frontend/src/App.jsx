@@ -16,15 +16,13 @@ import { useAuth } from './context/AuthContext.jsx'
 import { logout as apiLogout } from './services/api.js'
 import { KPICard } from './components/KPICard.jsx'
 import { FranceMap } from './components/FranceMap.jsx'
-import { HistoryChart } from './components/HistoryChart.jsx'
 import { CarbonBadge, computeCarbonIntensity } from './components/CarbonBadge.jsx'
 import { AlertBanner } from './components/AlertBanner.jsx'
 import { AlertHistory } from './components/AlertHistory.jsx'
-import { fetchProduction, fetchRegions, fetchAlerts, triggerPipeline, fetchMeteo, fetchCapacity } from './services/api.js'
+import { fetchProduction, fetchRegions, fetchAlerts, triggerPipeline, fetchMeteo } from './services/api.js'
 import { ProdConsChart } from './components/ProdConsChart.jsx'
 import { RegionSelector } from './components/RegionSelector.jsx'
 import { MeteoChart } from './components/MeteoChart.jsx'
-import { CapacityChart } from './components/CapacityChart.jsx'
 
 const REFRESH_INTERVAL_MS = 15 * 60 * 1000  // 15 minutes
 const ALERT_POLL_INTERVAL_MS = 60 * 1000    // 60 seconds
@@ -40,6 +38,76 @@ const SOURCE_LABELS = {
   fioul:       'Fioul',
 }
 
+const SOURCE_COLORS = {
+  nucleaire:   '#7c3aed',
+  eolien:      '#10b981',
+  solaire:     '#f59e0b',
+  hydraulique: '#3b82f6',
+  gaz:         '#ef4444',
+  bioenergies: '#84cc16',
+  charbon:     '#6b7280',
+  fioul:       '#f97316',
+}
+
+/** Aggregate multi-region data by timestamp (sum sources, sum conso). */
+function aggregateByTimestamp(data) {
+  const map = new Map()
+  for (const r of data) {
+    const ts = r.timestamp
+    if (!map.has(ts)) map.set(ts, { timestamp: ts, sources: {}, consommation_mw: null })
+    const agg = map.get(ts)
+    for (const [src, mw] of Object.entries(r.sources || {})) {
+      if (typeof mw === 'number' && mw > 0) agg.sources[src] = (agg.sources[src] || 0) + mw
+    }
+    if (r.consommation_mw != null) agg.consommation_mw = (agg.consommation_mw || 0) + r.consommation_mw
+  }
+  return Array.from(map.values()).sort((a, b) => (a.timestamp < b.timestamp ? -1 : 1))
+}
+
+/** Average meteo by timestamp across regions. */
+function aggregateMeteoByTimestamp(data) {
+  const map = new Map()
+  for (const r of data) {
+    const ts = r.timestamp
+    if (!map.has(ts)) map.set(ts, { timestamp: ts, temp: 0, wind: 0, n: 0 })
+    const agg = map.get(ts)
+    if (r.temperature_c != null) agg.temp += r.temperature_c
+    if (r.wind_speed_10m != null) agg.wind += r.wind_speed_10m
+    agg.n++
+  }
+  return Array.from(map.values())
+    .sort((a, b) => (a.timestamp < b.timestamp ? -1 : 1))
+    .map(r => ({
+      timestamp: r.timestamp,
+      temperature_c:   r.n ? Math.round((r.temp  / r.n) * 10) / 10 : null,
+      wind_speed_10m:  r.n ? Math.round((r.wind  / r.n) * 10) / 10 : null,
+    }))
+}
+
+/** Inline colored chips showing current MW per source. */
+function SourceChips({ sources }) {
+  const entries = Object.entries(sources)
+    .filter(([, v]) => v > 0)
+    .sort(([, a], [, b]) => b - a)
+    .slice(0, 7)
+  if (!entries.length) return <span style={{ color: 'var(--color-text-muted)', fontSize: '0.8rem' }}>—</span>
+  return (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 6 }}>
+      {entries.map(([src, mw]) => (
+        <span key={src} style={{
+          display: 'inline-flex', alignItems: 'center', gap: 4,
+          padding: '2px 8px', borderRadius: 12, fontSize: '0.7rem', fontWeight: 600,
+          background: (SOURCE_COLORS[src] || '#888') + '22',
+          color: SOURCE_COLORS[src] || '#888',
+          border: `1px solid ${(SOURCE_COLORS[src] || '#888')}55`,
+        }}>
+          {SOURCE_LABELS[src] || src} {Math.round(mw).toLocaleString('fr-FR')} MW
+        </span>
+      ))}
+    </div>
+  )
+}
+
 /** Sum all source MW from the last data point. */
 function computeTotalMw(data) {
   if (!data.length) return 0
@@ -47,15 +115,6 @@ function computeTotalMw(data) {
   return Math.round(Object.values(sources).reduce((sum, mw) => sum + (mw > 0 ? mw : 0), 0))
 }
 
-/** Return human-readable label of the dominant source at the last point. */
-function computeDominantSource(data) {
-  if (!data.length) return '—'
-  const sources = data[data.length - 1].sources || {}
-  const entries = Object.entries(sources).filter(([, v]) => v > 0)
-  if (!entries.length) return '—'
-  const [source] = entries.sort(([, a], [, b]) => b - a)[0]
-  return SOURCE_LABELS[source] || source
-}
 
 function formatTime(date) {
   if (!date) return '—'
@@ -101,9 +160,8 @@ export default function App() {
   const [startDate, setStartDate] = useState(isoDate(-7))
   const [endDate, setEndDate] = useState(isoDate(0))
 
-  // Meteo + capacity data for drill-down
+  // Meteo data (France or region)
   const [meteoData, setMeteoData] = useState([])
-  const [capacityData, setCapacityData] = useState([])
   const [drillLoading, setDrillLoading] = useState(false)
 
   // Story 5.2 — alert state
@@ -158,31 +216,27 @@ export default function App() {
       const regsResult = await fetchRegions().catch(() => [])
       if (!cancelled) {
         setRegions(regsResult)
-        // Load ALL regions data for the choropleth (no region filter)
-        await loadData('', startDate, endDate, true)
-        await loadAlerts('')
+        await Promise.all([
+          loadData('', startDate, endDate, true),
+          loadAlerts(''),
+          loadDrillData('', startDate, endDate),
+        ])
         setLoading(false)
       }
     })()
     return () => { cancelled = true }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loadData, loadAlerts])
+  }, [loadData, loadAlerts, loadDrillData])
 
-  // Load meteo + capacity for a region
+  // Load meteo (+ capacity when region selected)
   const loadDrillData = useCallback(async (code, start, end) => {
-    if (!code) {
-      setMeteoData([])
-      setCapacityData([])
-      return
-    }
     setDrillLoading(true)
     try {
-      const [meteoRes, capacityRes] = await Promise.allSettled([
-        fetchMeteo({ regionCode: code, startDate: start, endDate: end }),
-        fetchCapacity({ regionCode: code }),
-      ])
+      const meteoParams = code
+        ? { regionCode: code, startDate: start, endDate: end }
+        : { startDate: start, endDate: end }
+      const [meteoRes] = await Promise.allSettled([fetchMeteo(meteoParams)])
       setMeteoData(meteoRes.status === 'fulfilled' ? (meteoRes.value?.data || []) : [])
-      setCapacityData(capacityRes.status === 'fulfilled' ? (capacityRes.value?.data || []) : [])
     } finally {
       setDrillLoading(false)
     }
@@ -193,31 +247,22 @@ export default function App() {
     setSelectedRegion(code)
     setRefreshing(true)
     setDismissedAlertId(null)
-    if (code) {
-      // Drill-down: load selected region only
-      await Promise.all([loadData(code, startDate, endDate), loadAlerts(code), loadDrillData(code, startDate, endDate)])
-    } else {
-      // Back to global view: reload all-regions data
-      setMeteoData([])
-      setCapacityData([])
-      await Promise.all([loadData('', startDate, endDate, true), loadAlerts('')])
-    }
+    await Promise.all([
+      loadData(code || '', startDate, endDate, !code),
+      loadAlerts(code || ''),
+      loadDrillData(code || '', startDate, endDate),
+    ])
     setRefreshing(false)
   }, [loadData, loadAlerts, loadDrillData, startDate, endDate])
 
   // Date range change: reload data (preserve region selection)
   const handleDateChange = useCallback(async (newStart, newEnd) => {
     setRefreshing(true)
-    if (selectedRegion) {
-      // Keep choropleth up to date too
-      await Promise.all([
-        loadData(selectedRegion, newStart, newEnd),
-        loadData('', newStart, newEnd, true).then(() => {}),
-        loadDrillData(selectedRegion, newStart, newEnd),
-      ])
-    } else {
-      await loadData('', newStart, newEnd, true)
-    }
+    await Promise.all([
+      loadData(selectedRegion || '', newStart, newEnd, !selectedRegion),
+      selectedRegion ? loadData('', newStart, newEnd, true) : Promise.resolve(),
+      loadDrillData(selectedRegion || '', newStart, newEnd),
+    ])
     setRefreshing(false)
   }, [loadData, loadDrillData, selectedRegion])
 
@@ -240,12 +285,11 @@ export default function App() {
     setPipelineError(null)
     try {
       await triggerPipeline()
-      // Reload data after pipeline completes
       setRefreshing(true)
       await Promise.all([
-        loadData(selectedRegion, startDate, endDate, !selectedRegion),
-        loadAlerts(selectedRegion),
-        loadDrillData(selectedRegion, startDate, endDate),
+        loadData(selectedRegion || '', startDate, endDate, !selectedRegion),
+        loadAlerts(selectedRegion || ''),
+        loadDrillData(selectedRegion || '', startDate, endDate),
       ])
       setLastUpdated(new Date())
     } catch (err) {
@@ -285,7 +329,6 @@ export default function App() {
     ? (displayData[displayData.length - 1].sources || {})
     : {}
   const totalMw = computeTotalMw(displayData)
-  const dominantSource = computeDominantSource(displayData)
   const carbonIntensity = computeCarbonIntensity(lastSources)
 
   // Sparkline data: carbon intensity per time point (last 96 points max)
@@ -467,6 +510,25 @@ export default function App() {
           ))}
         </div>
 
+        {/* ── KPI strip ────────────────────────────────────────── */}
+        <div className="kpi-grid" data-testid="kpi-grid">
+          <KPICard
+            title={selectedRegionName ? `Production — ${selectedRegionName}` : 'Production France'}
+            value={totalMw.toLocaleString('fr-FR')} unit="MW" loading={loading}
+          />
+          <CarbonBadge intensity={carbonIntensity} sparkData={sparkData} loading={loading} />
+          <KPICard
+            title={selectedRegion ? 'Points de données' : 'Régions actives'}
+            value={selectedRegion ? productionData.length : Object.keys(regionTotals).length}
+            loading={loading}
+          />
+          {/* Mix énergétique actuel — spans remaining columns */}
+          <div className="glass-card kpi-card" style={{ gridColumn: 'span 1' }}>
+            <p className="kpi-label">Mix énergétique actuel</p>
+            <SourceChips sources={lastSources} />
+          </div>
+        </div>
+
         {/* ── Hero : carte + prod/conso ─────────────────────────── */}
         <div className="hero-grid">
           <FranceMap
@@ -478,39 +540,24 @@ export default function App() {
             loading={loading}
           />
           <ProdConsChart
-            data={selectedRegion ? productionData : globalData}
+            data={selectedRegion ? productionData : aggregateByTimestamp(globalData)}
             region={selectedRegionName}
             loading={loading || refreshing}
           />
         </div>
 
-        {/* ── KPI strip ────────────────────────────────────────── */}
-        <div className="kpi-grid" data-testid="kpi-grid">
-          <KPICard
-            title={selectedRegionName ? `Production — ${selectedRegionName}` : 'Production France'}
-            value={totalMw.toLocaleString('fr-FR')} unit="MW" loading={loading}
-          />
-          <KPICard title="Source dominante" value={dominantSource} loading={loading} />
-          <CarbonBadge intensity={carbonIntensity} sparkData={sparkData} loading={loading} />
-          <KPICard
-            title={selectedRegion ? 'Points de données' : 'Régions actives'}
-            value={selectedRegion ? productionData.length : Object.keys(regionTotals).length}
-            loading={loading}
-          />
-        </div>
-
-        {/* ── Détail région (drill-down) ────────────────────────── */}
+        {/* ── Météo (France ou région) ──────────────────────────── */}
         {error ? (
           <div className="glass-card chart-card chart-error" data-testid="app-error">
             <p>Erreur : {error}</p>
           </div>
-        ) : selectedRegion ? (
-          <div data-testid="charts-grid">
-            <HistoryChart data={productionData} region={selectedRegionName} loading={loading || refreshing} />
-            <MeteoChart data={meteoData} region={selectedRegionName} loading={drillLoading} />
-            <CapacityChart data={capacityData} region={selectedRegionName} loading={drillLoading} />
-          </div>
-        ) : null}
+        ) : (
+          <MeteoChart
+            data={selectedRegion ? meteoData : aggregateMeteoByTimestamp(meteoData)}
+            region={selectedRegionName || 'France'}
+            loading={drillLoading}
+          />
+        )}
 
         {/* ── Historique alertes ────────────────────────────────── */}
         <AlertHistory alerts={alerts} loading={alertsLoading} />

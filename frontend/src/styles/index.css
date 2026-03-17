@@ -133,11 +133,22 @@ body {
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
+  width: fit-content;
 }
 
 .date-bar__input {
   width: auto;
   min-width: 130px;
+  max-width: 160px;
+}
+
+/* override selector-input width: 100% inside date-bar */
+.date-bar .selector-input {
+  width: auto;
+  min-width: 130px;
+  max-width: 160px;
+  background-image: none;
+  padding-right: 12px;
 }
 
 /* ── Header ───────────────────────────────────────────────────────────────── */
