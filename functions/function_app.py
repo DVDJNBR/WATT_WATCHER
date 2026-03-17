@@ -464,9 +464,10 @@ if AZURE_FUNCTIONS_AVAILABLE:
                 headers={"X-Request-Id": request_id},
             )
         except Exception as exc:
+            import traceback
             logger.error("register error [%s]: %s", request_id, exc, exc_info=True)
             return func.HttpResponse(
-                json.dumps(server_error(request_id=request_id)),
+                json.dumps({**server_error(request_id=request_id), "debug": str(exc), "trace": traceback.format_exc()}),
                 status_code=500, mimetype="application/json",
                 headers={"X-Request-Id": request_id},
             )
