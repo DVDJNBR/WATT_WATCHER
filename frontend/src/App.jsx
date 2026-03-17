@@ -597,11 +597,12 @@ export default function App() {
           />
         )}
 
-        {/* Hidden — kept mounted to preserve recharts bundle evaluation order */}
-        <div style={{ display: 'none' }} aria-hidden="true">
-          <HistoryChart data={[]} region="" loading={false} />
-          <CapacityChart data={[]} region="" loading={false} />
-        </div>
+        {/* ── Stacked chart par source (always visible) ────────────── */}
+        <HistoryChart
+          data={aggregatedProdData}
+          region={selectedRegionName || 'France'}
+          loading={loading || refreshing}
+        />
 
         {/* ── Historique alertes ────────────────────────────────── */}
         <AlertHistory alerts={alerts} loading={alertsLoading} />
