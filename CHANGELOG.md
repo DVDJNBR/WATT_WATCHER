@@ -1,3 +1,20 @@
+## [1.10.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.9.1...v1.10.0) (2026-03-16)
+
+### Features
+
+* **a11y:** WCAG AA compliance — light mode contrast, focus-visible, skip link, prefers-color-scheme ([dafc253](https://github.com/DVDJNBR/WATT_WATCHER/commit/dafc253caebaa510d5ac904cc7367e86a830bb93))
+* **auth:** login, register + alert subscriptions pages ([e14754b](https://github.com/DVDJNBR/WATT_WATCHER/commit/e14754ba0a69d9bf1bebfc52207dce0616a92285))
+* **dashboard:** dynamic insight title on ProdConsChart (BMAD spec) ([608e7aa](https://github.com/DVDJNBR/WATT_WATCHER/commit/608e7aa27b27fa388beaa8bbc0ace3842aa0ecd2))
+* **dashboard:** hero layout 50/50 carte+prod-conso, coloration delta map, region selector in header ([ff5aa69](https://github.com/DVDJNBR/WATT_WATCHER/commit/ff5aa69f0a9ee8c7bd1a8981027a703a00ae36fc))
+* **dashboard:** replace CarbonGauge radial with badge + sparkline (BMAD spec) ([a5c62d2](https://github.com/DVDJNBR/WATT_WATCHER/commit/a5c62d2b4a9cec862be32cb3cffc97070e334c57))
+
+### Bug Fixes
+
+* **dev:** pass X-Api-Key from VITE_API_KEY env var for local dev against Azure ([da4d6ea](https://github.com/DVDJNBR/WATT_WATCHER/commit/da4d6ea3143aff46da66e4eaeb583a6257280a5d))
+* **frontend:** add france-regions.geojson to public/ for Vite dev server ([66965ce](https://github.com/DVDJNBR/WATT_WATCHER/commit/66965ce6ef57abe8a232bd210728fc32d37907f4))
+* **frontend:** add missing RegionSelector import to App.jsx ([c04e763](https://github.com/DVDJNBR/WATT_WATCHER/commit/c04e763fe691a6ef794546a6386c25e04c36d98d))
+* restore api.js and auth.js from main (fetchAlerts, triggerPipeline) ([35ebd46](https://github.com/DVDJNBR/WATT_WATCHER/commit/35ebd46d41884f68f0c2681325c1c4e18ff38632))
+
 ## [1.9.1](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.9.0...v1.9.1) (2026-03-16)
 
 ### Bug Fixes
