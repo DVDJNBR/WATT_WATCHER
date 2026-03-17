@@ -1,3 +1,9 @@
+## [1.15.1](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.15.0...v1.15.1) (2026-03-17)
+
+### Bug Fixes
+
+* **dashboard:** kpi-title class + memoize aggregations to fix runtime crash ([fc2d3d0](https://github.com/DVDJNBR/WATT_WATCHER/commit/fc2d3d0e62e9990481555e4278d0080b21e3da68))
+
 ## [1.15.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.14.0...v1.15.0) (2026-03-17)
 
 ### Features
