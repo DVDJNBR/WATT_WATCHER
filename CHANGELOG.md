@@ -1,3 +1,9 @@
+## [1.13.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.12.3...v1.13.0) (2026-03-17)
+
+### Features
+
+* add 3 new data sources — Météo, Capacité, Maintenance (full pipeline) ([e8cbccd](https://github.com/DVDJNBR/WATT_WATCHER/commit/e8cbccd56e51c866d0c028ec6bb124ff984e38d1))
+
 ## [1.12.3](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.12.2...v1.12.3) (2026-03-17)
 
 ### Bug Fixes
