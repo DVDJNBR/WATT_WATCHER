@@ -1,3 +1,9 @@
+## [1.18.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.17.0...v1.18.0) (2026-03-17)
+
+### Features
+
+* **dashboard:** 2x2 grid layout — prod/conso | sources / carte | météo ([5657294](https://github.com/DVDJNBR/WATT_WATCHER/commit/56572949f910ec2859ff3058e07926863a668301))
+
 ## [1.17.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.16.1...v1.17.0) (2026-03-17)
 
 ### Features
