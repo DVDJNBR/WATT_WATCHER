@@ -1,3 +1,9 @@
+## [1.14.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.13.4...v1.14.0) (2026-03-17)
+
+### Features
+
+* **dashboard:** stable layout — KPIs top, source chips, meteo always visible, fix spikes ([ac27cb8](https://github.com/DVDJNBR/WATT_WATCHER/commit/ac27cb85f86d852bf1655e4a53883b7fbf86d562))
+
 ## [1.13.4](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.13.3...v1.13.4) (2026-03-17)
 
 ### Bug Fixes
