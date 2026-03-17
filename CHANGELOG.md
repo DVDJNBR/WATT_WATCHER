@@ -1,3 +1,9 @@
+## [1.12.3](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.12.2...v1.12.3) (2026-03-17)
+
+### Bug Fixes
+
+* **subscriptions:** send array directly instead of wrapping object ([55ea10a](https://github.com/DVDJNBR/WATT_WATCHER/commit/55ea10a4196e3a3d4ee66de303ed843a3fbeff94))
+
 ## [1.12.2](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.12.1...v1.12.2) (2026-03-17)
 
 ### Bug Fixes
