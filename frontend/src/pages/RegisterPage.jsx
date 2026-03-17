@@ -1,10 +1,11 @@
 /**
  * RegisterPage — create account with email + password.
- * On success → shows confirmation pending message.
+ * On success → auto-login and redirect to dashboard.
  */
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
-import { register as apiRegister, resendConfirmation } from '../services/api.js'
+import { Link, useNavigate } from 'react-router-dom'
+import { register as apiRegister } from '../services/api.js'
+import { useAuth } from '../context/AuthContext.jsx'
 
 export default function RegisterPage() {
   const [email,    setEmail]    = useState('')
@@ -12,8 +13,8 @@ export default function RegisterPage() {
   const [confirm,  setConfirm]  = useState('')
   const [error,    setError]    = useState(null)
   const [loading,  setLoading]  = useState(false)
-  const [done,     setDone]     = useState(false)
-  const [resent,   setResent]   = useState(false)
+  const { login }  = useAuth()
+  const navigate   = useNavigate()
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -28,8 +29,9 @@ export default function RegisterPage() {
     }
     setLoading(true)
     try {
-      await apiRegister(email, password)
-      setDone(true)
+      const result = await apiRegister(email, password)
+      login(result.token, { user_id: result.user_id, email: result.email })
+      navigate('/')
     } catch (err) {
       setError(err.message || 'Erreur lors de l\'inscription')
     } finally {
@@ -37,37 +39,6 @@ export default function RegisterPage() {
     }
   }
 
-  async function handleResend() {
-    try {
-      await resendConfirmation(email)
-      setResent(true)
-    } catch { /* ignore */ }
-  }
-
-  if (done) {
-    return (
-      <div className="auth-page">
-        <div className="auth-card glass-card">
-          <div className="auth-logo">⚡ WATT WATCHER</div>
-          <h1 className="auth-title">Vérifiez votre email</h1>
-          <p className="auth-hint">
-            Un lien de confirmation a été envoyé à <strong>{email}</strong>.
-            Cliquez dessus pour activer votre compte.
-          </p>
-          {resent ? (
-            <p className="auth-hint auth-hint--success">Email renvoyé ✓</p>
-          ) : (
-            <button className="btn btn-ghost auth-resend" onClick={handleResend}>
-              Renvoyer l'email de confirmation
-            </button>
-          )}
-          <div className="auth-links">
-            <Link to="/login" className="auth-link">Retour à la connexion</Link>
-          </div>
-        </div>
-      </div>
-    )
-  }
 
   return (
     <div className="auth-page">

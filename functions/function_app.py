@@ -442,11 +442,13 @@ if AZURE_FUNCTIONS_AVAILABLE:
             conn = _get_db_connection()
             svc = EmailService()
             result = register(conn, email, password, svc)
+            token = login(conn, email, password)
             return func.HttpResponse(
                 json.dumps({
                     "request_id": request_id,
                     "user_id": result["user_id"],
                     "email": result["email"],
+                    "token": token["token"],
                 }),
                 status_code=201, mimetype="application/json",
                 headers={"X-Request-Id": request_id},

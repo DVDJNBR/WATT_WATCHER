@@ -120,9 +120,9 @@ def register(conn: Any, email: str, password: str, email_service: Any) -> dict:
             f"""
             INSERT INTO USER_ACCOUNT
                 (email, password_hash, is_confirmed, confirmation_token, confirmation_token_expires)
-            VALUES ({p}, {p}, FALSE, {p}, {p})
+            VALUES ({p}, {p}, TRUE, NULL, NULL)
             """,
-            (email, password_hash, token, expires),
+            (email, password_hash),
         )
         conn.commit()
     except Exception as exc:
