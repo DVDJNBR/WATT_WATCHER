@@ -11,13 +11,18 @@ export default defineConfig({
       },
     },
   },
+  optimizeDeps: {
+    include: ['recharts'],
+  },
   build: {
     rollupOptions: {
       output: {
+        hoistTransitiveImports: false,
         manualChunks: {
-          'vendor-react':    ['react', 'react-dom', 'react-router-dom'],
-          'vendor-recharts': ['recharts'],
-          'vendor-d3':       ['d3-shape', 'd3-scale', 'd3-selection', 'd3-interpolate', 'd3-transition', 'd3-zoom'],
+          'vendor-react':  ['react', 'react-dom', 'react-router-dom'],
+          'vendor-charts': ['recharts', 'd3-shape', 'd3-scale', 'd3-selection',
+                            'd3-interpolate', 'd3-transition', 'd3-zoom',
+                            'd3-color', 'd3-path', 'd3-array'],
         },
       },
     },
