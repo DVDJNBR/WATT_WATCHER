@@ -184,7 +184,7 @@ class DimLoader:
                 continue
             rows.append((
                 ts_str, ts.day, ts.month, ts.year, ts.hour,
-                ts.isoweekday(), 1 if ts.isoweekday() >= 6 else 0,
+                ts.isoweekday(), ts.isoweekday() >= 6,
             ))
 
         if not rows:
