@@ -1,3 +1,9 @@
+## [1.16.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.15.6...v1.16.0) (2026-03-17)
+
+### Features
+
+* **dashboard:** UX overhaul + cloudcover meteo + fix recharts TDZ crash ([732517f](https://github.com/DVDJNBR/WATT_WATCHER/commit/732517ffe8c0b0a5d8535141bb7f590243f9136c))
+
 ## [1.15.6](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.15.5...v1.15.6) (2026-03-17)
 
 ### Bug Fixes
