@@ -1,3 +1,9 @@
+## [1.11.2](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.11.1...v1.11.2) (2026-03-17)
+
+### Bug Fixes
+
+* **ci:** install psycopg2-binary with manylinux_2_17 wheel (no manylinux_2_28 available) ([b1c2842](https://github.com/DVDJNBR/WATT_WATCHER/commit/b1c28426c27ae2b01ed977480d87c572a7a4b02e))
+
 ## [1.11.1](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.11.0...v1.11.1) (2026-03-17)
 
 ### Bug Fixes
