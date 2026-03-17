@@ -1,3 +1,13 @@
+## [1.12.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.11.6...v1.12.0) (2026-03-17)
+
+### Features
+
+* **auth:** auto-confirm on register + redirect to dashboard ([aa1dd3f](https://github.com/DVDJNBR/WATT_WATCHER/commit/aa1dd3f493b4a6a92602a3a48a0cb95da9060c00))
+
+### Bug Fixes
+
+* **tests:** update test fixtures for auto-confirm register flow ([284ccb8](https://github.com/DVDJNBR/WATT_WATCHER/commit/284ccb80902afb2b93c713a1fc06afa2236c4319))
+
 ## [1.11.6](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.11.5...v1.11.6) (2026-03-17)
 
 ### Bug Fixes
