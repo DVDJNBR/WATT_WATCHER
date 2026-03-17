@@ -238,3 +238,12 @@ node_modules/
 # Terraform extra
 .cloud/tfplan
 .cloud/*.backup
+
+# Azurite local storage
+AzuriteConfig
+__azurite_db_*.json
+__blobstorage__/
+functions/AzuriteConfig
+functions/__azurite_db_*.json
+functions/__blobstorage__/
+functions/host.json
