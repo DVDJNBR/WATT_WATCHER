@@ -120,7 +120,7 @@ def register(conn: Any, email: str, password: str, email_service: Any) -> dict:
             f"""
             INSERT INTO USER_ACCOUNT
                 (email, password_hash, is_confirmed, confirmation_token, confirmation_token_expires)
-            VALUES ({p}, {p}, 0, {p}, {p})
+            VALUES ({p}, {p}, FALSE, {p}, {p})
             """,
             (email, password_hash, token, expires),
         )
@@ -196,7 +196,7 @@ def confirm_email(conn: Any, token: str) -> dict:
     cursor.execute(
         f"""
         UPDATE USER_ACCOUNT
-        SET is_confirmed = 1,
+        SET is_confirmed = TRUE,
             confirmation_token = NULL,
             confirmation_token_expires = NULL
         WHERE id = {_ph(conn)}
@@ -409,7 +409,7 @@ def request_password_reset(conn: Any, email: str, email_service: Any) -> dict:
 
     cursor = conn.cursor()
     cursor.execute(
-        f"SELECT id FROM USER_ACCOUNT WHERE email = {_ph(conn)} AND is_confirmed = 1", (email,)
+        f"SELECT id FROM USER_ACCOUNT WHERE email = {_ph(conn)} AND is_confirmed = TRUE", (email,)
     )
     row = cursor.fetchone()
 

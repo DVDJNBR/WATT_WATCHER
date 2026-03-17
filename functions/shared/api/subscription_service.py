@@ -35,7 +35,7 @@ def get_subscriptions(conn: Any, user_id: int) -> list:
     cursor = conn.cursor()
     cursor.execute(
         f"SELECT region_code, alert_type, is_active FROM ALERT_SUBSCRIPTION "
-        f"WHERE user_id = {_ph(conn)} AND is_active = 1 ORDER BY region_code, alert_type",
+        f"WHERE user_id = {_ph(conn)} AND is_active = TRUE ORDER BY region_code, alert_type",
         (user_id,),
     )
     rows = cursor.fetchall()

@@ -53,7 +53,7 @@ def dispatch_alerts(conn: Any, email_svc: Any) -> dict:
             f"SELECT u.id, u.email "
             f"FROM ALERT_SUBSCRIPTION s "
             f"JOIN USER_ACCOUNT u ON s.user_id = u.id "
-            f"WHERE s.region_code = {p} AND s.alert_type = {p} AND s.is_active = 1",
+            f"WHERE s.region_code = {p} AND s.alert_type = {p} AND s.is_active = TRUE",
             (region_code, alert_type),
         )
         subscribers = cursor.fetchall()
