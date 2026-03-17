@@ -567,8 +567,21 @@ export default function App() {
           />
         </div>
 
-        {/* ── Hero : carte + prod/conso ─────────────────────────── */}
+        {/* ── 2×2 grid : [prod/conso | sources] / [carte | météo] ── */}
         <div className="hero-grid">
+          {/* Ligne 1 gauche — prod vs conso */}
+          <ProdConsChart
+            data={aggregatedProdData}
+            region={selectedRegionName}
+            loading={loading || refreshing}
+          />
+          {/* Ligne 1 droite — stacked par source */}
+          <HistoryChart
+            data={aggregatedProdData}
+            region={selectedRegionName || 'France'}
+            loading={loading || refreshing}
+          />
+          {/* Ligne 2 gauche — carte France */}
           <FranceMap
             regions={regions}
             regionTotals={regionTotals}
@@ -577,32 +590,19 @@ export default function App() {
             onSelect={handleRegionChange}
             loading={loading}
           />
-          <ProdConsChart
-            data={aggregatedProdData}
-            region={selectedRegionName}
-            loading={loading || refreshing}
-          />
+          {/* Ligne 2 droite — météo */}
+          {error ? (
+            <div className="glass-card chart-card chart-error" data-testid="app-error">
+              <p>Erreur : {error}</p>
+            </div>
+          ) : (
+            <MeteoChart
+              data={aggregatedMeteoData}
+              region={selectedRegionName}
+              loading={drillLoading}
+            />
+          )}
         </div>
-
-        {/* ── Météo (always visible: France by default, region on drill-down) ── */}
-        {error ? (
-          <div className="glass-card chart-card chart-error" data-testid="app-error">
-            <p>Erreur : {error}</p>
-          </div>
-        ) : (
-          <MeteoChart
-            data={aggregatedMeteoData}
-            region={selectedRegionName}
-            loading={drillLoading}
-          />
-        )}
-
-        {/* ── Stacked chart par source (always visible) ────────────── */}
-        <HistoryChart
-          data={aggregatedProdData}
-          region={selectedRegionName || 'France'}
-          loading={loading || refreshing}
-        />
 
         {/* ── Historique alertes ────────────────────────────────── */}
         <AlertHistory alerts={alerts} loading={alertsLoading} />
