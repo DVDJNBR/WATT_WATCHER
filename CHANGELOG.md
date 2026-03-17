@@ -1,3 +1,9 @@
+## [1.16.1](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.16.0...v1.16.1) (2026-03-17)
+
+### Bug Fixes
+
+* **build:** resolve recharts v3 circular dep TDZ via CJS alias ([28e308f](https://github.com/DVDJNBR/WATT_WATCHER/commit/28e308fa0088271461302cf7aae00c67de5ead69))
+
 ## [1.16.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.15.6...v1.16.0) (2026-03-17)
 
 ### Features
