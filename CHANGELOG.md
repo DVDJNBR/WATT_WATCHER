@@ -1,3 +1,9 @@
+## [1.13.3](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.13.2...v1.13.3) (2026-03-17)
+
+### Bug Fixes
+
+* **odre:** fix region code float→int, convert kW→MW ([24fa268](https://github.com/DVDJNBR/WATT_WATCHER/commit/24fa26835fd81829f388e5e419c55f1684f7d5f6))
+
 ## [1.13.2](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.13.1...v1.13.2) (2026-03-17)
 
 ### Bug Fixes
