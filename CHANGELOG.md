@@ -1,3 +1,9 @@
+## [1.12.2](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.12.1...v1.12.2) (2026-03-17)
+
+### Bug Fixes
+
+* **db:** use Python bool for est_weekend in dim_time (PostgreSQL boolean) ([66fa7c1](https://github.com/DVDJNBR/WATT_WATCHER/commit/66fa7c172082a9e206f13d51da2f4373cb7302f5))
+
 ## [1.12.1](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.12.0...v1.12.1) (2026-03-17)
 
 ### Bug Fixes
