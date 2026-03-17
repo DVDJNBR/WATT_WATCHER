@@ -62,13 +62,9 @@ def _make_email_service() -> MagicMock:
 
 
 def _register_confirmed(conn: sqlite3.Connection, email: str = "user@test.com", password: str = "password123") -> int:
-    """Register + confirm account, return user_id."""
+    """Register account (auto-confirmed at insert time), return user_id."""
     svc = _make_email_service()
     register(conn, email, password, svc)
-    token = conn.execute(
-        "SELECT confirmation_token FROM USER_ACCOUNT WHERE email = ?", (email,)
-    ).fetchone()[0]
-    confirm_email(conn, token)
     return conn.execute(
         "SELECT id FROM USER_ACCOUNT WHERE email = ?", (email,)
     ).fetchone()[0]

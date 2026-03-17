@@ -55,13 +55,9 @@ def _make_email_service() -> MagicMock:
 
 
 def _register_confirmed(conn: sqlite3.Connection, email: str = "user@test.com", password: str = "password123"):
-    """Register + confirm a user account in one step."""
+    """Register a user account (auto-confirmed at insert time)."""
     svc = _make_email_service()
     register(conn, email, password, svc)
-    token = conn.execute(
-        "SELECT confirmation_token FROM USER_ACCOUNT WHERE email = ?", (email,)
-    ).fetchone()[0]
-    confirm_email(conn, token)
 
 
 @pytest.fixture(autouse=True)
@@ -171,17 +167,24 @@ class TestLoginBadCredentials:
 
 class TestLoginUnconfirmed:
 
+    def _insert_unconfirmed(self, conn, email="user@test.com", password="password123"):
+        import bcrypt as _bcrypt
+        h = _bcrypt.hashpw(password.encode(), _bcrypt.gensalt(rounds=4)).decode()
+        conn.execute(
+            "INSERT INTO USER_ACCOUNT (email, password_hash, is_confirmed) VALUES (?, ?, 0)",
+            (email, h),
+        )
+        conn.commit()
+
     def test_unconfirmed_account_raises_unconfirmed_error(self):
         conn = _make_db()
-        svc = _make_email_service()
-        register(conn, "user@test.com", "password123", svc)  # sans confirm
+        self._insert_unconfirmed(conn)
         with pytest.raises(UnconfirmedError):
             login(conn, "user@test.com", "password123")
 
     def test_unconfirmed_error_message_mentions_email(self):
         conn = _make_db()
-        svc = _make_email_service()
-        register(conn, "user@test.com", "password123", svc)
+        self._insert_unconfirmed(conn)
         try:
             login(conn, "user@test.com", "password123")
         except UnconfirmedError as e:

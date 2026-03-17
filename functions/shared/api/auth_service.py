@@ -110,10 +110,6 @@ def register(conn: Any, email: str, password: str, email_service: Any) -> dict:
         password.encode("utf-8"), bcrypt.gensalt(rounds=12)
     ).decode("utf-8")
 
-    # Generate confirmation token
-    token = str(uuid.uuid4())
-    expires = datetime.utcnow() + timedelta(hours=TOKEN_EXPIRY_HOURS)
-
     try:
         p = _ph(conn)
         cursor.execute(
@@ -136,15 +132,6 @@ def register(conn: Any, email: str, password: str, email_service: Any) -> dict:
     cursor.execute(f"SELECT id FROM USER_ACCOUNT WHERE email = {_ph(conn)}", (email,))
     row = cursor.fetchone()
     user_id = row[0]
-
-    # Send confirmation email — fire-and-forget
-    try:
-        email_service.send_confirmation(email, token)
-    except Exception as exc:
-        logger.error(
-            "Failed to send confirmation email to %s: %s", email, exc, exc_info=True
-        )
-        # Do NOT re-raise — registration succeeds even if email send fails
 
     return {"user_id": user_id, "email": email}
 

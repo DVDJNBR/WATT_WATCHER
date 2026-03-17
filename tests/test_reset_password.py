@@ -55,13 +55,9 @@ def _make_email_service() -> MagicMock:
 
 
 def _register_confirmed(conn: sqlite3.Connection, email: str = "user@test.com", password: str = "password123"):
-    """Register + confirm a user account in one step."""
+    """Register a user account (auto-confirmed at insert time)."""
     svc = _make_email_service()
     register(conn, email, password, svc)
-    token = conn.execute(
-        "SELECT confirmation_token FROM USER_ACCOUNT WHERE email = ?", (email,)
-    ).fetchone()[0]
-    confirm_email(conn, token)
 
 
 def _get_reset_token(conn: sqlite3.Connection, email: str) -> str:
@@ -304,21 +300,25 @@ class TestConfirmPasswordReset:
     def test_unconfirmed_account_does_not_receive_reset_email(self):
         """request_password_reset must not send email to unconfirmed accounts."""
         conn = _make_db()
+        # Insert manually as unconfirmed (is_confirmed=0)
+        conn.execute(
+            "INSERT INTO USER_ACCOUNT (email, password_hash, is_confirmed) VALUES (?, ?, 0)",
+            ("unconfirmed@test.com", "hash"),
+        )
+        conn.commit()
         svc = _make_email_service()
-        # Register but do NOT confirm
-        register(conn, "unconfirmed@test.com", "password123", svc)
-        svc2 = _make_email_service()
-        result = request_password_reset(conn, "unconfirmed@test.com", svc2)
-        # Same generic message
+        result = request_password_reset(conn, "unconfirmed@test.com", svc)
         assert "message" in result
-        # But send_reset must NOT have been called
-        svc2.send_reset.assert_not_called()
+        svc.send_reset.assert_not_called()
 
     def test_unconfirmed_account_returns_generic_message(self):
         """Unconfirmed account must return the same generic message as unknown email (no info leak)."""
         conn = _make_db()
-        svc_reg = _make_email_service()
-        register(conn, "unconfirmed@test.com", "password123", svc_reg)
+        conn.execute(
+            "INSERT INTO USER_ACCOUNT (email, password_hash, is_confirmed) VALUES (?, ?, 0)",
+            ("unconfirmed@test.com", "hash"),
+        )
+        conn.commit()
         svc = _make_email_service()
         result_unconfirmed = request_password_reset(conn, "unconfirmed@test.com", svc)
         svc2 = _make_email_service()
