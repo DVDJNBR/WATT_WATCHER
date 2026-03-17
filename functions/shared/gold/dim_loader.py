@@ -74,6 +74,7 @@ class DimLoader:
                     id_region INTEGER NOT NULL REFERENCES DIM_REGION(id_region),
                     temperature_c REAL,
                     wind_speed_10m REAL,
+                    cloudcover_pct REAL,
                     UNIQUE(id_date, id_region)
                 );
 
@@ -154,8 +155,11 @@ class DimLoader:
                        id_region           INT             NOT NULL REFERENCES dim_region(id_region),
                        temperature_c       NUMERIC(5,2)    NULL,
                        wind_speed_10m      NUMERIC(6,2)    NULL,
+                       cloudcover_pct      NUMERIC(5,2)    NULL,
                        UNIQUE (id_date, id_region)
                    )""",
+                # Migration: add cloudcover_pct if existing table predates this column
+                "ALTER TABLE fact_meteo ADD COLUMN IF NOT EXISTS cloudcover_pct NUMERIC(5,2) NULL",
                 "CREATE INDEX IF NOT EXISTS ix_fact_meteo_region_date ON fact_meteo (id_region, id_date)",
                 """CREATE TABLE IF NOT EXISTS fact_capacity (
                        id_fact                 BIGSERIAL       PRIMARY KEY,

@@ -927,7 +927,7 @@ if AZURE_FUNCTIONS_AVAILABLE:
             where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
             query = f"""
                 SELECT t.horodatage, r.code_insee, r.nom_region,
-                       m.temperature_c, m.wind_speed_10m
+                       m.temperature_c, m.wind_speed_10m, m.cloudcover_pct
                 FROM {tbl_meteo} m
                 JOIN {tbl_time} t   ON t.id_date   = m.id_date
                 JOIN {tbl_reg}  r   ON r.id_region = m.id_region
@@ -945,8 +945,9 @@ if AZURE_FUNCTIONS_AVAILABLE:
                     "timestamp": str(row[0]),
                     "code_insee": row[1],
                     "region": row[2],
-                    "temperature_c": float(row[3]) if row[3] is not None else None,
+                    "temperature_c":  float(row[3]) if row[3] is not None else None,
                     "wind_speed_10m": float(row[4]) if row[4] is not None else None,
+                    "cloudcover_pct": float(row[5]) if row[5] is not None else None,
                 }
                 for row in rows
             ]
@@ -1346,23 +1347,27 @@ def run_full_pipeline(
                     id_region_r = cursor_m.fetchone()
                     if not id_date_r or not id_region_r:
                         continue
+                    _cloud = row.get("cloudcover_pct")
+                    _cloud = float(_cloud) if _cloud is not None and _cloud == _cloud else None
                     if is_sqlite_m:
                         cursor_m.execute(
-                            f"""INSERT INTO {tbl_mt} (id_date, id_region, temperature_c, wind_speed_10m)
-                                VALUES (?, ?, ?, ?)
+                            f"""INSERT INTO {tbl_mt} (id_date, id_region, temperature_c, wind_speed_10m, cloudcover_pct)
+                                VALUES (?, ?, ?, ?, ?)
                                 ON CONFLICT(id_date, id_region) DO UPDATE SET
                                     temperature_c  = excluded.temperature_c,
-                                    wind_speed_10m = excluded.wind_speed_10m""",
-                            (id_date_r[0], id_region_r[0], row["temperature_c"], row.get("wind_speed_10m")),
+                                    wind_speed_10m = excluded.wind_speed_10m,
+                                    cloudcover_pct = excluded.cloudcover_pct""",
+                            (id_date_r[0], id_region_r[0], row["temperature_c"], row.get("wind_speed_10m"), _cloud),
                         )
                     else:
                         cursor_m.execute(
-                            f"""INSERT INTO {tbl_mt} (id_date, id_region, temperature_c, wind_speed_10m)
-                                VALUES (%s, %s, %s, %s)
+                            f"""INSERT INTO {tbl_mt} (id_date, id_region, temperature_c, wind_speed_10m, cloudcover_pct)
+                                VALUES (%s, %s, %s, %s, %s)
                                 ON CONFLICT (id_date, id_region) DO UPDATE SET
                                     temperature_c  = EXCLUDED.temperature_c,
-                                    wind_speed_10m = EXCLUDED.wind_speed_10m""",
-                            (id_date_r[0], id_region_r[0], row["temperature_c"], row.get("wind_speed_10m")),
+                                    wind_speed_10m = EXCLUDED.wind_speed_10m,
+                                    cloudcover_pct = EXCLUDED.cloudcover_pct""",
+                            (id_date_r[0], id_region_r[0], row["temperature_c"], row.get("wind_speed_10m"), _cloud),
                         )
                     rows_loaded_m += 1
                     if rows_loaded_m % 500 == 0:

@@ -33,13 +33,14 @@ BASE_URL = "https://api.open-meteo.com/v1/forecast"
 
 def fetch_meteo_all_regions(past_days: int = 3) -> list[dict]:
     """
-    Fetch hourly temperature + wind speed for all French regions.
+    Fetch hourly temperature, wind speed, and cloud cover for all French regions.
 
     Args:
         past_days: Number of past days to retrieve (0–7 on free tier).
 
     Returns:
-        List of dicts: {region_code, region_name, timestamp, temperature_c, wind_speed_10m}
+        List of dicts: {region_code, region_name, timestamp, temperature_c,
+                        wind_speed_10m, cloudcover_pct}
     """
     records = []
 
@@ -50,7 +51,7 @@ def fetch_meteo_all_regions(past_days: int = 3) -> list[dict]:
                 params={
                     "latitude": info["lat"],
                     "longitude": info["lon"],
-                    "hourly": "temperature_2m,wind_speed_10m",
+                    "hourly": "temperature_2m,wind_speed_10m,cloudcover",
                     "timezone": "Europe/Paris",
                     "past_days": past_days,
                     "forecast_days": 0,
@@ -60,21 +61,23 @@ def fetch_meteo_all_regions(past_days: int = 3) -> list[dict]:
             resp.raise_for_status()
             data = resp.json()
             hourly = data.get("hourly", {})
-            times = hourly.get("time", [])
-            temps = hourly.get("temperature_2m", [])
-            winds = hourly.get("wind_speed_10m", [])
+            times  = hourly.get("time", [])
+            temps  = hourly.get("temperature_2m", [])
+            winds  = hourly.get("wind_speed_10m", [])
+            clouds = hourly.get("cloudcover", [])
 
-            for ts, temp, wind in zip(times, temps, winds):
+            for ts, temp, wind, cloud in zip(times, temps, winds, clouds):
                 if temp is not None:
                     records.append({
                         "region_code": code,
                         "region_name": info["name"],
                         "timestamp": ts,          # "YYYY-MM-DDTHH:MM"
-                        "temperature_c": float(temp),
-                        "wind_speed_10m": float(wind) if wind is not None else None,
+                        "temperature_c":  float(temp),
+                        "wind_speed_10m": float(wind)  if wind  is not None else None,
+                        "cloudcover_pct": float(cloud) if cloud is not None else None,
                     })
 
-            logger.info("Fetched %d météo records for region %s (%s)", len(times), code, info["name"])
+            logger.info("Fetched %d météo records for region %s (%s) (cloudcover included)", len(times), code, info["name"])
 
         except Exception as exc:
             logger.warning("Failed to fetch météo for region %s: %s", code, exc)

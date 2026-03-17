@@ -69,18 +69,20 @@ function aggregateMeteoByTimestamp(data) {
   const map = new Map()
   for (const r of data) {
     const ts = r.timestamp
-    if (!map.has(ts)) map.set(ts, { timestamp: ts, temp: 0, wind: 0, n: 0 })
+    if (!map.has(ts)) map.set(ts, { timestamp: ts, temp: 0, wind: 0, cloud: 0, n: 0 })
     const agg = map.get(ts)
-    if (r.temperature_c != null) agg.temp += r.temperature_c
-    if (r.wind_speed_10m != null) agg.wind += r.wind_speed_10m
+    if (r.temperature_c  != null) agg.temp  += r.temperature_c
+    if (r.wind_speed_10m != null) agg.wind  += r.wind_speed_10m
+    if (r.cloudcover_pct != null) agg.cloud += r.cloudcover_pct
     agg.n++
   }
   return Array.from(map.values())
     .sort((a, b) => (a.timestamp < b.timestamp ? -1 : 1))
     .map(r => ({
-      timestamp: r.timestamp,
+      timestamp:       r.timestamp,
       temperature_c:   r.n ? Math.round((r.temp  / r.n) * 10) / 10 : null,
       wind_speed_10m:  r.n ? Math.round((r.wind  / r.n) * 10) / 10 : null,
+      cloudcover_pct:  r.n ? Math.round( r.cloud / r.n)            : null,
     }))
 }
 
