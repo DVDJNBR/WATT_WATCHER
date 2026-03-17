@@ -228,7 +228,7 @@ export async function updateSubscriptions(subscriptions) {
       'X-Api-Key': API_KEY,
       ...(jwt ? { Authorization: `Bearer ${jwt}` } : {}),
     },
-    body: JSON.stringify({ subscriptions }),
+    body: JSON.stringify(subscriptions),
   })
   let json = {}
   try { json = await response.json() } catch (_) { /* ignore */ }
