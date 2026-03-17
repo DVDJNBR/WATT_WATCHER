@@ -114,13 +114,19 @@ def fetch_capacity() -> list[dict]:
         if not source_name:
             continue
 
-        region_code = str(row.get(col_code, "") or "").strip() if col_code else None
+        # coderegion may come back as float (e.g. 11.0) due to pandas CSV parsing
+        try:
+            region_code = str(int(float(str(row.get(col_code, "") or "0").strip())))
+        except (ValueError, TypeError):
+            region_code = None
         region_name = str(row.get(col_name, "") or "").strip() if col_name else None
-        if not region_code:
+        if not region_code or region_code == "0":
             continue
 
         try:
-            puissance = float(str(row.get(col_puiss, 0) or 0).replace(",", "."))
+            # puismaxinstallee is in kW → convert to MW
+            puissance_kw = float(str(row.get(col_puiss, 0) or 0).replace(",", "."))
+            puissance = puissance_kw / 1000.0
         except (ValueError, TypeError):
             puissance = 0.0
 
