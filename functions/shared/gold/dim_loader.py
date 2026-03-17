@@ -220,14 +220,14 @@ class DimLoader:
         """
         if sources is None:
             sources = [
-                {"source_name": "nucleaire", "is_green": 0},
-                {"source_name": "eolien", "is_green": 1},
-                {"source_name": "solaire", "is_green": 1},
-                {"source_name": "hydraulique", "is_green": 1},
-                {"source_name": "gaz", "is_green": 0},
-                {"source_name": "charbon", "is_green": 0},
-                {"source_name": "fioul", "is_green": 0},
-                {"source_name": "bioenergies", "is_green": 1},
+                {"source_name": "nucleaire", "is_green": False},
+                {"source_name": "eolien", "is_green": True},
+                {"source_name": "solaire", "is_green": True},
+                {"source_name": "hydraulique", "is_green": True},
+                {"source_name": "gaz", "is_green": False},
+                {"source_name": "charbon", "is_green": False},
+                {"source_name": "fioul", "is_green": False},
+                {"source_name": "bioenergies", "is_green": True},
             ]
 
         cursor = self.conn.cursor()
