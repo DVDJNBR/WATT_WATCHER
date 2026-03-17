@@ -17,7 +17,7 @@ Usage:
         python inject_test_data.py --mode restore
 
 Environment variables:
-    DATABASE_URL            PostgreSQL connection string (production/staging)
+    SUPABASE_CONNECTION_STRING            PostgreSQL connection string (production/staging)
     LOCAL_GOLD_DB           Path to local SQLite gold.db (local dev override)
 
 If neither is set, defaults to gold.db in the project root.
@@ -48,11 +48,11 @@ def _get_connection() -> Any:
     Return a Gold DB connection.
 
     Priority:
-      1. DATABASE_URL env var → psycopg2 (PostgreSQL/Supabase)
+      1. SUPABASE_CONNECTION_STRING env var → psycopg2 (PostgreSQL/Supabase)
       2. LOCAL_GOLD_DB env var → sqlite3
       3. Default → sqlite3 on gold.db in project root
     """
-    db_url = os.environ.get("DATABASE_URL", "")
+    db_url = os.environ.get("SUPABASE_CONNECTION_STRING", "")
     if db_url:
         import psycopg2  # type: ignore[import]
         return psycopg2.connect(db_url)

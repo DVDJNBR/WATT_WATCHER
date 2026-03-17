@@ -66,11 +66,11 @@ def _get_db_connection() -> Any:
     Return a Gold SQL DB connection.
 
     Priority:
-    1. DATABASE_URL env var → psycopg2 (Supabase/PostgreSQL in production)
+    1. SUPABASE_CONNECTION_STRING env var → psycopg2 (Supabase/PostgreSQL in production)
     2. LOCAL_GOLD_DB env var → sqlite3 (local dev, points to gold.db path)
     3. Default → sqlite3 on gold.db in project root (local dev fallback)
     """
-    db_url = os.environ.get("DATABASE_URL", "")
+    db_url = os.environ.get("SUPABASE_CONNECTION_STRING", "")
     if db_url:
         try:
             import psycopg2  # type: ignore[import]
@@ -85,7 +85,7 @@ def _get_db_connection() -> Any:
         "LOCAL_GOLD_DB",
         str(Path(__file__).parent.parent / "gold.db"),
     )
-    logger.info("DATABASE_URL not set — using local SQLite: %s", local_db)
+    logger.info("SUPABASE_CONNECTION_STRING not set — using local SQLite: %s", local_db)
     return sqlite3.connect(local_db)
 
 
