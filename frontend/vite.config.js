@@ -5,10 +5,20 @@ export default defineConfig({
   plugins: [react()],
   server: {
     proxy: {
-      // Proxy /api to the local dev server (scripts/dev_server.py)
       '/api': {
         target: 'http://localhost:8765',
         changeOrigin: true,
+      },
+    },
+  },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor-react':    ['react', 'react-dom', 'react-router-dom'],
+          'vendor-recharts': ['recharts'],
+          'vendor-d3':       ['d3-shape', 'd3-scale', 'd3-selection', 'd3-interpolate', 'd3-transition', 'd3-zoom'],
+        },
       },
     },
   },
