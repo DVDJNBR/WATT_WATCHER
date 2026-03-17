@@ -1,3 +1,9 @@
+## [1.15.3](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.15.2...v1.15.3) (2026-03-17)
+
+### Bug Fixes
+
+* **build:** split d3/recharts/react into separate chunks to resolve circular dep crash ([1459a1e](https://github.com/DVDJNBR/WATT_WATCHER/commit/1459a1eff1b176d007c74323dc5b3e2dde3928c7))
+
 ## [1.15.2](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.15.1...v1.15.2) (2026-03-17)
 
 ### Bug Fixes
