@@ -71,64 +71,58 @@ class DimLoader:
             self.conn.commit()
             logger.info("Gold schema ensured (SQLite)")
         else:
-            # SQL Server: use IF NOT EXISTS pattern with INFORMATION_SCHEMA
+            # PostgreSQL (Supabase): use CREATE TABLE IF NOT EXISTS
             statements = [
-                """IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME='DIM_REGION')
-                   CREATE TABLE DIM_REGION (
-                       id_region       INT             PRIMARY KEY IDENTITY(1,1),
+                """CREATE TABLE IF NOT EXISTS dim_region (
+                       id_region       SERIAL          PRIMARY KEY,
                        code_insee      VARCHAR(5)      NOT NULL UNIQUE,
-                       nom_region      NVARCHAR(100)   NOT NULL,
+                       nom_region      VARCHAR(100)    NOT NULL,
                        population      INT             NULL,
                        superficie_km2  INT             NULL,
                        status          VARCHAR(10)     NOT NULL DEFAULT 'active',
-                       first_seen_at   DATETIME2       NOT NULL DEFAULT GETDATE(),
-                       last_seen_at    DATETIME2       NOT NULL DEFAULT GETDATE()
+                       first_seen_at   TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
+                       last_seen_at    TIMESTAMPTZ     NOT NULL DEFAULT NOW()
                    )""",
-                """IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME='DIM_TIME')
-                   CREATE TABLE DIM_TIME (
-                       id_date         INT             PRIMARY KEY IDENTITY(1,1),
-                       horodatage      DATETIME2       NOT NULL UNIQUE,
+                """CREATE TABLE IF NOT EXISTS dim_time (
+                       id_date         SERIAL          PRIMARY KEY,
+                       horodatage      TIMESTAMPTZ     NOT NULL UNIQUE,
                        jour            INT             NOT NULL,
                        mois            INT             NOT NULL,
                        annee           INT             NOT NULL,
                        heure           INT             NOT NULL,
                        minute          INT             NOT NULL DEFAULT 0,
                        jour_semaine    INT             NULL,
-                       est_weekend     BIT             NULL
+                       est_weekend     BOOLEAN         NULL
                    )""",
-                """IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME='DIM_SOURCE')
-                   CREATE TABLE DIM_SOURCE (
-                       id_source       INT             PRIMARY KEY IDENTITY(1,1),
-                       source_name     NVARCHAR(50)    NOT NULL UNIQUE,
-                       is_green        BIT             NOT NULL DEFAULT 0,
-                       category        NVARCHAR(30)    NULL
+                """CREATE TABLE IF NOT EXISTS dim_source (
+                       id_source       SERIAL          PRIMARY KEY,
+                       source_name     VARCHAR(50)     NOT NULL UNIQUE,
+                       is_green        BOOLEAN         NOT NULL DEFAULT FALSE,
+                       category        VARCHAR(30)     NULL
                    )""",
-                """IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME='FACT_ENERGY_FLOW')
-                   CREATE TABLE FACT_ENERGY_FLOW (
-                       id_fact             BIGINT          PRIMARY KEY IDENTITY(1,1),
-                       id_date             INT             NOT NULL REFERENCES DIM_TIME(id_date),
-                       id_region           INT             NOT NULL REFERENCES DIM_REGION(id_region),
-                       id_source           INT             NOT NULL REFERENCES DIM_SOURCE(id_source),
-                       valeur_mw           DECIMAL(10,2)   NULL,
-                       taux_couverture     DECIMAL(6,2)    NULL,
-                       taux_charge         DECIMAL(6,2)    NULL,
-                       facteur_charge      DECIMAL(5,4)    NULL,
-                       temperature_moyenne DECIMAL(5,2)    NULL,
-                       prix_mwh            DECIMAL(8,2)    NULL,
-                       consommation_mw     DECIMAL(10,2)   NULL,
-                       ech_physiques_mw    DECIMAL(10,2)   NULL
+                """CREATE TABLE IF NOT EXISTS fact_energy_flow (
+                       id_fact             BIGSERIAL       PRIMARY KEY,
+                       id_date             INT             NOT NULL REFERENCES dim_time(id_date),
+                       id_region           INT             NOT NULL REFERENCES dim_region(id_region),
+                       id_source           INT             NOT NULL REFERENCES dim_source(id_source),
+                       valeur_mw           NUMERIC(10,2)   NULL,
+                       taux_couverture     NUMERIC(6,2)    NULL,
+                       taux_charge         NUMERIC(6,2)    NULL,
+                       facteur_charge      NUMERIC(5,4)    NULL,
+                       temperature_moyenne NUMERIC(5,2)    NULL,
+                       prix_mwh            NUMERIC(8,2)    NULL,
+                       consommation_mw     NUMERIC(10,2)   NULL,
+                       ech_physiques_mw    NUMERIC(10,2)   NULL,
+                       UNIQUE (id_date, id_region, id_source)
                    )""",
-                """IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='IX_FACT_region_date')
-                   CREATE INDEX IX_FACT_region_date ON FACT_ENERGY_FLOW (id_region, id_date)""",
-                """IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='IX_DIM_TIME_horodatage')
-                   CREATE INDEX IX_DIM_TIME_horodatage ON DIM_TIME (horodatage)""",
-                """IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='IX_DIM_REGION_insee')
-                   CREATE INDEX IX_DIM_REGION_insee ON DIM_REGION (code_insee)""",
+                "CREATE INDEX IF NOT EXISTS ix_fact_region_date ON fact_energy_flow (id_region, id_date)",
+                "CREATE INDEX IF NOT EXISTS ix_dim_time_horodatage ON dim_time (horodatage)",
+                "CREATE INDEX IF NOT EXISTS ix_dim_region_insee ON dim_region (code_insee)",
             ]
             for stmt in statements:
                 cursor.execute(stmt)
             self.conn.commit()
-            logger.info("Gold schema ensured (SQL Server)")
+            logger.info("Gold schema ensured (PostgreSQL)")
 
     def upsert_regions(self, regions: list[dict]) -> int:
         """
@@ -158,26 +152,16 @@ class DimLoader:
                 rows,
             )
         else:
-            # SQL Server: batch MERGE via VALUES table constructor (max ~300 rows / 2100 params)
-            BATCH = 200
-            for i in range(0, len(rows), BATCH):
-                chunk = rows[i:i + BATCH]
-                placeholders = ",".join(["(?,?,?,?)"] * len(chunk))
-                params = [v for row in chunk for v in row]
-                cursor.execute(
-                    f"""MERGE DIM_REGION AS t
-                        USING (VALUES {placeholders})
-                            AS s(code_insee, nom_region, population, superficie_km2)
-                        ON t.code_insee = s.code_insee
-                        WHEN MATCHED THEN UPDATE SET
-                            nom_region = s.nom_region,
-                            population = s.population,
-                            superficie_km2 = s.superficie_km2
-                        WHEN NOT MATCHED THEN INSERT
-                            (code_insee, nom_region, population, superficie_km2)
-                            VALUES (s.code_insee, s.nom_region, s.population, s.superficie_km2);""",
-                    params,
-                )
+            # PostgreSQL: batch INSERT ... ON CONFLICT DO UPDATE
+            cursor.executemany(
+                """INSERT INTO dim_region (code_insee, nom_region, population, superficie_km2)
+                   VALUES (%s, %s, %s, %s)
+                   ON CONFLICT (code_insee) DO UPDATE SET
+                       nom_region = EXCLUDED.nom_region,
+                       population = EXCLUDED.population,
+                       superficie_km2 = EXCLUDED.superficie_km2""",
+                rows,
+            )
         self.conn.commit()
         logger.info("Upserted %d regions", len(rows))
         return len(rows)
@@ -216,23 +200,14 @@ class DimLoader:
                 rows,
             )
         else:
-            # SQL Server: batch MERGE (7 params/row → max 300 rows per batch)
-            BATCH = 200
-            for i in range(0, len(rows), BATCH):
-                chunk = rows[i:i + BATCH]
-                placeholders = ",".join(["(?,?,?,?,?,?,?)"] * len(chunk))
-                params = [v for row in chunk for v in row]
-                cursor.execute(
-                    f"""MERGE DIM_TIME AS t
-                        USING (VALUES {placeholders})
-                            AS s(horodatage, jour, mois, annee, heure, jour_semaine, est_weekend)
-                        ON t.horodatage = s.horodatage
-                        WHEN NOT MATCHED THEN INSERT
-                            (horodatage, jour, mois, annee, heure, jour_semaine, est_weekend)
-                            VALUES (s.horodatage, s.jour, s.mois, s.annee,
-                                    s.heure, s.jour_semaine, s.est_weekend);""",
-                    params,
-                )
+            # PostgreSQL: batch INSERT ... ON CONFLICT DO NOTHING
+            cursor.executemany(
+                """INSERT INTO dim_time
+                   (horodatage, jour, mois, annee, heure, jour_semaine, est_weekend)
+                   VALUES (%s, %s, %s, %s, %s, %s, %s)
+                   ON CONFLICT (horodatage) DO NOTHING""",
+                rows,
+            )
         self.conn.commit()
         logger.info("Upserted %d time entries", len(rows))
         return len(rows)
@@ -268,12 +243,10 @@ class DimLoader:
                 )
             else:
                 cursor.execute(
-                    """MERGE DIM_SOURCE AS t
-                       USING (VALUES (?, ?)) AS s(source_name, is_green)
-                       ON t.source_name = s.source_name
-                       WHEN MATCHED THEN UPDATE SET is_green = s.is_green
-                       WHEN NOT MATCHED THEN INSERT (source_name, is_green)
-                           VALUES (s.source_name, s.is_green);""",
+                    """INSERT INTO dim_source (source_name, is_green)
+                       VALUES (%s, %s)
+                       ON CONFLICT (source_name) DO UPDATE SET
+                           is_green = EXCLUDED.is_green""",
                     (s["source_name"], s["is_green"]),
                 )
             count += 1
@@ -284,20 +257,26 @@ class DimLoader:
     def get_region_id(self, code_insee: str) -> int | None:
         """Get id_region for a given code_insee."""
         cursor = self.conn.cursor()
-        cursor.execute("SELECT id_region FROM DIM_REGION WHERE code_insee = ?", (code_insee,))
+        ph = "?" if self._is_sqlite else "%s"
+        tbl = "DIM_REGION" if self._is_sqlite else "dim_region"
+        cursor.execute(f"SELECT id_region FROM {tbl} WHERE code_insee = {ph}", (code_insee,))
         row = cursor.fetchone()
         return row[0] if row else None
 
     def get_time_id(self, horodatage: str) -> int | None:
         """Get id_date for a given horodatage."""
         cursor = self.conn.cursor()
-        cursor.execute("SELECT id_date FROM DIM_TIME WHERE horodatage = ?", (horodatage,))
+        ph = "?" if self._is_sqlite else "%s"
+        tbl = "DIM_TIME" if self._is_sqlite else "dim_time"
+        cursor.execute(f"SELECT id_date FROM {tbl} WHERE horodatage = {ph}", (horodatage,))
         row = cursor.fetchone()
         return row[0] if row else None
 
     def get_source_id(self, source_name: str) -> int | None:
         """Get id_source for a given source name."""
         cursor = self.conn.cursor()
-        cursor.execute("SELECT id_source FROM DIM_SOURCE WHERE source_name = ?", (source_name,))
+        ph = "?" if self._is_sqlite else "%s"
+        tbl = "DIM_SOURCE" if self._is_sqlite else "dim_source"
+        cursor.execute(f"SELECT id_source FROM {tbl} WHERE source_name = {ph}", (source_name,))
         row = cursor.fetchone()
         return row[0] if row else None

@@ -5,7 +5,7 @@ Compares regions found in Bronze RTE data against the SQL DIM_REGION table.
 - New regions → INSERT with status='active', first_seen_at=NOW()
 - Known regions → UPDATE last_seen_at=NOW()
 
-Supports both Azure SQL (pyodbc) and local SQLite for development.
+Supports both PostgreSQL/Supabase (psycopg2) and local SQLite for development.
 """
 
 import logging
@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 
 class DBConnection(Protocol):
-    """Protocol for database connections (works with pyodbc and sqlite3)."""
+    """Protocol for database connections (works with psycopg2 and sqlite3)."""
 
     def cursor(self) -> Any: ...
     def commit(self) -> None: ...
@@ -29,7 +29,7 @@ class AssetDiscovery:
     def __init__(self, db_connection: Any, audit_logger=None):
         """
         Args:
-            db_connection: Database connection (pyodbc or sqlite3).
+            db_connection: Database connection (psycopg2 or sqlite3).
             audit_logger: Optional AuditLogger instance.
         """
         self.conn = db_connection
@@ -125,7 +125,7 @@ class AssetDiscovery:
             cursor.execute(
                 """INSERT INTO DIM_REGION
                    (code_insee_region, libelle_region, status, first_seen_at, last_seen_at)
-                   VALUES (?, ?, 'active', ?, ?)""",
+                   VALUES (%s, %s, 'active', %s, %s)""",
                 (code, label, now, now),
             )
 
@@ -141,7 +141,7 @@ class AssetDiscovery:
         else:
             cursor.execute(
                 """UPDATE DIM_REGION
-                   SET last_seen_at = ?, status = 'active'
-                   WHERE code_insee_region = ?""",
+                   SET last_seen_at = %s, status = 'active'
+                   WHERE code_insee_region = %s""",
                 (now, code),
             )

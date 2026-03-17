@@ -8,6 +8,7 @@ Called by the alert_dispatch_timer Azure Function in function_app.py.
 """
 
 import logging
+import sqlite3 as _sqlite3
 from datetime import datetime, timezone
 from typing import Any
 
@@ -16,12 +17,17 @@ from shared.alerting.alert_detector import detect
 logger = logging.getLogger(__name__)
 
 
+def _ph(conn: Any) -> str:
+    """Return the correct query placeholder for this connection."""
+    return "?" if isinstance(conn, _sqlite3.Connection) else "%s"
+
+
 def dispatch_alerts(conn: Any, email_svc: Any) -> dict:
     """
     Run one dispatch cycle: detect → match subscribers → dedup → send.
 
     Args:
-        conn: DB connection (pyodbc or sqlite3).
+        conn: DB connection (psycopg2 or sqlite3).
         email_svc: EmailService instance (real or mock).
 
     Returns:
@@ -42,11 +48,12 @@ def dispatch_alerts(conn: Any, email_svc: Any) -> dict:
         conso_mw = alert["conso_mw"]
 
         # Find active subscribers for this region + alert_type
+        p = _ph(conn)
         cursor.execute(
-            "SELECT u.id, u.email "
-            "FROM ALERT_SUBSCRIPTION s "
-            "JOIN USER_ACCOUNT u ON s.user_id = u.id "
-            "WHERE s.region_code = ? AND s.alert_type = ? AND s.is_active = 1",
+            f"SELECT u.id, u.email "
+            f"FROM ALERT_SUBSCRIPTION s "
+            f"JOIN USER_ACCOUNT u ON s.user_id = u.id "
+            f"WHERE s.region_code = {p} AND s.alert_type = {p} AND s.is_active = 1",
             (region_code, alert_type),
         )
         subscribers = cursor.fetchall()
@@ -54,8 +61,8 @@ def dispatch_alerts(conn: Any, email_svc: Any) -> dict:
         for user_id, email in subscribers:
             # Dedup: skip if already sent today
             cursor.execute(
-                "SELECT 1 FROM ALERT_SENT_LOG "
-                "WHERE user_id = ? AND region_code = ? AND alert_type = ? AND sent_at >= ?",
+                f"SELECT 1 FROM ALERT_SENT_LOG "
+                f"WHERE user_id = {p} AND region_code = {p} AND alert_type = {p} AND sent_at >= {p}",
                 (user_id, region_code, alert_type, today_start),
             )
             if cursor.fetchone():
@@ -80,7 +87,7 @@ def dispatch_alerts(conn: Any, email_svc: Any) -> dict:
             # Log successful send
             try:
                 cursor.execute(
-                    "INSERT INTO ALERT_SENT_LOG (user_id, region_code, alert_type) VALUES (?, ?, ?)",
+                    f"INSERT INTO ALERT_SENT_LOG (user_id, region_code, alert_type) VALUES ({p}, {p}, {p})",
                     (user_id, region_code, alert_type),
                 )
                 conn.commit()

@@ -30,7 +30,7 @@ def build_production_query(
     """
     Build parameterized SQL query for production data.
 
-    Returns (sql, params). Uses ? placeholders (pyodbc / sqlite3 compatible).
+    Returns (sql, params). Uses ? placeholders for SQLite, %s for PostgreSQL.
     AC #2: Parameterized → query plan caching, index usage.
 
     Note: LIMIT is applied on raw rows (one per source). Multiply by 10 to
@@ -38,7 +38,8 @@ def build_production_query(
     records. Final pagination is applied in query_production() after aggregation.
 
     Args:
-        is_sqlite: Use LIMIT syntax (SQLite) vs TOP syntax (SQL Server).
+        is_sqlite: Use SQLite syntax (? placeholders, uppercase tables) vs
+                   PostgreSQL syntax (%s placeholders, lowercase tables).
     """
     where_clauses: list[str] = []
     params: list[Any] = []
@@ -89,9 +90,10 @@ def build_production_query(
         """
         params.append(sql_limit)
     else:
-        # SQL Server: TOP clause at top of SELECT (? placeholder before WHERE params)
+        # PostgreSQL: LIMIT clause at end with %s placeholder
+        where_pg = where.replace("?", "%s")
         sql = f"""
-            SELECT TOP(?)
+            SELECT
                 r.code_insee,
                 r.nom_region,
                 t.horodatage,
@@ -99,20 +101,21 @@ def build_production_query(
                 f.valeur_mw,
                 f.facteur_charge,
                 f.consommation_mw
-            FROM FACT_ENERGY_FLOW f
-            JOIN DIM_REGION r ON f.id_region = r.id_region
-            JOIN DIM_TIME t ON f.id_date = t.id_date
-            JOIN DIM_SOURCE s ON f.id_source = s.id_source
-            {where}
+            FROM fact_energy_flow f
+            JOIN dim_region r ON f.id_region = r.id_region
+            JOIN dim_time t ON f.id_date = t.id_date
+            JOIN dim_source s ON f.id_source = s.id_source
+            {where_pg}
             ORDER BY t.horodatage ASC, r.code_insee
+            LIMIT %s
         """
-        params.insert(0, sql_limit)
+        params.append(sql_limit)
 
     return sql, params
 
 
 def _to_json_safe(value):
-    """Convert pyodbc non-JSON-serializable types (datetime, Decimal) to native Python."""
+    """Convert non-JSON-serializable types (datetime, Decimal) to native Python."""
     if value is None:
         return None
     # datetime / date → ISO string
@@ -133,7 +136,7 @@ def _aggregate_rows(rows: list, cols: list[str]) -> list[dict]:
     Pivot flat SQL rows into region/timestamp records with source breakdown.
 
     AC #3: {region, timestamp, sources: {eolien, ...}, facteur_charge, consommation_mw}
-    Converts pyodbc-specific types (datetime, Decimal) to JSON-serializable types.
+    Converts DB-specific types (datetime, Decimal) to JSON-serializable types.
     consommation_mw is a region/timestamp-level field (not per source) — taken from first row.
     """
     aggregated: dict[tuple, dict] = {}
@@ -176,7 +179,7 @@ def query_production(
     AC #2: Parameterized queries → <500ms with proper indexes.
 
     Args:
-        conn: Any DB connection with cursor() support (pyodbc, sqlite3…).
+        conn: Any DB connection with cursor() support (psycopg2, sqlite3…).
         request_id: Trace ID; auto-generated if None.
 
     Returns:

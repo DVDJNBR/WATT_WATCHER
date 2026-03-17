@@ -66,18 +66,17 @@ def _get_db_connection() -> Any:
     Return a Gold SQL DB connection.
 
     Priority:
-    1. SQL_CONNECTION_STRING env var → pyodbc (Azure SQL in production)
+    1. DATABASE_URL env var → psycopg2 (Supabase/PostgreSQL in production)
     2. LOCAL_GOLD_DB env var → sqlite3 (local dev, points to gold.db path)
     3. Default → sqlite3 on gold.db in project root (local dev fallback)
     """
-    conn_str = os.environ.get("SQL_CONNECTION_STRING", "")
-    if conn_str:
+    db_url = os.environ.get("DATABASE_URL", "")
+    if db_url:
         try:
-            import pyodbc  # type: ignore[import]
-            # timeout=90 handles Azure SQL Serverless auto-resume (can take ~60 s)
-            return pyodbc.connect(conn_str, timeout=90)
+            import psycopg2  # type: ignore[import]
+            return psycopg2.connect(db_url)
         except ImportError as e:
-            raise RuntimeError("pyodbc not available — install it for Azure SQL") from e
+            raise RuntimeError("psycopg2 not available — install psycopg2-binary") from e
 
     # Local dev fallback: sqlite3
     import sqlite3
@@ -86,7 +85,7 @@ def _get_db_connection() -> Any:
         "LOCAL_GOLD_DB",
         str(Path(__file__).parent.parent / "gold.db"),
     )
-    logger.info("SQL_CONNECTION_STRING not set — using local SQLite: %s", local_db)
+    logger.info("DATABASE_URL not set — using local SQLite: %s", local_db)
     return sqlite3.connect(local_db)
 
 

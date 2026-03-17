@@ -4,8 +4,9 @@ Auth Service — Story 2.2
 Handles: register, confirm_email, resend_confirmation.
 Login/logout/reset/delete will be added in stories 2.3/2.4/2.5.
 
-DB compatibility: works with both pyodbc (Azure SQL) and sqlite3 (local/tests).
-Both use '?' as placeholder. pyodbc returns datetime objects; sqlite3 returns strings.
+DB compatibility: works with both psycopg2 (PostgreSQL/Supabase) and sqlite3 (local/tests).
+sqlite3 uses '?' placeholders; psycopg2 uses '%s'. SQLite returns strings for datetimes;
+psycopg2 returns datetime objects.
 """
 
 import logging
@@ -17,10 +18,17 @@ from typing import Any
 import bcrypt
 import jwt as pyjwt
 
+import sqlite3 as _sqlite3
+
 logger = logging.getLogger(__name__)
 
 EMAIL_REGEX = re.compile(r"^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$")
 TOKEN_EXPIRY_HOURS = 1
+
+
+def _ph(conn: Any) -> str:
+    """Return the correct query placeholder for this connection."""
+    return "?" if isinstance(conn, _sqlite3.Connection) else "%s"
 
 
 # ── Custom exceptions ─────────────────────────────────────────────────────────
@@ -56,7 +64,7 @@ def _parse_datetime(value: Any) -> datetime:
     """
     Normalize datetime from DB row.
 
-    pyodbc (Azure SQL) → already a datetime object.
+    psycopg2 (PostgreSQL) → already a datetime object.
     sqlite3 → ISO string like "2026-03-10 14:30:00.123456"
     """
     if isinstance(value, datetime):
@@ -93,7 +101,7 @@ def register(conn: Any, email: str, password: str, email_service: Any) -> dict:
     cursor = conn.cursor()
 
     # Check for duplicate email
-    cursor.execute("SELECT id FROM USER_ACCOUNT WHERE email = ?", (email,))
+    cursor.execute(f"SELECT id FROM USER_ACCOUNT WHERE email = {_ph(conn)}", (email,))
     if cursor.fetchone():
         raise ConflictError("Email already registered")
 
@@ -107,11 +115,12 @@ def register(conn: Any, email: str, password: str, email_service: Any) -> dict:
     expires = datetime.utcnow() + timedelta(hours=TOKEN_EXPIRY_HOURS)
 
     try:
+        p = _ph(conn)
         cursor.execute(
-            """
+            f"""
             INSERT INTO USER_ACCOUNT
                 (email, password_hash, is_confirmed, confirmation_token, confirmation_token_expires)
-            VALUES (?, ?, 0, ?, ?)
+            VALUES ({p}, {p}, 0, {p}, {p})
             """,
             (email, password_hash, token, expires),
         )
@@ -124,8 +133,7 @@ def register(conn: Any, email: str, password: str, email_service: Any) -> dict:
         raise
 
     # Retrieve the generated user_id
-    # Note: cursor.lastrowid is unreliable with pyodbc — use SELECT instead
-    cursor.execute("SELECT id FROM USER_ACCOUNT WHERE email = ?", (email,))
+    cursor.execute(f"SELECT id FROM USER_ACCOUNT WHERE email = {_ph(conn)}", (email,))
     row = cursor.fetchone()
     user_id = row[0]
 
@@ -162,10 +170,10 @@ def confirm_email(conn: Any, token: str) -> dict:
 
     cursor = conn.cursor()
     cursor.execute(
-        """
+        f"""
         SELECT id, email, is_confirmed, confirmation_token_expires
         FROM USER_ACCOUNT
-        WHERE confirmation_token = ?
+        WHERE confirmation_token = {_ph(conn)}
         """,
         (token,),
     )
@@ -186,12 +194,12 @@ def confirm_email(conn: Any, token: str) -> dict:
 
     # Activate account and invalidate token
     cursor.execute(
-        """
+        f"""
         UPDATE USER_ACCOUNT
         SET is_confirmed = 1,
             confirmation_token = NULL,
             confirmation_token_expires = NULL
-        WHERE id = ?
+        WHERE id = {_ph(conn)}
         """,
         (user_id,),
     )
@@ -224,7 +232,7 @@ def resend_confirmation(conn: Any, email: str, email_service: Any) -> dict:
 
     cursor = conn.cursor()
     cursor.execute(
-        "SELECT id, is_confirmed FROM USER_ACCOUNT WHERE email = ?", (email,)
+        f"SELECT id, is_confirmed FROM USER_ACCOUNT WHERE email = {_ph(conn)}", (email,)
     )
     row = cursor.fetchone()
 
@@ -241,11 +249,12 @@ def resend_confirmation(conn: Any, email: str, email_service: Any) -> dict:
     token = str(uuid.uuid4())
     expires = datetime.utcnow() + timedelta(hours=TOKEN_EXPIRY_HOURS)
 
+    p = _ph(conn)
     cursor.execute(
-        """
+        f"""
         UPDATE USER_ACCOUNT
-        SET confirmation_token = ?, confirmation_token_expires = ?
-        WHERE id = ?
+        SET confirmation_token = {p}, confirmation_token_expires = {p}
+        WHERE id = {p}
         """,
         (token, expires, user_id),
     )
@@ -295,7 +304,7 @@ def login(conn: Any, email: str, password: str) -> dict:
 
     cursor = conn.cursor()
     cursor.execute(
-        "SELECT id, email, password_hash, is_confirmed FROM USER_ACCOUNT WHERE email = ?",
+        f"SELECT id, email, password_hash, is_confirmed FROM USER_ACCOUNT WHERE email = {_ph(conn)}",
         (email,),
     )
     row = cursor.fetchone()
@@ -315,8 +324,9 @@ def login(conn: Any, email: str, password: str) -> dict:
     if not is_confirmed:
         raise UnconfirmedError("Account not confirmed — please check your email")
 
+    p = _ph(conn)
     cursor.execute(
-        "UPDATE USER_ACCOUNT SET last_activity = ? WHERE id = ?",
+        f"UPDATE USER_ACCOUNT SET last_activity = {p} WHERE id = {p}",
         (datetime.now(timezone.utc), user_id),
     )
     conn.commit()
@@ -364,11 +374,11 @@ def delete_account(conn: Any, user_id: int) -> None:
     handle cleanup of linked rows automatically.
 
     Args:
-        conn: DB connection (pyodbc or sqlite3).
+        conn: DB connection (psycopg2 or sqlite3).
         user_id: ID of the account to delete.
     """
     cursor = conn.cursor()
-    cursor.execute("DELETE FROM USER_ACCOUNT WHERE id = ?", (user_id,))
+    cursor.execute(f"DELETE FROM USER_ACCOUNT WHERE id = {_ph(conn)}", (user_id,))
     conn.commit()
 
 
@@ -399,7 +409,7 @@ def request_password_reset(conn: Any, email: str, email_service: Any) -> dict:
 
     cursor = conn.cursor()
     cursor.execute(
-        "SELECT id FROM USER_ACCOUNT WHERE email = ? AND is_confirmed = 1", (email,)
+        f"SELECT id FROM USER_ACCOUNT WHERE email = {_ph(conn)} AND is_confirmed = 1", (email,)
     )
     row = cursor.fetchone()
 
@@ -410,8 +420,9 @@ def request_password_reset(conn: Any, email: str, email_service: Any) -> dict:
     token = str(uuid.uuid4())
     expires = datetime.now(timezone.utc) + timedelta(hours=TOKEN_EXPIRY_HOURS)
 
+    p = _ph(conn)
     cursor.execute(
-        "UPDATE USER_ACCOUNT SET reset_token = ?, reset_token_expires = ? WHERE id = ?",
+        f"UPDATE USER_ACCOUNT SET reset_token = {p}, reset_token_expires = {p} WHERE id = {p}",
         (token, expires, user_id),
     )
     conn.commit()
@@ -451,7 +462,7 @@ def confirm_password_reset(conn: Any, token: str, new_password: str) -> dict:
 
     cursor = conn.cursor()
     cursor.execute(
-        "SELECT id, email, reset_token_expires FROM USER_ACCOUNT WHERE reset_token = ?",
+        f"SELECT id, email, reset_token_expires FROM USER_ACCOUNT WHERE reset_token = {_ph(conn)}",
         (token,),
     )
     row = cursor.fetchone()
@@ -475,14 +486,15 @@ def confirm_password_reset(conn: Any, token: str, new_password: str) -> dict:
         new_password.encode("utf-8"), bcrypt.gensalt(rounds=12)
     ).decode("utf-8")
 
+    p = _ph(conn)
     cursor.execute(
-        """
+        f"""
         UPDATE USER_ACCOUNT
-        SET password_hash = ?,
+        SET password_hash = {p},
             reset_token = NULL,
             reset_token_expires = NULL,
-            last_activity = ?
-        WHERE id = ?
+            last_activity = {p}
+        WHERE id = {p}
         """,
         (password_hash, datetime.now(timezone.utc), user_id),
     )

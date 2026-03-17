@@ -17,7 +17,7 @@ Usage:
         python inject_test_data.py --mode restore
 
 Environment variables:
-    SQL_CONNECTION_STRING   Azure SQL connection string (production/staging)
+    DATABASE_URL            PostgreSQL connection string (production/staging)
     LOCAL_GOLD_DB           Path to local SQLite gold.db (local dev override)
 
 If neither is set, defaults to gold.db in the project root.
@@ -48,14 +48,14 @@ def _get_connection() -> Any:
     Return a Gold DB connection.
 
     Priority:
-      1. SQL_CONNECTION_STRING env var → pyodbc (Azure SQL)
+      1. DATABASE_URL env var → psycopg2 (PostgreSQL/Supabase)
       2. LOCAL_GOLD_DB env var → sqlite3
       3. Default → sqlite3 on gold.db in project root
     """
-    conn_str = os.environ.get("SQL_CONNECTION_STRING", "")
-    if conn_str:
-        import pyodbc  # type: ignore[import]
-        return pyodbc.connect(conn_str, timeout=90)
+    db_url = os.environ.get("DATABASE_URL", "")
+    if db_url:
+        import psycopg2  # type: ignore[import]
+        return psycopg2.connect(db_url)
     import sqlite3
     local_db = os.environ.get(
         "LOCAL_GOLD_DB",
@@ -66,16 +66,23 @@ def _get_connection() -> Any:
 
 
 def _last_inserted_id(cursor: Any, conn: Any) -> int:
-    """Return the last auto-generated row ID — compatible with sqlite3 and pyodbc."""
+    """Return the last auto-generated row ID — compatible with sqlite3 and psycopg2."""
     if "sqlite3" in type(conn).__module__:
         return cursor.lastrowid
-    cursor.execute("SELECT SCOPE_IDENTITY()")
+    # psycopg2: use RETURNING id — caller must have used INSERT ... RETURNING id
     return int(cursor.fetchone()[0])
 
 
 def _ensure_row(cursor: Any, conn: Any, select_sql: str, insert_sql: str,
                 select_params: tuple, insert_params: tuple) -> int:
     """Return existing row ID or insert and return new ID."""
+    is_pg = "sqlite3" not in type(conn).__module__
+    if is_pg:
+        select_sql = select_sql.replace("?", "%s")
+        insert_sql = insert_sql.replace("?", "%s")
+        # Append RETURNING id for PostgreSQL to retrieve the generated PK
+        if "RETURNING" not in insert_sql.upper():
+            insert_sql = insert_sql.rstrip(";") + " RETURNING id"
     cursor.execute(select_sql, select_params)
     row = cursor.fetchone()
     if row:
@@ -95,7 +102,7 @@ def inject(conn: Any, region_code: str, alert_type: str,
     Call restore() first to clean up before re-injecting.
 
     Args:
-        conn:        DB connection (pyodbc or sqlite3).
+        conn:        DB connection (psycopg2 or sqlite3).
         region_code: Target region code_insee (e.g. "FR", "IDF").
         alert_type:  "under_production" (prod < conso) or "over_production" (prod > conso).
         prod_mw:     Production value in MW.
@@ -109,31 +116,34 @@ def inject(conn: Any, region_code: str, alert_type: str,
         raise ValueError(f"over_production requires prod_mw > conso_mw (got {prod_mw} <= {conso_mw})")
 
     cursor = conn.cursor()
+    is_pg = "sqlite3" not in type(conn).__module__
+    ph = "%s" if is_pg else "?"
 
     id_date = _ensure_row(
         cursor, conn,
-        "SELECT id_date FROM DIM_TIME WHERE horodatage = ?",
-        "INSERT INTO DIM_TIME (horodatage) VALUES (?)",
+        f"SELECT id_date FROM DIM_TIME WHERE horodatage = ?",
+        f"INSERT INTO DIM_TIME (horodatage) VALUES (?)",
         (SENTINEL_TS,), (SENTINEL_TS,),
     )
 
     id_region = _ensure_row(
         cursor, conn,
-        "SELECT id_region FROM DIM_REGION WHERE code_insee = ?",
-        "INSERT INTO DIM_REGION (code_insee, nom_region) VALUES (?, ?)",
+        f"SELECT id_region FROM DIM_REGION WHERE code_insee = ?",
+        f"INSERT INTO DIM_REGION (code_insee, nom_region) VALUES (?, ?)",
         (region_code,), (region_code, region_code),
     )
 
     id_source = _ensure_row(
         cursor, conn,
-        "SELECT id_source FROM DIM_SOURCE WHERE source_name = ?",
-        "INSERT INTO DIM_SOURCE (source_name) VALUES (?)",
+        f"SELECT id_source FROM DIM_SOURCE WHERE source_name = ?",
+        f"INSERT INTO DIM_SOURCE (source_name) VALUES (?)",
         (TEST_SOURCE,), (TEST_SOURCE,),
     )
 
+    fact_tbl = "fact_energy_flow" if is_pg else "FACT_ENERGY_FLOW"
     cursor.execute(
-        "INSERT INTO FACT_ENERGY_FLOW (id_region, id_date, id_source, valeur_mw, consommation_mw) "
-        "VALUES (?, ?, ?, ?, ?)",
+        f"INSERT INTO {fact_tbl} (id_region, id_date, id_source, valeur_mw, consommation_mw) "
+        f"VALUES ({ph}, {ph}, {ph}, {ph}, {ph})",
         (id_region, id_date, id_source, prod_mw, conso_mw),
     )
     conn.commit()
@@ -155,14 +165,19 @@ def restore(conn: Any) -> None:
     Real production data is untouched.
     """
     cursor = conn.cursor()
+    is_pg = "sqlite3" not in type(conn).__module__
+    ph = "%s" if is_pg else "?"
+    fact_tbl = "fact_energy_flow" if is_pg else "FACT_ENERGY_FLOW"
+    src_tbl = "dim_source" if is_pg else "DIM_SOURCE"
+    time_tbl = "dim_time" if is_pg else "DIM_TIME"
 
     cursor.execute(
-        "SELECT id_source FROM DIM_SOURCE WHERE source_name = ?", (TEST_SOURCE,)
+        f"SELECT id_source FROM {src_tbl} WHERE source_name = {ph}", (TEST_SOURCE,)
     )
     src_row = cursor.fetchone()
 
     cursor.execute(
-        "SELECT id_date FROM DIM_TIME WHERE horodatage = ?", (SENTINEL_TS,)
+        f"SELECT id_date FROM {time_tbl} WHERE horodatage = {ph}", (SENTINEL_TS,)
     )
     time_row = cursor.fetchone()
 
@@ -170,15 +185,15 @@ def restore(conn: Any) -> None:
         id_source = src_row[0]
         id_date = time_row[0]
         cursor.execute(
-            "SELECT COUNT(*) FROM FACT_ENERGY_FLOW WHERE id_source = ? AND id_date = ?",
+            f"SELECT COUNT(*) FROM {fact_tbl} WHERE id_source = {ph} AND id_date = {ph}",
             (id_source, id_date),
         )
         deleted_facts = cursor.fetchone()[0]
         cursor.execute(
-            "DELETE FROM FACT_ENERGY_FLOW WHERE id_source = ? AND id_date = ?",
+            f"DELETE FROM {fact_tbl} WHERE id_source = {ph} AND id_date = {ph}",
             (id_source, id_date),
         )
-        cursor.execute("DELETE FROM DIM_TIME WHERE horodatage = ?", (SENTINEL_TS,))
+        cursor.execute(f"DELETE FROM {time_tbl} WHERE horodatage = {ph}", (SENTINEL_TS,))
         conn.commit()
         logger.info("Restored: removed %d FACT_ENERGY_FLOW row(s) and sentinel DIM_TIME row.", deleted_facts)
     else:

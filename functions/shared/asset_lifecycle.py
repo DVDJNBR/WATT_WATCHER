@@ -27,7 +27,7 @@ class AssetLifecycle:
     def __init__(self, db_connection: Any, audit_logger=None):
         """
         Args:
-            db_connection: Database connection (pyodbc or sqlite3).
+            db_connection: Database connection (psycopg2 or sqlite3).
             audit_logger: Optional AuditLogger instance.
         """
         self.conn = db_connection
@@ -106,14 +106,17 @@ class AssetLifecycle:
         else:
             cursor.execute(
                 """SELECT code_insee_region FROM DIM_REGION
-                   WHERE status = 'active' AND last_seen_at < ?""",
+                   WHERE status = 'active' AND last_seen_at < %s""",
                 (threshold,),
             )
 
         stale = [row[0] for row in cursor.fetchall()]
 
         if stale:
-            placeholders = ",".join(["?"] * len(stale))
+            if self._is_sqlite:
+                placeholders = ",".join(["?"] * len(stale))
+            else:
+                placeholders = ",".join(["%s"] * len(stale))
             cursor.execute(
                 f"UPDATE DIM_REGION SET status = 'stale' "
                 f"WHERE code_insee_region IN ({placeholders})",
@@ -135,14 +138,17 @@ class AssetLifecycle:
         else:
             cursor.execute(
                 """SELECT code_insee_region FROM DIM_REGION
-                   WHERE status IN ('active', 'stale') AND last_seen_at < ?""",
+                   WHERE status IN ('active', 'stale') AND last_seen_at < %s""",
                 (threshold,),
             )
 
         inactive = [row[0] for row in cursor.fetchall()]
 
         if inactive:
-            placeholders = ",".join(["?"] * len(inactive))
+            if self._is_sqlite:
+                placeholders = ",".join(["?"] * len(inactive))
+            else:
+                placeholders = ",".join(["%s"] * len(inactive))
             cursor.execute(
                 f"UPDATE DIM_REGION SET status = 'inactive' "
                 f"WHERE code_insee_region IN ({placeholders})",

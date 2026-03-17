@@ -35,7 +35,7 @@ def detect(conn: Any) -> list:
     Detect production/consumption crossings at the latest Gold timestamp.
 
     Args:
-        conn: DB connection (pyodbc or sqlite3).
+        conn: DB connection (psycopg2 or sqlite3).
 
     Returns:
         List of dicts: [{"region_code": str, "alert_type": str, "prod_mw": float, "conso_mw": float}]

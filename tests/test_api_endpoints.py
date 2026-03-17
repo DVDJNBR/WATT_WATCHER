@@ -275,14 +275,13 @@ class TestProductionService:
         # sql_limit = (offset=0 + limit=100) * 10 = 1000
         assert params[-1] == 1000
 
-    def test_build_query_no_filters_sqlserver(self):
+    def test_build_query_no_filters_postgres(self):
         sql, params = build_production_query(is_sqlite=False)
-        assert "FACT_ENERGY_FLOW" in sql
-        assert "TOP(?)" in sql.replace(" ", "")
-        assert "LIMIT" not in sql
+        assert "fact_energy_flow" in sql
+        assert "LIMIT" in sql
         assert "consommation_mw" in sql
-        # sql_limit is first param for TOP(?)
-        assert params[0] == 1000
+        # sql_limit is last param for LIMIT %s
+        assert params[-1] == 1000
 
     def test_build_query_with_region(self):
         sql, params = build_production_query(region_code="11", is_sqlite=True)

@@ -5,12 +5,18 @@ Handles GET and PUT /v1/subscriptions.
 Users manage their alert subscriptions (region_code + alert_type pairs).
 PUT is a replace-all operation: deletes existing then inserts new.
 
-DB compatibility: works with both pyodbc (Azure SQL) and sqlite3 (local/tests).
-Both use '?' as placeholder.
+DB compatibility: works with both psycopg2 (PostgreSQL/Supabase) and sqlite3 (local/tests).
+sqlite3 uses '?' placeholders; psycopg2 uses '%s'.
 """
 
+import sqlite3 as _sqlite3
 from datetime import datetime, timezone
 from typing import Any
+
+
+def _ph(conn: Any) -> str:
+    """Return the correct query placeholder for this connection."""
+    return "?" if isinstance(conn, _sqlite3.Connection) else "%s"
 
 VALID_ALERT_TYPES = {"under_production", "over_production"}
 
@@ -20,7 +26,7 @@ def get_subscriptions(conn: Any, user_id: int) -> list:
     Return active subscriptions for a user.
 
     Args:
-        conn: DB connection (pyodbc or sqlite3).
+        conn: DB connection (psycopg2 or sqlite3).
         user_id: Authenticated user ID from JWT.
 
     Returns:
@@ -28,8 +34,8 @@ def get_subscriptions(conn: Any, user_id: int) -> list:
     """
     cursor = conn.cursor()
     cursor.execute(
-        "SELECT region_code, alert_type, is_active FROM ALERT_SUBSCRIPTION "
-        "WHERE user_id = ? AND is_active = 1 ORDER BY region_code, alert_type",
+        f"SELECT region_code, alert_type, is_active FROM ALERT_SUBSCRIPTION "
+        f"WHERE user_id = {_ph(conn)} AND is_active = 1 ORDER BY region_code, alert_type",
         (user_id,),
     )
     rows = cursor.fetchall()
@@ -46,7 +52,7 @@ def update_subscriptions(conn: Any, user_id: int, subscriptions: list) -> list:
     Validates each subscription before any DB write.
 
     Args:
-        conn: DB connection (pyodbc or sqlite3).
+        conn: DB connection (psycopg2 or sqlite3).
         user_id: Authenticated user ID from JWT.
         subscriptions: List of dicts with keys: region_code, alert_type, is_active (optional).
 
@@ -81,13 +87,14 @@ def update_subscriptions(conn: Any, user_id: int, subscriptions: list) -> list:
         validated.append((region_code, alert_type, is_active))
 
     cursor = conn.cursor()
-    cursor.execute("DELETE FROM ALERT_SUBSCRIPTION WHERE user_id = ?", (user_id,))
+    cursor.execute(f"DELETE FROM ALERT_SUBSCRIPTION WHERE user_id = {_ph(conn)}", (user_id,))
 
     result = []
+    p = _ph(conn)
     for region_code, alert_type, is_active in validated:
         cursor.execute(
-            "INSERT INTO ALERT_SUBSCRIPTION (user_id, region_code, alert_type, is_active) "
-            "VALUES (?, ?, ?, ?)",
+            f"INSERT INTO ALERT_SUBSCRIPTION (user_id, region_code, alert_type, is_active) "
+            f"VALUES ({p}, {p}, {p}, {p})",
             (user_id, region_code, alert_type, 1 if is_active else 0),
         )
         result.append({
@@ -97,7 +104,7 @@ def update_subscriptions(conn: Any, user_id: int, subscriptions: list) -> list:
         })
 
     cursor.execute(
-        "UPDATE USER_ACCOUNT SET last_activity = ? WHERE id = ?",
+        f"UPDATE USER_ACCOUNT SET last_activity = {p} WHERE id = {p}",
         (datetime.now(timezone.utc), user_id),
     )
     conn.commit()

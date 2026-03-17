@@ -163,18 +163,17 @@ class FactLoader:
             )
             rows_loaded = len(params)
         else:
-            # Azure SQL: staging table + JOIN-based MERGE (no Python FK resolution)
+            # PostgreSQL: staging temp table + JOIN-based INSERT ... ON CONFLICT DO UPDATE
             cursor.execute("""
-                CREATE TABLE #stg (
-                    horodatage      DATETIME2,
-                    code_insee      NVARCHAR(10),
-                    source_name     NVARCHAR(50),
+                CREATE TEMP TABLE stg_fact (
+                    horodatage      TIMESTAMPTZ,
+                    code_insee      VARCHAR(10),
+                    source_name     VARCHAR(50),
                     valeur_mw       FLOAT,
                     temperature_moy FLOAT,
                     consommation_mw FLOAT
                 )
             """)
-            cursor.fast_executemany = True
             stg_rows = [
                 (
                     row["horodatage"],
@@ -188,27 +187,21 @@ class FactLoader:
             ]
             BATCH = 5000
             for i in range(0, len(stg_rows), BATCH):
-                cursor.executemany("INSERT INTO #stg VALUES (?,?,?,?,?,?)", stg_rows[i:i+BATCH])
+                cursor.executemany("INSERT INTO stg_fact VALUES (%s,%s,%s,%s,%s,%s)", stg_rows[i:i+BATCH])
                 logger.info("Staged %d / %d", min(i+BATCH, len(stg_rows)), len(stg_rows))
             cursor.execute("""
-                MERGE FACT_ENERGY_FLOW AS t
-                USING (
-                    SELECT dt.id_date, dr.id_region, ds.id_source,
-                           s.valeur_mw, s.temperature_moy, s.consommation_mw
-                    FROM #stg s
-                    JOIN DIM_TIME   dt ON dt.horodatage  = s.horodatage
-                    JOIN DIM_REGION dr ON dr.code_insee  = s.code_insee
-                    JOIN DIM_SOURCE ds ON ds.source_name = s.source_name
-                ) AS src
-                ON t.id_date=src.id_date AND t.id_region=src.id_region AND t.id_source=src.id_source
-                WHEN MATCHED THEN UPDATE SET
-                    valeur_mw=src.valeur_mw, temperature_moyenne=src.temperature_moy,
-                    consommation_mw=src.consommation_mw
-                WHEN NOT MATCHED THEN INSERT
-                    (id_date,id_region,id_source,valeur_mw,facteur_charge,temperature_moyenne,consommation_mw)
-                VALUES (src.id_date,src.id_region,src.id_source,src.valeur_mw,NULL,src.temperature_moy,src.consommation_mw);
+                INSERT INTO fact_energy_flow (id_date, id_region, id_source, valeur_mw, facteur_charge, temperature_moyenne, consommation_mw)
+                SELECT dt.id_date, dr.id_region, ds.id_source, s.valeur_mw, NULL, s.temperature_moy, s.consommation_mw
+                FROM stg_fact s
+                JOIN dim_time dt ON dt.horodatage = s.horodatage
+                JOIN dim_region dr ON dr.code_insee = s.code_insee
+                JOIN dim_source ds ON ds.source_name = s.source_name
+                ON CONFLICT (id_date, id_region, id_source) DO UPDATE SET
+                    valeur_mw = EXCLUDED.valeur_mw,
+                    temperature_moyenne = EXCLUDED.temperature_moyenne,
+                    consommation_mw = EXCLUDED.consommation_mw
             """)
-            cursor.execute("DROP TABLE #stg")
+            cursor.execute("DROP TABLE stg_fact")
 
         self.conn.commit()
 
