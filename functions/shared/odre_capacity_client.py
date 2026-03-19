@@ -106,7 +106,8 @@ def fetch_capacity() -> list[dict]:
 
     # Aggregate by region_code + source_name (sum installed capacity)
     from collections import defaultdict
-    agg: dict = defaultdict(lambda: {"region_code": None, "region_name": None, "puissance": 0.0})
+    from typing import Any
+    agg: dict[tuple[str, str], dict[str, Any]] = defaultdict(lambda: {"region_code": None, "region_name": None, "puissance": 0.0})
 
     for _, row in df.iterrows():
         filiere_raw = str(row.get(col_fil, "") or "").strip().lower() if col_fil else ""
@@ -144,11 +145,11 @@ def fetch_capacity() -> list[dict]:
             "region_code": v["region_code"],
             "region_name": v["region_name"],
             "source_name": k[1],
-            "puissance_installee_mw": round(v["puissance"], 2),
+            "puissance_installee_mw": round(float(v["puissance"]), 2),
             "annee": current_year,
         }
         for k, v in agg.items()
-        if v["puissance"] > 0
+        if float(v["puissance"]) > 0
     ]
 
     logger.info("Aggregated to %d capacity records from ODRE (%d raw rows)", len(records), len(df))

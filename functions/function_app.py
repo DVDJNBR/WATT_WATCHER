@@ -1191,7 +1191,6 @@ def run_full_pipeline(
         minutes: Lookback window for RTE API (default 30min).
         backfill_days: If >0, fetch N days of historical data.
     """
-    import sqlite3 as _sqlite3
     from pathlib import Path as _Path
     from shared.transformations.rte_silver import transform_rte_to_silver
     from shared.gold.dim_loader import DimLoader
@@ -1336,7 +1335,7 @@ def run_full_pipeline(
                 cursor_m = conn_m.cursor()
                 rows_loaded_m = 0
                 for _, row in df_meteo.iterrows():
-                    ts_str = row["timestamp"].strftime("%Y-%m-%dT%H:%M:00")
+                    ts_str = row["timestamp"].strftime("%Y-%m-%dT%H:%M:00")  # type: ignore
                     cursor_m.execute(
                         f"SELECT id_date FROM {tbl_dt} WHERE horodatage = {ph_m}", (ts_str,)
                     )
@@ -1493,7 +1492,6 @@ def run_full_pipeline(
 
                 import sqlite3 as _sqlite3_mn
                 is_sqlite_mn = isinstance(conn_mn, _sqlite3_mn.Connection)
-                ph_mn = "?" if is_sqlite_mn else "%s"
                 tbl_mnt = "FACT_MAINTENANCE" if is_sqlite_mn else "fact_maintenance"
                 now_str = _datetime.now(_tz.utc).isoformat()
 

@@ -23,8 +23,8 @@ try:
     conn = psycopg2.connect(url, connect_timeout=10)
     cur = conn.cursor()
 
-    cur.execute("SELECT version()")
-    version = cur.fetchone()[0]
+    res = cur.fetchone()
+    version = res[0] if res else "Inconnue"
     print(f"✅  Connecté — {version[:50]}")
 
     cur.execute("""

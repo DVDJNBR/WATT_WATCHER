@@ -300,6 +300,7 @@ def login(conn: Any, email: str, password: str) -> dict:
         user_id, db_email, password_hash, is_confirmed = row
         password_ok = bcrypt.checkpw(password.encode("utf-8"), password_hash.encode("utf-8"))
     else:
+        user_id, db_email, is_confirmed = 0, "", False
         # Always run bcrypt to prevent timing-based email enumeration
         bcrypt.checkpw(password.encode("utf-8"), _DUMMY_HASH.encode("utf-8"))
         password_ok = False
