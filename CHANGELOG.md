@@ -1,3 +1,9 @@
+## [1.19.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.18.0...v1.19.0) (2026-08-18)
+
+### Features
+
+* move app off Azure to VPS, pipeline-only Functions, drop auth/alerting ([0a5d456](https://github.com/DVDJNBR/WATT_WATCHER/commit/0a5d456ec93dd19523f917701098f5411ad1d2a0))
+
 ## [1.18.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.17.0...v1.18.0) (2026-03-17)
 
 ### Features
