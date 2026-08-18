@@ -57,7 +57,7 @@ describe('fetchProduction', () => {
     vi.restoreAllMocks()
   })
 
-  it('calls fetch with X-Api-Key header', async () => {
+  it('calls fetch with the production endpoint', async () => {
     const { fetchProduction } = await import('../api.js')
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
@@ -67,9 +67,8 @@ describe('fetchProduction', () => {
     await fetchProduction({ limit: 10 })
 
     expect(global.fetch).toHaveBeenCalledOnce()
-    const [url, options] = global.fetch.mock.calls[0]
+    const [url] = global.fetch.mock.calls[0]
     expect(url).toContain('/v1/production/regional')
-    expect('X-Api-Key' in options.headers).toBe(true)
   })
 
   it('does not send Authorization header', async () => {

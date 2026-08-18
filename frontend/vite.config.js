@@ -15,10 +15,11 @@ export default defineConfig({
   },
   server: {
     proxy: {
-      // Proxy /api to the local dev server (scripts/dev_server.py)
+      // Proxy /api to the local FastAPI dev server (uvicorn api.main:app --port 8000)
       '/api': {
-        target: 'http://localhost:8765',
+        target: 'http://localhost:8000',
         changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api/, ''),
       },
     },
   },

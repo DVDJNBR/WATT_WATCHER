@@ -1,26 +1,14 @@
 /**
- * App — Story 5.1, Tasks 2.1, 2.5, 3.3, 4.1, 4.4
- *      Story 5.2, Tasks 3.3, 3.4
- *
- * Main dashboard layout: header + sidebar + main charts area.
- * AC #1: Fetches real-time data and displays interactive charts.
- * AC #2: Region selection updates all charts.
- * AC #3: Responsive, dark/light theme, glassmorphism design.
- * AC #4: MSAL.js SSO authentication via api.js.
- * Story 5.2 AC #1: Alert polling every 60 s + AlertBanner + AlertHistory.
- * Story 5.2 AC #3: Pulsing icon in header when active alerts exist.
+ * App — main dashboard layout: header + charts area.
+ * Fetches dataviz data (production, météo, capacity) from the FastAPI backend
+ * and displays interactive charts. Public, no auth — portfolio showroom.
  */
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
-import { useAuth } from './context/AuthContext.jsx'
-import { logout as apiLogout } from './services/api.js'
 import { KPICard } from './components/KPICard.jsx'
 import { FranceMap } from './components/FranceMap.jsx'
 import { HistoryChart } from './components/HistoryChart.jsx'
 import { CarbonBadge, computeCarbonIntensity } from './components/CarbonBadge.jsx'
-import { AlertBanner } from './components/AlertBanner.jsx'
-import { AlertHistory } from './components/AlertHistory.jsx'
-import { fetchProduction, fetchRegions, fetchAlerts, triggerPipeline, fetchMeteo, fetchCapacity } from './services/api.js'
+import { fetchProduction, fetchRegions, fetchMeteo, fetchCapacity } from './services/api.js'
 import { ProdConsChart } from './components/ProdConsChart.jsx'
 import { RegionSelector } from './components/RegionSelector.jsx'
 import { MeteoChart } from './components/MeteoChart.jsx'
@@ -31,7 +19,6 @@ import { CapacityChart } from './components/CapacityChart.jsx'
 // the circular-dep resolution and causes a TDZ crash.
 
 const REFRESH_INTERVAL_MS = 15 * 60 * 1000  // 15 minutes
-const ALERT_POLL_INTERVAL_MS = 60 * 1000    // 60 seconds
 
 const SOURCE_LABELS = {
   nucleaire:   'Nucléaire',
@@ -146,15 +133,6 @@ function isoDate(offsetDays = 0) {
 }
 
 export default function App() {
-  const { user, logout } = useAuth()
-  const navigate = useNavigate()
-
-  const handleLogout = useCallback(async () => {
-    await apiLogout()
-    logout()
-    navigate('/login')
-  }, [logout, navigate])
-
   const [theme, setTheme] = useState(
     () => window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
   )
@@ -170,8 +148,6 @@ export default function App() {
   const [error, setError] = useState(null)
   const [lastUpdated, setLastUpdated] = useState(null)
   const [refreshing, setRefreshing] = useState(false)
-  const [pipelineRunning, setPipelineRunning] = useState(false)
-  const [pipelineError, setPipelineError] = useState(null)
 
   // Date range filter (default: last 7 days)
   const [startDate, setStartDate] = useState(isoDate(-7))
@@ -182,12 +158,7 @@ export default function App() {
   const [capacityData, setCapacityData] = useState([])
   const [drillLoading, setDrillLoading] = useState(false)
 
-  // Story 5.2 — alert state
-  const [alerts, setAlerts] = useState([])
-  const [alertsLoading, setAlertsLoading] = useState(false)
-  const [dismissedAlertId, setDismissedAlertId] = useState(null)
-
-  // Apply theme to root element (AC #3)
+  // Apply theme to root element
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme)
   }, [theme])
@@ -213,19 +184,6 @@ export default function App() {
     }
   }, [])
 
-  // Story 5.2 — load alerts (AC #1: poll every 60 s)
-  const loadAlerts = useCallback(async (regionCode) => {
-    setAlertsLoading(true)
-    try {
-      const result = await fetchAlerts({ regionCode: regionCode || undefined })
-      setAlerts(result.alerts || [])
-    } catch {
-      // Non-blocking — alert failures don't break the dashboard
-    } finally {
-      setAlertsLoading(false)
-    }
-  }, [])
-
   // Initial load: fetch all regions without filter (choropleth view)
   useEffect(() => {
     let cancelled = false
@@ -236,13 +194,13 @@ export default function App() {
         setRegions(regsResult)
         // Load ALL regions data for the choropleth (no region filter)
         await loadData('', startDate, endDate, true)
-        await Promise.all([loadAlerts(''), loadDrillData('', startDate, endDate)])
+        await loadDrillData('', startDate, endDate)
         setLoading(false)
       }
     })()
     return () => { cancelled = true }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loadData, loadAlerts])
+  }, [loadData])
 
   // Load meteo + capacity; when code is '' fetch France-level meteo (no region filter)
   const loadDrillData = useCallback(async (code, start, end) => {
@@ -266,16 +224,15 @@ export default function App() {
   const handleRegionChange = useCallback(async (code) => {
     setSelectedRegion(code)
     setRefreshing(true)
-    setDismissedAlertId(null)
     if (code) {
       // Drill-down: load selected region only
-      await Promise.all([loadData(code, startDate, endDate), loadAlerts(code), loadDrillData(code, startDate, endDate)])
+      await Promise.all([loadData(code, startDate, endDate), loadDrillData(code, startDate, endDate)])
     } else {
       // Back to global view: reload all-regions data + France meteo
-      await Promise.all([loadData('', startDate, endDate, true), loadAlerts(''), loadDrillData('', startDate, endDate)])
+      await Promise.all([loadData('', startDate, endDate, true), loadDrillData('', startDate, endDate)])
     }
     setRefreshing(false)
-  }, [loadData, loadAlerts, loadDrillData, startDate, endDate])
+  }, [loadData, loadDrillData, startDate, endDate])
 
   // Date range change: reload data (preserve region selection)
   const handleDateChange = useCallback(async (newStart, newEnd) => {
@@ -306,33 +263,6 @@ export default function App() {
     }, REFRESH_INTERVAL_MS)
     return () => clearInterval(id)
   }, [selectedRegion, startDate, endDate, loadData])
-
-  const handlePipelineRefresh = useCallback(async () => {
-    setPipelineRunning(true)
-    setPipelineError(null)
-    try {
-      await triggerPipeline()
-      // Reload data after pipeline completes
-      setRefreshing(true)
-      await Promise.all([
-        loadData(selectedRegion, startDate, endDate, !selectedRegion),
-        loadAlerts(selectedRegion),
-        loadDrillData(selectedRegion, startDate, endDate),
-      ])
-      setLastUpdated(new Date())
-    } catch (err) {
-      setPipelineError(err.message || 'Erreur pipeline')
-    } finally {
-      setPipelineRunning(false)
-      setRefreshing(false)
-    }
-  }, [selectedRegion, startDate, endDate, loadData, loadAlerts, loadDrillData])
-
-  // Story 5.2 — alert polling every 60 s (AC #1, Task 3.3)
-  useEffect(() => {
-    const id = setInterval(() => loadAlerts(selectedRegion), ALERT_POLL_INTERVAL_MS)
-    return () => clearInterval(id)
-  }, [selectedRegion, loadAlerts])
 
   // Compute per-region totals for choropleth (latest point per region)
   const { regionTotals, regionConsommation } = useMemo(() => {
@@ -379,14 +309,6 @@ export default function App() {
     [displayData]
   )
 
-  // Top alert to display in banner (highest severity, not dismissed)
-  const severityOrder = { CRITICAL: 0, WARNING: 1, INFO: 2 }
-  const topAlert = alerts
-    .filter(a => a.alert_id !== dismissedAlertId)
-    .sort((a, b) => (severityOrder[a.severity] ?? 9) - (severityOrder[b.severity] ?? 9))[0] ?? null
-
-  const hasCritical = alerts.some(a => a.severity === 'CRITICAL' && a.alert_id !== dismissedAlertId)
-
   const selectedRegionName = regions.find(r => r.code_insee === selectedRegion)?.region
 
   return (
@@ -398,14 +320,6 @@ export default function App() {
       <header className="app-header">
         <span className="logo" aria-label="WATT WATCHER">
           ⚡ WATT WATCHER
-          {hasCritical && (
-            <span
-              className="alert-pulse-dot"
-              aria-label="Alertes critiques actives"
-              title="Alertes critiques actives"
-              data-testid="alert-pulse-dot"
-            />
-          )}
         </span>
 
         <div className="header-actions">
@@ -429,21 +343,6 @@ export default function App() {
               Màj {formatTime(lastUpdated)}
             </span>
           )}
-          {pipelineError && (
-            <span className="last-updated" style={{ color: 'var(--color-error, #f87171)' }} title={pipelineError}>
-              Erreur pipeline
-            </span>
-          )}
-          <button
-            className="btn btn-ghost"
-            onClick={handlePipelineRefresh}
-            disabled={pipelineRunning}
-            aria-label="Rafraîchir les données"
-            data-testid="pipeline-refresh"
-            title={pipelineRunning ? 'Pipeline en cours…' : 'Rafraîchir les données depuis RTE'}
-          >
-            {pipelineRunning ? '⏳' : '↻'}
-          </button>
           <button
             className="btn btn-ghost"
             onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}
@@ -452,22 +351,8 @@ export default function App() {
           >
             {theme === 'dark' ? '☀' : '⏾'}
           </button>
-          <Link to="/subscriptions" className="btn btn-ghost" title="Gérer mes alertes email">
-            🔔
-          </Link>
-          {user && (
-            <button className="btn btn-ghost" onClick={handleLogout} title={`Déconnexion (${user.email})`}>
-              ⎋
-            </button>
-          )}
         </div>
       </header>
-
-      {/* ── Alert banner ──────────────────────────────────────────── */}
-      <AlertBanner
-        alert={topAlert}
-        onDismiss={() => topAlert && setDismissedAlertId(topAlert.alert_id)}
-      />
 
       {/* sidebar supprimée — contenu déplacé dans app-main */}
       {false && <aside className="app-sidebar">
@@ -603,9 +488,6 @@ export default function App() {
             />
           )}
         </div>
-
-        {/* ── Historique alertes ────────────────────────────────── */}
-        <AlertHistory alerts={alerts} loading={alertsLoading} />
 
       </main>
     </div>

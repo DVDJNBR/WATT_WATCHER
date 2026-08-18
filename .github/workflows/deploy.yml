@@ -108,42 +108,21 @@ jobs:
             --resource-group watt-watcher-rg \
             --src /tmp/functions.zip
 
-  # ── Frontend build + Azure Storage Static Website deployment ────────────────
-  deploy-frontend:
-    name: Deploy Frontend
-    needs: deploy-functions
+  # ── VPS deployment (api/ + frontend/, via docker compose over SSH) ──────────
+  deploy-vps:
+    name: Deploy VPS (api + frontend)
+    needs: test
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
     environment: production
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1
         with:
-          node-version: 20
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
-
-      - name: Install frontend dependencies
-        working-directory: frontend
-        run: npm ci
-
-      - name: Build frontend
-        working-directory: frontend
-        env:
-          VITE_API_BASE_URL: ${{ secrets.AZURE_FUNCTIONS_URL }}
-          VITE_API_KEY: ${{ secrets.VITE_API_KEY }}
-        run: npm run build
-
-      - name: Deploy to Azure Storage Static Website
-        uses: azure/CLI@v2
-        with:
-          azcliversion: latest
-          inlineScript: |
-            az storage blob upload-batch \
-              --account-name ${{ secrets.AZURE_FRONTEND_STORAGE_NAME }} \
-              --account-key "${{ secrets.AZURE_FRONTEND_STORAGE_KEY }}" \
-              --source frontend/dist \
-              --destination '$web' \
-              --overwrite true
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            cd ${{ secrets.VPS_PROJECT_PATH }}
+            git pull --ff-only
+            docker compose up -d --build

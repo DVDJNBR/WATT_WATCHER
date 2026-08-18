@@ -1,6 +1,4 @@
 """
-API Models — Story 4.1, Task 1.3
-
 Request/response dataclasses for the production API endpoints.
 No external deps — stdlib only.
 """

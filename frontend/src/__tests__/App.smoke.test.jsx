@@ -8,19 +8,14 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import App from '../App.jsx'
-import { fetchProduction, fetchRegions, fetchAlerts } from '../services/api.js'
+import { fetchProduction, fetchRegions } from '../services/api.js'
 
 // vi.mock hoisted above imports — factory must NOT reference module-level vars
 vi.mock('../services/api.js', () => ({
   fetchProduction: vi.fn(),
   fetchRegions:    vi.fn(),
-  fetchAlerts:     vi.fn(),
-}))
-
-vi.mock('../services/auth.js', () => ({
-  acquireToken:        vi.fn().mockResolvedValue('mock-token'),
-  getMsalInstance:     vi.fn(),
-  getCurrentAccount:   vi.fn().mockResolvedValue(null),
+  fetchMeteo:      vi.fn().mockResolvedValue({ data: [] }),
+  fetchCapacity:   vi.fn().mockResolvedValue({ data: [] }),
 }))
 
 // FranceMap uses react-simple-maps which fetches a GeoJSON URL —
@@ -66,7 +61,6 @@ describe('App smoke test (Task 6.3)', () => {
     vi.clearAllMocks()
     fetchProduction.mockResolvedValue({ data: MOCK_DATA, total_records: 2, request_id: 'smoke-1' })
     fetchRegions.mockResolvedValue(MOCK_REGIONS)
-    fetchAlerts.mockResolvedValue({ alerts: [] })
   })
 
   it('renders the dashboard layout container', () => {

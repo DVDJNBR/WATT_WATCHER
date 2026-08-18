@@ -1,16 +1,10 @@
 /**
- * API client — Story 5.1, Task 3.1
+ * API client — fetches dataviz data from the FastAPI backend.
  *
- * Fetches production data from GET /v1/production/regional.
- * AC #1: Real-time data fetch with auth headers.
- * AC #3: Graceful error handling with typed errors.
+ * Public, read-only endpoints — no auth (portfolio showroom).
  */
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
-const API_KEY  = import.meta.env.VITE_API_KEY || ''
-
-/** Read the JWT stored by AuthContext. */
-function getToken() { return localStorage.getItem('ww_token') || '' }
 
 export class ApiError extends Error {
   constructor(message, status, requestId) {
@@ -33,23 +27,16 @@ export function buildQueryString(params) {
 }
 
 /**
- * Perform an authenticated GET request.
+ * Perform a GET request against the API.
  * @param {string} path  e.g. '/v1/production/regional'
  * @param {Record<string,any>} params  query parameters
  * @returns {Promise<any>}
  */
-async function authGet(path, params = {}) {
+async function apiGet(path, params = {}) {
   const qs = buildQueryString(params)
   const url = `${API_BASE}${path}${qs}`
 
-  const jwt = getToken()
-  const headers = {
-    'Content-Type': 'application/json',
-    'X-Api-Key': API_KEY,
-    ...(jwt ? { Authorization: `Bearer ${jwt}` } : {}),
-  }
-
-  const response = await fetch(url, { headers })
+  const response = await fetch(url, { headers: { 'Content-Type': 'application/json' } })
 
   if (!response.ok) {
     let errorBody = {}
@@ -67,9 +54,6 @@ async function authGet(path, params = {}) {
 /**
  * Fetch regional production data.
  *
- * AC #1: Populates production charts.
- * AC #2: Filterable by region_code.
- *
  * @param {Object} params
  * @param {string} [params.regionCode]  INSEE code
  * @param {string} [params.startDate]   ISO 8601
@@ -80,7 +64,7 @@ async function authGet(path, params = {}) {
  * @returns {Promise<{data: Array, total_records: number, request_id: string}>}
  */
 export async function fetchProduction({ regionCode, startDate, endDate, sourceType, limit = 100, offset = 0 } = {}) {
-  return authGet('/v1/production/regional', {
+  return apiGet('/v1/production/regional', {
     region_code:  regionCode,
     start_date:   startDate,
     end_date:     endDate,
@@ -88,46 +72,6 @@ export async function fetchProduction({ regionCode, startDate, endDate, sourceTy
     limit,
     offset,
   })
-}
-
-/**
- * Fetch active alerts — Story 5.2, Task 3.3.
- *
- * AC #1: Polls /v1/alerts every 60 s to keep dashboard current.
- *
- * @param {Object} params
- * @param {string} [params.regionCode]  filter by region
- * @param {string} [params.status]      'active' | 'acknowledged' | undefined (all)
- * @param {number} [params.days]        look-back window (default 7)
- * @param {number} [params.limit]       max alerts (default 50)
- * @returns {Promise<{alerts: Array, total: number}>}
- */
-export async function fetchAlerts({ regionCode, status = 'active', days = 7, limit = 50 } = {}) {
-  return authGet('/v1/alerts', { region_code: regionCode, status, days, limit })
-}
-
-/**
- * Trigger the full ETL pipeline: Bronze → Silver → Gold SQL.
- * Returns when the pipeline completes (may take ~60 s if SQL was paused).
- *
- * @returns {Promise<{status: string, stages: object}>}
- */
-export async function triggerPipeline() {
-  const url = `${API_BASE}/v1/pipeline/refresh`
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-Api-Key': API_KEY },
-  })
-  if (!response.ok) {
-    let errorBody = {}
-    try { errorBody = await response.json() } catch (_) { /* ignore */ }
-    throw new ApiError(
-      errorBody.message || `HTTP ${response.status}`,
-      response.status,
-      errorBody.request_id,
-    )
-  }
-  return response.json()
 }
 
 /**
@@ -147,74 +91,6 @@ export async function fetchRegions() {
   return Array.from(seen.values()).sort((a, b) => a.region.localeCompare(b.region))
 }
 
-// ─── Auth endpoints ──────────────────────────────────────────────────────────
-
-async function authPost(path, body) {
-  const response = await fetch(`${API_BASE}${path}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-Api-Key': API_KEY },
-    body: JSON.stringify(body),
-  })
-  let json = {}
-  try { json = await response.json() } catch (_) { /* ignore */ }
-  if (!response.ok) throw new ApiError(json.message || `HTTP ${response.status}`, response.status)
-  return json
-}
-
-/**
- * Register a new account.
- * @param {string} email
- * @param {string} password
- * @returns {Promise<{message: string}>}
- */
-export async function register(email, password) {
-  return authPost('/v1/auth/register', { email, password })
-}
-
-/**
- * Resend email confirmation.
- * @param {string} email
- */
-export async function resendConfirmation(email) {
-  return authPost('/v1/auth/resend-confirmation', { email })
-}
-
-/**
- * Login — returns JWT token + user info.
- * @param {string} email
- * @param {string} password
- * @returns {Promise<{token: string, user: {email: string, user_id: string}}>}
- */
-export async function login(email, password) {
-  return authPost('/v1/auth/login', { email, password })
-}
-
-/**
- * Logout — revoke server-side token.
- */
-export async function logout() {
-  const jwt = getToken()
-  if (!jwt) return
-  await fetch(`${API_BASE}/v1/auth/logout`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Api-Key': API_KEY,
-      Authorization: `Bearer ${jwt}`,
-    },
-  }).catch(() => {})
-}
-
-// ─── Subscriptions endpoints ─────────────────────────────────────────────────
-
-/**
- * Get current user's alert subscriptions.
- * @returns {Promise<{subscriptions: Array<{region_code:string, alert_type:string, active:boolean}>}>}
- */
-export async function fetchSubscriptions() {
-  return authGet('/v1/subscriptions', {})
-}
-
 /**
  * Fetch météo data (temperature + wind) from fact_meteo.
  * @param {Object} params
@@ -225,7 +101,7 @@ export async function fetchSubscriptions() {
  * @returns {Promise<{data: Array, total_records: number}>}
  */
 export async function fetchMeteo({ regionCode, startDate, endDate, limit = 500 } = {}) {
-  return authGet('/v1/meteo/regional', {
+  return apiGet('/v1/meteo/regional', {
     region_code: regionCode,
     start_date:  startDate,
     end_date:    endDate,
@@ -241,7 +117,7 @@ export async function fetchMeteo({ regionCode, startDate, endDate, limit = 500 }
  * @returns {Promise<{data: Array, total_records: number}>}
  */
 export async function fetchCapacity({ regionCode, annee } = {}) {
-  return authGet('/v1/capacity/regional', { region_code: regionCode, annee })
+  return apiGet('/v1/capacity/regional', { region_code: regionCode, annee })
 }
 
 /**
@@ -252,26 +128,5 @@ export async function fetchCapacity({ regionCode, annee } = {}) {
  * @returns {Promise<{data: Array, total_records: number}>}
  */
 export async function fetchMaintenance({ regionCode, limit = 100 } = {}) {
-  return authGet('/v1/maintenance', { region_code: regionCode, limit })
-}
-
-/**
- * Update alert subscriptions (full replace).
- * @param {Array<{region_code:string, alert_type:string, active:boolean}>} subscriptions
- */
-export async function updateSubscriptions(subscriptions) {
-  const jwt = getToken()
-  const response = await fetch(`${API_BASE}/v1/subscriptions`, {
-    method: 'PUT',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Api-Key': API_KEY,
-      ...(jwt ? { Authorization: `Bearer ${jwt}` } : {}),
-    },
-    body: JSON.stringify(subscriptions),
-  })
-  let json = {}
-  try { json = await response.json() } catch (_) { /* ignore */ }
-  if (!response.ok) throw new ApiError(json.message || `HTTP ${response.status}`, response.status)
-  return json
+  return apiGet('/v1/maintenance', { region_code: regionCode, limit })
 }

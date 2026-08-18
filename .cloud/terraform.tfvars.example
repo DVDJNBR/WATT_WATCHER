@@ -1,13 +1,11 @@
-# GRID_POWER_STREAM — Terraform Variables
+# WATT_WATCHER — Terraform Variables
 # Copy this file to terraform.tfvars and fill in your values.
 
-project_name = "ww"
-environment  = "dev"
-location     = "francecentral"
+location = "francecentral"
 
-# SQL Server credentials
-sql_admin_login    = "wwadmin"
-sql_admin_password = "CHANGE_ME_Str0ng!Pass"  # ⚠️ Change this!
+# Supabase PostgreSQL connection string — injected into the Function App
+# as SUPABASE_CONNECTION_STRING (pipeline writes Gold data here).
+supabase_connection_string = "postgresql://postgres:CHANGE_ME@db.xxxxx.supabase.co:5432/postgres"
 
 # Data retention (days)
 retention_bronze_days = 180   # 6 months

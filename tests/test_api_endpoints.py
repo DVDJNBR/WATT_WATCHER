@@ -1,8 +1,8 @@
 """
-Tests for Story 4.1 — Production API Endpoints
+Tests for the dataviz API (api/) — production/export endpoints.
 
-Tasks: 5.1 (production_service), 5.2 (export_service),
-       5.3 (integration / HTTP trigger), 5.4 (performance).
+Covers: error_handlers, models (query parsing), production_service,
+export_service, and end-to-end FastAPI integration via TestClient.
 """
 
 import csv
@@ -11,40 +11,31 @@ import json
 import sqlite3
 import time
 import uuid
-from unittest.mock import MagicMock
 
 import pytest
+from fastapi.testclient import TestClient
 
-from functions.shared.api.error_handlers import (
+from api.error_handlers import (
     bad_request,
     not_found,
     server_error,
-    unauthorized,
-    forbidden,
-    conflict,
     error_response,
 )
-from functions.shared.api.models import (
+from api.models import (
     parse_production_request,
     parse_export_request,
     ProductionResponse,
 )
-from functions.shared.api.production_service import (
+from api.production_service import (
     build_production_query,
     query_production,
     _aggregate_rows,
 )
-from functions.shared.api.export_service import (
+from api.export_service import (
     export_to_csv,
     _format_cell,
     UTF8_BOM,
     CSV_DELIMITER,
-)
-from functions.shared.api.routes import (
-    PRODUCTION_REGIONAL,
-    EXPORT_CSV,
-    ROUTE_PRODUCTION,
-    ROUTE_EXPORT,
 )
 from functions.shared.gold.dim_loader import DimLoader
 from functions.shared.gold.fact_loader import FactLoader
@@ -55,7 +46,8 @@ from functions.shared.gold.fact_loader import FactLoader
 @pytest.fixture
 def db():
     """In-memory SQLite with Gold Star Schema + sample data."""
-    conn = sqlite3.connect(":memory:")
+    # check_same_thread=False: FastAPI TestClient runs handlers in a worker thread.
+    conn = sqlite3.connect(":memory:", check_same_thread=False)
     dim = DimLoader(conn)
     dim.ensure_schema()
     dim.upsert_sources()
@@ -86,7 +78,7 @@ def db():
     return conn
 
 
-# ─── Task 4: Error handlers ──────────────────────────────────────────────────
+# ─── Error handlers ───────────────────────────────────────────────────────────
 
 class TestErrorHandlers:
     def test_bad_request_structure(self):
@@ -95,12 +87,6 @@ class TestErrorHandlers:
         assert resp["error"] == "Bad Request"
         assert resp["request_id"] == "abc"
         assert "invalid param" in resp["message"]
-
-    def test_unauthorized_structure(self):
-        resp = unauthorized(request_id="x")
-        assert resp["status_code"] == 401
-        assert resp["error"] == "Unauthorized"
-        assert resp["request_id"] == "x"
 
     def test_not_found_structure(self):
         resp = not_found(request_id="y")
@@ -113,7 +99,7 @@ class TestErrorHandlers:
         assert resp["error"] == "Internal Server Error"
 
     def test_auto_request_id(self):
-        """AC #4: request_id always present even when not supplied."""
+        """request_id always present even when not supplied."""
         resp = error_response(400, "test")
         assert uuid.UUID(resp["request_id"])  # valid UUID
 
@@ -125,79 +111,8 @@ class TestErrorHandlers:
         resp = error_response(400, "msg", details={"field": "region_code"})
         assert resp["details"]["field"] == "region_code"
 
-    def test_forbidden_structure(self):
-        resp = forbidden("Account not confirmed", request_id="req-1")
-        assert resp["status_code"] == 403
-        assert resp["error"] == "Forbidden"
-        assert resp["request_id"] == "req-1"
-        assert "Account not confirmed" in resp["message"]
 
-    def test_conflict_structure(self):
-        resp = conflict("Email already registered", request_id="req-2")
-        assert resp["status_code"] == 409
-        assert resp["error"] == "Conflict"
-        assert "Email already registered" in resp["message"]
-
-
-# ─── Story 2.3: Auth endpoint response shapes ─────────────────────────────────
-
-
-class TestLoginEndpointShapes:
-    """Verify that error-handler dicts used by the login endpoint are well-formed.
-
-    The HTTP handlers in function_app.py are not importable without Azure
-    Functions installed, so we test the response shapes produced by the
-    same helpers the handlers call.
-    """
-
-    def test_401_response_shape(self):
-        """Inline 401 dict matches what the login handler builds for AuthError."""
-        request_id = "test-rid"
-        resp = {
-            "request_id": request_id,
-            "status_code": 401,
-            "error": "Unauthorized",
-            "message": "Invalid email or password",
-            "details": {},
-        }
-        assert resp["status_code"] == 401
-        assert resp["error"] == "Unauthorized"
-        assert resp["request_id"] == request_id
-        assert resp["details"] == {}
-
-    def test_403_response_shape(self):
-        """forbidden() used by the login handler for UnconfirmedError."""
-        resp = forbidden("Account not confirmed — please check your email", "test-rid")
-        assert resp["status_code"] == 403
-        assert resp["error"] == "Forbidden"
-        assert "email" in resp["message"].lower()
-
-    def test_400_missing_email_shape(self):
-        """bad_request() used by the login handler when email/password absent."""
-        resp = bad_request("email and password are required", "test-rid")
-        assert resp["status_code"] == 400
-        assert "email" in resp["message"]
-        assert "password" in resp["message"]
-
-    def test_200_login_response_contains_token(self):
-        """200 response dict structure returned on successful login."""
-        request_id = "test-rid"
-        service_result = {"user_id": 1, "email": "user@test.com", "token": "jwt.abc.def"}
-        resp = {"request_id": request_id, **service_result}
-        assert resp["user_id"] == 1
-        assert resp["email"] == "user@test.com"
-        assert resp["token"] == "jwt.abc.def"
-        assert resp["request_id"] == request_id
-
-    def test_200_logout_response_contains_message(self):
-        """200 response dict structure returned by logout endpoint."""
-        from functions.shared.api.auth_service import logout
-        result = logout()
-        resp = {"request_id": "test-rid", "message": result["message"]}
-        assert resp["message"] == "Logged out successfully"
-
-
-# ─── Task 1.3: Models / parameter parsing ────────────────────────────────────
+# ─── Models / parameter parsing ───────────────────────────────────────────────
 
 class TestModels:
     def test_parse_production_defaults(self):
@@ -251,19 +166,7 @@ class TestModels:
         assert len(d["data"]) == 1
 
 
-# ─── Task 1.2: Routes ────────────────────────────────────────────────────────
-
-class TestRoutes:
-    def test_versioned_prefix(self):
-        assert PRODUCTION_REGIONAL.startswith("/v1/")
-        assert EXPORT_CSV.startswith("/v1/")
-
-    def test_route_constants(self):
-        assert ROUTE_PRODUCTION == "v1/production/regional"
-        assert ROUTE_EXPORT == "v1/export/csv"
-
-
-# ─── Task 5.1: production_service unit tests ─────────────────────────────────
+# ─── production_service unit tests ────────────────────────────────────────────
 
 class TestProductionService:
     def test_build_query_no_filters_sqlite(self):
@@ -317,7 +220,7 @@ class TestProductionService:
         assert "2025-06-30T18:00:00" in params
 
     def test_aggregate_rows_pivot(self):
-        """AC #3: sources dict is correctly built from flat rows."""
+        """sources dict is correctly built from flat rows."""
         cols = ["code_insee", "nom_region", "horodatage", "source_name", "valeur_mw", "facteur_charge", "consommation_mw"]
         rows = [
             ("11", "IDF", "2025-06-15T10:00", "eolien", 450.0, 0.09, 500.0),
@@ -348,7 +251,7 @@ class TestProductionService:
         assert reparsed[0]["consommation_mw"] == 500.0
 
     def test_query_production_returns_data(self, db):
-        """AC #1: Returns aggregated data from Gold SQL."""
+        """Returns aggregated data from Gold SQL."""
         result = query_production(db, request_id="test-rid")
         assert result["request_id"] == "test-rid"
         assert result["total_records"] > 0
@@ -358,7 +261,7 @@ class TestProductionService:
         assert "timestamp" in record
 
     def test_query_production_filter_region(self, db):
-        """AC #1: region_code filter works."""
+        """region_code filter works."""
         result = query_production(db, region_code="11")
         assert result["total_records"] > 0
         for rec in result["data"]:
@@ -390,7 +293,7 @@ class TestProductionService:
         assert "offset" in result
 
     def test_query_production_includes_consommation_mw(self, db):
-        """AC: consommation_mw appears at region/timestamp level in each record."""
+        """consommation_mw appears at region/timestamp level in each record."""
         result = query_production(db, request_id="cons-test")
         assert result["total_records"] > 0
         for record in result["data"]:
@@ -416,14 +319,14 @@ class TestProductionService:
             assert record["consommation_mw"] is None
 
 
-# ─── Task 5.2: export_service unit tests ─────────────────────────────────────
+# ─── export_service unit tests ────────────────────────────────────────────────
 
 class TestExportService:
     def test_format_cell_none(self):
         assert _format_cell(None) == ""
 
     def test_format_cell_float_comma(self):
-        """AC #4: FR locale — decimal comma."""
+        """FR locale — decimal comma."""
         val = _format_cell(0.0945)
         assert "," in val
         assert "." not in val
@@ -432,12 +335,12 @@ class TestExportService:
         assert _format_cell("Île-de-France") == "Île-de-France"
 
     def test_export_returns_bom(self, db):
-        """AC #4: UTF-8 BOM for Excel compatibility."""
+        """UTF-8 BOM for Excel compatibility."""
         csv_bytes, _, _ = export_to_csv(db, request_id="test-exp")
         assert csv_bytes[:3] == UTF8_BOM
 
     def test_export_semicolon_delimiter(self, db):
-        """AC #4: Semicolon separator for FR Excel."""
+        """Semicolon separator for FR Excel."""
         csv_bytes, _, _ = export_to_csv(db)
         content = csv_bytes.decode("utf-8-sig")   # strip BOM
         lines = content.strip().splitlines()
@@ -475,162 +378,36 @@ class TestExportService:
         assert len(rows) == 1
 
 
-# ─── Task 5.3: Integration — HTTP trigger simulation ─────────────────────────
+# ─── FastAPI integration ──────────────────────────────────────────────────────
 
-class MockHttpRequest:
-    """Minimal mock for func.HttpRequest."""
-    def __init__(self, params: dict | None = None, body: bytes = b""):
-        self.params = params or {}
-        self.method = "GET"
-        self._body = body
+@pytest.fixture
+def client(db, monkeypatch):
+    """TestClient with api.main.get_db_connection patched to the sqlite fixture."""
+    import api.main as main_module
 
-    def get_json(self) -> dict:
-        return json.loads(self._body) if self._body else {}
-
-
-class MockHttpResponse:
-    """Captured HTTP response for assertions."""
-    def __init__(self, body, status_code: int = 200, mimetype: str = "", headers: dict | None = None):
-        self._body = body
-        self.status_code = status_code
-        self.mimetype = mimetype
-        self.headers = headers or {}
-
-    def get_body(self) -> bytes:
-        if isinstance(self._body, bytes):
-            return self._body
-        if isinstance(self._body, str):
-            return self._body.encode("utf-8")
-        return self._body
-
-
-def _simulate_production_endpoint(
-    conn,
-    params: dict,
-    request_id: str | None = None,
-) -> MockHttpResponse:
-    """
-    Simulate the /v1/production/regional handler logic (pure, no azure.functions).
-    This is the production handler decoupled for testability.
-    """
-    from functions.shared.api.models import parse_production_request
-    from functions.shared.api.production_service import query_production
-    from functions.shared.api.error_handlers import bad_request, not_found, server_error
-
-    rid = request_id or str(uuid.uuid4())
-
-    prod_req, err = parse_production_request(params)
-    if err:
-        return MockHttpResponse(
-            body=json.dumps(bad_request(err, rid)),
-            status_code=400,
-            mimetype="application/json",
-            headers={"X-Request-Id": rid},
-        )
-
-    try:
-        result = query_production(
-            conn,
-            region_code=prod_req.region_code,
-            start_date=prod_req.start_date,
-            end_date=prod_req.end_date,
-            source_type=prod_req.source_type,
-            limit=prod_req.limit,
-            offset=prod_req.offset,
-            request_id=rid,
-        )
-
-        if not result["data"]:
-            return MockHttpResponse(
-                body=json.dumps(not_found(request_id=rid)),
-                status_code=404,
-                mimetype="application/json",
-                headers={"X-Request-Id": rid},
-            )
-
-        return MockHttpResponse(
-            body=json.dumps(result),
-            status_code=200,
-            mimetype="application/json",
-            headers={"X-Request-Id": rid},
-        )
-
-    except Exception as exc:
-        return MockHttpResponse(
-            body=json.dumps(server_error(request_id=rid)),
-            status_code=500,
-            mimetype="application/json",
-            headers={"X-Request-Id": rid},
-        )
-
-
-def _simulate_export_endpoint(
-    conn,
-    params: dict,
-    request_id: str | None = None,
-) -> MockHttpResponse:
-    """Simulate the /v1/export/csv handler logic."""
-    from functions.shared.api.models import parse_export_request
-    from functions.shared.api.export_service import export_to_csv
-    from functions.shared.api.error_handlers import not_found, server_error
-
-    rid = request_id or str(uuid.uuid4())
-    export_req = parse_export_request(params)
-
-    try:
-        csv_bytes, filename, row_count = export_to_csv(
-            conn,
-            region_code=export_req.region_code,
-            start_date=export_req.start_date,
-            end_date=export_req.end_date,
-            source_type=export_req.source_type,
-            request_id=rid,
-        )
-
-        if row_count == 0:
-            return MockHttpResponse(
-                body=json.dumps(not_found(request_id=rid)),
-                status_code=404,
-                mimetype="application/json",
-                headers={"X-Request-Id": rid},
-            )
-
-        return MockHttpResponse(
-            body=csv_bytes,
-            status_code=200,
-            mimetype="text/csv; charset=utf-8",
-            headers={
-                "Content-Disposition": f'attachment; filename="{filename}"',
-                "X-Request-Id": rid,
-            },
-        )
-
-    except Exception:
-        return MockHttpResponse(
-            body=json.dumps(server_error(request_id=rid)),
-            status_code=500,
-            mimetype="application/json",
-            headers={"X-Request-Id": rid},
-        )
+    monkeypatch.setattr(main_module, "get_db_connection", lambda: db)
+    return TestClient(main_module.app)
 
 
 class TestHTTPIntegration:
-    """AC #3: HTTP trigger → response validation."""
-
-    def test_production_200_with_data(self, db):
-        resp = _simulate_production_endpoint(db, {})
+    def test_health(self, client):
+        resp = client.get("/health")
         assert resp.status_code == 200
-        body = json.loads(resp.get_body())
+        assert resp.json()["status"] == "healthy"
+
+    def test_production_200_with_data(self, client):
+        resp = client.get("/v1/production/regional")
+        assert resp.status_code == 200
+        body = resp.json()
         assert "data" in body
         assert body["total_records"] > 0
 
-    def test_production_200_json_structure(self, db):
-        resp = _simulate_production_endpoint(db, {}, request_id="int-test")
-        body = json.loads(resp.get_body())
-        assert body["request_id"] == "int-test"
+    def test_production_200_json_structure(self, client):
+        resp = client.get("/v1/production/regional", params={"request_id_unused": 1})
+        body = resp.json()
+        assert "request_id" in body
         assert "limit" in body
         assert "offset" in body
-        # Each record must have required fields
         for rec in body["data"]:
             assert "code_insee" in rec
             assert "region" in rec
@@ -638,76 +415,84 @@ class TestHTTPIntegration:
             assert "sources" in rec
             assert "consommation_mw" in rec
 
-    def test_production_400_invalid_limit(self, db):
-        resp = _simulate_production_endpoint(db, {"limit": "not_a_number"})
+    def test_production_400_invalid_limit(self, client):
+        resp = client.get("/v1/production/regional", params={"limit": "not_a_number"})
         assert resp.status_code == 400
-        body = json.loads(resp.get_body())
+        body = resp.json()
         assert body["status_code"] == 400
         assert "request_id" in body
 
-    def test_production_400_limit_too_high(self, db):
-        resp = _simulate_production_endpoint(db, {"limit": "9999"})
+    def test_production_400_limit_too_high(self, client):
+        resp = client.get("/v1/production/regional", params={"limit": "9999"})
         assert resp.status_code == 400
 
-    def test_production_404_no_data(self, db):
-        resp = _simulate_production_endpoint(db, {"region_code": "ZZ"})
+    def test_production_404_no_data(self, client):
+        resp = client.get("/v1/production/regional", params={"region_code": "ZZ"})
         assert resp.status_code == 404
-        body = json.loads(resp.get_body())
-        assert body["status_code"] == 404
+        assert resp.json()["status_code"] == 404
 
-    def test_production_request_id_in_header(self, db):
-        resp = _simulate_production_endpoint(db, {}, request_id="my-rid")
-        assert resp.headers.get("X-Request-Id") == "my-rid"
+    def test_production_request_id_in_header(self, client):
+        resp = client.get("/v1/production/regional")
+        assert "X-Request-Id" in resp.headers
 
-    def test_production_filter_by_region(self, db):
-        resp = _simulate_production_endpoint(db, {"region_code": "11"})
+    def test_production_filter_by_region(self, client):
+        resp = client.get("/v1/production/regional", params={"region_code": "11"})
         assert resp.status_code == 200
-        body = json.loads(resp.get_body())
-        for rec in body["data"]:
+        for rec in resp.json()["data"]:
             assert rec["code_insee"] == "11"
 
-    def test_export_200_with_data(self, db):
-        resp = _simulate_export_endpoint(db, {})
+    def test_export_200_with_data(self, client):
+        resp = client.get("/v1/export/csv")
         assert resp.status_code == 200
-        assert resp.mimetype.startswith("text/csv")
+        assert resp.headers["content-type"].startswith("text/csv")
 
-    def test_export_content_disposition_header(self, db):
-        resp = _simulate_export_endpoint(db, {})
-        assert "attachment" in resp.headers.get("Content-Disposition", "")
-        assert ".csv" in resp.headers.get("Content-Disposition", "")
+    def test_export_content_disposition_header(self, client):
+        resp = client.get("/v1/export/csv")
+        assert "attachment" in resp.headers.get("content-disposition", "")
+        assert ".csv" in resp.headers.get("content-disposition", "")
 
-    def test_export_utf8_bom(self, db):
-        resp = _simulate_export_endpoint(db, {})
+    def test_export_utf8_bom(self, client):
+        resp = client.get("/v1/export/csv")
         assert resp.status_code == 200
-        body = resp.get_body()
-        assert body[:3] == UTF8_BOM
+        assert resp.content[:3] == UTF8_BOM
 
-    def test_export_404_no_data(self, db):
-        resp = _simulate_export_endpoint(db, {"region_code": "ZZ"})
+    def test_export_404_no_data(self, client):
+        resp = client.get("/v1/export/csv", params={"region_code": "ZZ"})
         assert resp.status_code == 404
 
-    def test_export_request_id_header(self, db):
-        resp = _simulate_export_endpoint(db, {}, request_id="exp-rid")
-        assert resp.headers.get("X-Request-Id") == "exp-rid"
+    def test_meteo_endpoint(self, client):
+        resp = client.get("/v1/meteo/regional")
+        assert resp.status_code == 200
+        assert "data" in resp.json()
+
+    def test_capacity_endpoint(self, client):
+        resp = client.get("/v1/capacity/regional")
+        assert resp.status_code == 200
+        assert "data" in resp.json()
+
+    def test_maintenance_endpoint(self, client):
+        resp = client.get("/v1/maintenance")
+        assert resp.status_code == 200
+        assert "data" in resp.json()
 
 
-# ─── Task 5.4: Performance — <500ms on sample dataset ────────────────────────
+# ─── Performance — <500ms on sample dataset ───────────────────────────────────
 
 class TestPerformance:
-    """AC #2: NFR-P2 — response time < 500ms."""
+    """Response time budget for the dataviz endpoints."""
 
     def test_production_query_under_500ms(self, db):
         """Baseline: <500ms on SQLite in-memory with small dataset."""
         start = time.perf_counter()
         query_production(db)
         elapsed_ms = (time.perf_counter() - start) * 1000
-        assert elapsed_ms < 500, f"Query took {elapsed_ms:.1f}ms — exceeds 500ms NFR-P2"
+        assert elapsed_ms < 500, f"Query took {elapsed_ms:.1f}ms — exceeds 500ms budget"
 
     def test_export_csv_under_500ms(self, db):
         start = time.perf_counter()
         export_to_csv(db)  # returns (bytes, filename, row_count)
         elapsed_ms = (time.perf_counter() - start) * 1000
-        assert elapsed_ms < 500, f"CSV export took {elapsed_ms:.1f}ms — exceeds 500ms NFR-P2"
+        assert elapsed_ms < 500, f"CSV export took {elapsed_ms:.1f}ms — exceeds 500ms budget"
 
     def test_production_filtered_query_under_500ms(self, db):
         start = time.perf_counter()
