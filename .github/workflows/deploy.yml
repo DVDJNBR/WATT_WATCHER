@@ -117,12 +117,13 @@ jobs:
     environment: production
     steps:
       - name: Deploy over SSH
-        uses: appleboy/ssh-action@v1
+        uses: appleboy/ssh-action@v1.0.3
         with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
+          host: ${{ secrets.VPS_IP }}
+          port: 5790
+          username: deploy
           key: ${{ secrets.VPS_SSH_KEY }}
           script: |
-            cd ${{ secrets.VPS_PROJECT_PATH }}
-            git pull --ff-only
-            docker compose up -d --build
+            cd /home/ubuntu/dev/WATT_WATCHER
+            git pull origin main
+            docker compose up --build -d
