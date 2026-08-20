@@ -1,3 +1,9 @@
+## [1.19.1](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.19.0...v1.19.1) (2026-08-20)
+
+### Bug Fixes
+
+* **ci:** align VPS deploy job with the shared deploy-user convention ([3c670c4](https://github.com/DVDJNBR/WATT_WATCHER/commit/3c670c440ccb444180816d8a9bc776e5b41008df))
+
 ## [1.19.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.18.0...v1.19.0) (2026-08-18)
 
 ### Features
