@@ -67,6 +67,13 @@ def build_production_query(
 
     # Multiply SQL LIMIT by 10 (max ~8 sources per aggregated record) so that
     # enough raw rows are fetched to build `limit` aggregated records after pivot.
+    #
+    # ORDER BY ... DESC: fetch the most recent rows in the (optionally
+    # date-bounded) range first. With ASC + LIMIT, a range wider than the
+    # limit would get truncated to its earliest rows instead of its latest —
+    # the API would never surface fresh data. Matches the DESC-then-limit
+    # pattern used by meteo_service/maintenance_service; the frontend
+    # re-sorts ascending for display.
     sql_limit = (offset + limit) * 10
 
     if is_sqlite:
@@ -85,7 +92,7 @@ def build_production_query(
             JOIN DIM_TIME t ON f.id_date = t.id_date
             JOIN DIM_SOURCE s ON f.id_source = s.id_source
             {where}
-            ORDER BY t.horodatage ASC, r.code_insee
+            ORDER BY t.horodatage DESC, r.code_insee
             LIMIT ?
         """
         params.append(sql_limit)
@@ -106,7 +113,7 @@ def build_production_query(
             JOIN dim_time t ON f.id_date = t.id_date
             JOIN dim_source s ON f.id_source = s.id_source
             {where_pg}
-            ORDER BY t.horodatage ASC, r.code_insee
+            ORDER BY t.horodatage DESC, r.code_insee
             LIMIT %s
         """
         params.append(sql_limit)
