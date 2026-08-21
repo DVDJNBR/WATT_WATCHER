@@ -1,3 +1,9 @@
+## [1.19.2](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.19.1...v1.19.2) (2026-08-21)
+
+### Bug Fixes
+
+* **api:** order production query by most-recent instead of oldest ([a66d1fd](https://github.com/DVDJNBR/WATT_WATCHER/commit/a66d1fdf0c62533e403dd1eb6de1e4b9abad1417))
+
 ## [1.19.1](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.19.0...v1.19.1) (2026-08-20)
 
 ### Bug Fixes
