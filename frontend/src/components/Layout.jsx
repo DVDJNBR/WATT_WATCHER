@@ -6,8 +6,9 @@ import { useState, useEffect } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 
 const TABS = [
-  { to: '/origine', label: 'À propos' },
-  { to: '/',        label: 'Dashboard', end: true },
+  { to: '/origine',  label: 'À propos' },
+  { to: '/pipeline', label: 'Pipeline de données' },
+  { to: '/',         label: 'Dashboard', end: true },
 ]
 
 export function Layout() {

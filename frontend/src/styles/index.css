@@ -922,3 +922,296 @@ input[type="date"] {
 }
 
 .content-card p + p { margin-top: 12px; }
+
+.content-heading {
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--color-text);
+  margin: 24px 0 10px;
+}
+
+.content-card > .content-heading:first-child { margin-top: 0; }
+
+.content-card code {
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 0.85em;
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  padding: 1px 5px;
+}
+
+.content-list {
+  margin-top: 8px;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.content-list li {
+  font-size: 0.9rem;
+  line-height: 1.6;
+  color: var(--color-text);
+}
+
+.content-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.content-grid__item {
+  padding: 14px 16px;
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.content-grid__title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.content-grid__desc {
+  font-size: 0.78rem;
+  line-height: 1.5;
+  color: var(--color-text-muted);
+}
+
+.content-grid__tag {
+  align-self: flex-start;
+  margin-top: 4px;
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-accent);
+  background: var(--color-accent-glow);
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
+.method-badge {
+  display: inline-block;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #10b981;
+  background: rgba(16,185,129,0.15);
+  padding: 1px 6px;
+  border-radius: 4px;
+  margin-right: 6px;
+}
+
+/* ── JSON syntax coloring ─────────────────────────────────────────────────── */
+.json-block .json-key    { color: var(--color-accent); }
+.json-block .json-string { color: #10b981; }
+.json-block .json-number { color: #f59e0b; }
+.json-block .json-bool   { color: #7c3aed; }
+.json-block .json-null   { color: var(--color-text-muted); font-style: italic; }
+
+.json-line { display: block; }
+.json-line--dropped {
+  opacity: 0.4;
+  text-decoration: line-through;
+  text-decoration-color: var(--color-text-muted);
+}
+
+/* ── Medallion strip (bronze/argent/or) ───────────────────────────────────── */
+.medallion-strip {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 14px 0;
+  flex-wrap: wrap;
+}
+
+.medallion-chip {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.medallion-chip--bronze { background: rgba(180,120,80,0.16);  color: #c2895f; }
+.medallion-chip--silver { background: rgba(160,168,180,0.16); color: #a8b0bc; }
+.medallion-chip--gold   { background: rgba(234,179,8,0.16);   color: #eab308; }
+
+.content-codeblock {
+  margin-top: 10px;
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 0.8rem;
+  line-height: 1.6;
+  color: var(--color-text);
+  overflow-x: auto;
+  white-space: pre;
+}
+
+.content-caption {
+  margin-top: 8px;
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+  line-height: 1.5;
+}
+
+.content-diagram {
+  margin: 20px 0;
+  border-radius: var(--radius);
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+}
+
+.content-diagram img,
+.content-diagram svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.content-table {
+  width: 100%;
+  margin-top: 10px;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.content-table td {
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--color-border);
+  vertical-align: top;
+}
+
+.content-table tr:last-child td { border-bottom: none; }
+
+.content-table td:first-child {
+  white-space: nowrap;
+  width: 1%;
+}
+
+.content-table td:last-child { color: var(--color-text-muted); }
+
+/* ── Pipeline flow (clickable step row) ───────────────────────────────────── */
+.pipeline-flow {
+  display: flex;
+  align-items: stretch;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 20px;
+}
+
+.pipeline-flow__item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.pipeline-step {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 108px;
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-2);
+  color: var(--color-text);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color var(--transition), background var(--transition), transform var(--transition);
+}
+
+.pipeline-step:hover {
+  border-color: var(--color-accent);
+  transform: translateY(-1px);
+}
+
+.pipeline-step:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.pipeline-step--active {
+  border-color: var(--color-accent);
+  background: var(--color-accent-glow);
+}
+
+.pipeline-step__index {
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: var(--color-text-muted);
+}
+
+.pipeline-step--active .pipeline-step__index { color: var(--color-accent); }
+
+.pipeline-step__title {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.pipeline-step__sub {
+  font-size: 0.7rem;
+  color: var(--color-text-muted);
+}
+
+.pipeline-arrow {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  width: 22px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+.pipeline-arrow::before {
+  content: '';
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  top: 50%;
+  height: 1px;
+  background: var(--color-border);
+  transform: translateY(-50%);
+}
+
+.pipeline-arrow__dot {
+  position: absolute;
+  top: 50%;
+  left: 2px;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  box-shadow: 0 0 4px var(--color-accent-glow);
+  transform: translateY(-50%);
+  animation: pipeline-flow-dot 1.8s linear infinite;
+}
+
+@keyframes pipeline-flow-dot {
+  0%   { left: 2px;  opacity: 0; }
+  15%  { opacity: 1; }
+  85%  { opacity: 1; }
+  100% { left: 18px; opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pipeline-arrow__dot { animation: none; opacity: 0.6; left: 10px; }
+}
+
+.pipeline-panel {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid var(--color-border);
+}

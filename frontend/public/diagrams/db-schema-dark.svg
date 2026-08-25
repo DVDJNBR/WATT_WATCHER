@@ -1,0 +1,163 @@
+<svg viewBox="0 0 700 424" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="db-schema-dark-title db-schema-dark-desc" font-family="Inter, system-ui, sans-serif">
+  <title id="db-schema-dark-title">Schéma physique de la base WATT_WATCHER</title>
+  <desc id="db-schema-dark-desc">Modèle en étoile : la table de faits FACT_ENERGY_FLOW référence trois dimensions — DIM_REGION, DIM_TIME et DIM_SOURCE — via des clés étrangères sur id_region, id_date et id_source.</desc>
+
+  <defs>
+    <marker id="dbs-arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+      <polygon points="0 0, 8 3, 0 6" fill="#8b9ab5"/>
+    </marker>
+  </defs>
+
+  <!-- FK connectors — drawn before table rects so they're masked inside boxes -->
+  <line x1="110" y1="108" x2="110" y2="256" stroke="#8b9ab5" stroke-width="1" marker-end="url(#dbs-arrow)"/>
+  <line x1="330" y1="84"  x2="330" y2="256" stroke="#8b9ab5" stroke-width="1" marker-end="url(#dbs-arrow)"/>
+  <line x1="550" y1="132" x2="550" y2="256" stroke="#8b9ab5" stroke-width="1" marker-end="url(#dbs-arrow)"/>
+
+  <!-- FK edge labels (referential action) -->
+  <rect x="88"  y="176" width="44" height="12" rx="2" fill="#0a0e1a"/>
+  <text x="110" y="185" fill="#8b9ab5" font-size="7" font-family="ui-monospace, monospace" text-anchor="middle" letter-spacing="0.04em">RESTRICT</text>
+  <rect x="308" y="176" width="44" height="12" rx="2" fill="#0a0e1a"/>
+  <text x="330" y="185" fill="#8b9ab5" font-size="7" font-family="ui-monospace, monospace" text-anchor="middle" letter-spacing="0.04em">RESTRICT</text>
+  <rect x="528" y="176" width="44" height="12" rx="2" fill="#0a0e1a"/>
+  <text x="550" y="185" fill="#8b9ab5" font-size="7" font-family="ui-monospace, monospace" text-anchor="middle" letter-spacing="0.04em">RESTRICT</text>
+
+  <!-- ── FACT_ENERGY_FLOW ─────────────────────────────────────────────── -->
+  <g>
+    <rect x="60" y="20" width="620" height="196" rx="6" fill="#1c2538" stroke="rgba(255,255,255,0.16)" stroke-width="1"/>
+    <rect x="60" y="20" width="620" height="28" rx="6" fill="rgba(255,255,255,0.05)"/>
+    <rect x="60" y="40" width="620" height="8" fill="rgba(255,255,255,0.05)"/>
+    <text x="76" y="38" fill="#f0f4ff" font-size="12" font-weight="600">public.fact_energy_flow</text>
+    <rect x="628" y="26" width="44" height="14" rx="2" fill="transparent" stroke="rgba(240,244,255,0.35)" stroke-width="0.8"/>
+    <text x="650" y="36" fill="rgba(240,244,255,0.7)" font-size="7" font-family="ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">TABLE</text>
+    <line x1="60" y1="48" x2="680" y2="48" stroke="rgba(255,255,255,0.12)" stroke-width="0.8"/>
+
+    <!-- rows (24px each, alternating tint) -->
+    <rect x="60" y="48"  width="620" height="24" fill="rgba(255,255,255,0.02)"/>
+    <rect x="60" y="96"  width="620" height="24" fill="rgba(255,255,255,0.02)"/>
+    <rect x="60" y="144" width="620" height="24" fill="rgba(255,255,255,0.02)"/>
+    <rect x="60" y="192" width="620" height="24" fill="rgba(255,255,255,0.02)"/>
+
+    <!-- row 0 — id_fact PK -->
+    <text x="76"  y="64" fill="#f0f4ff" font-size="11">id_fact</text>
+    <rect x="150" y="55" width="18" height="12" rx="2" fill="rgba(255,255,255,0.10)"/>
+    <text x="159" y="64" fill="#f0f4ff" font-size="7" font-family="ui-monospace, monospace" text-anchor="middle">PK</text>
+    <text x="664" y="64" fill="#8b9ab5" font-size="9" font-family="ui-monospace, monospace" text-anchor="end">bigint</text>
+
+    <!-- row 1 — id_date FK -->
+    <text x="76"  y="88" fill="#f0f4ff" font-size="11">id_date</text>
+    <rect x="150" y="79" width="18" height="12" rx="2" fill="rgba(255,255,255,0.10)"/>
+    <text x="159" y="88" fill="#f0f4ff" font-size="7" font-family="ui-monospace, monospace" text-anchor="middle">FK</text>
+    <text x="664" y="88" fill="#8b9ab5" font-size="9" font-family="ui-monospace, monospace" text-anchor="end">int</text>
+
+    <!-- row 2 — id_region FK -->
+    <text x="76"  y="112" fill="#f0f4ff" font-size="11">id_region</text>
+    <rect x="150" y="103" width="18" height="12" rx="2" fill="rgba(255,255,255,0.10)"/>
+    <text x="159" y="112" fill="#f0f4ff" font-size="7" font-family="ui-monospace, monospace" text-anchor="middle">FK</text>
+    <text x="664" y="112" fill="#8b9ab5" font-size="9" font-family="ui-monospace, monospace" text-anchor="end">int</text>
+
+    <!-- row 3 — id_source FK -->
+    <text x="76"  y="136" fill="#f0f4ff" font-size="11">id_source</text>
+    <rect x="150" y="127" width="18" height="12" rx="2" fill="rgba(255,255,255,0.10)"/>
+    <text x="159" y="136" fill="#f0f4ff" font-size="7" font-family="ui-monospace, monospace" text-anchor="middle">FK</text>
+    <text x="664" y="136" fill="#8b9ab5" font-size="9" font-family="ui-monospace, monospace" text-anchor="end">int</text>
+
+    <!-- row 4 — valeur_mw -->
+    <text x="76"  y="160" fill="#f0f4ff" font-size="11">valeur_mw</text>
+    <text x="664" y="160" fill="#8b9ab5" font-size="9" font-family="ui-monospace, monospace" text-anchor="end">decimal(10,2)</text>
+
+    <!-- row 5 — consommation_mw -->
+    <text x="76"  y="184" fill="#f0f4ff" font-size="11">consommation_mw</text>
+    <text x="664" y="184" fill="#8b9ab5" font-size="9" font-family="ui-monospace, monospace" text-anchor="end">decimal(10,2)</text>
+
+    <!-- row 6 — overflow -->
+    <text x="76" y="208" fill="#8b9ab5" font-size="9" font-family="ui-monospace, monospace">+ 6 more columns</text>
+  </g>
+
+  <!-- ── DIM_REGION ───────────────────────────────────────────────────── -->
+  <g>
+    <rect x="20" y="256" width="180" height="148" rx="6" fill="#1c2538" stroke="rgba(255,255,255,0.16)" stroke-width="1"/>
+    <rect x="20" y="256" width="180" height="28" rx="6" fill="rgba(255,255,255,0.05)"/>
+    <rect x="20" y="276" width="180" height="8" fill="rgba(255,255,255,0.05)"/>
+    <text x="30" y="274" fill="#f0f4ff" font-size="11" font-weight="600">public.dim_region</text>
+    <line x1="20" y1="284" x2="200" y2="284" stroke="rgba(255,255,255,0.12)" stroke-width="0.8"/>
+
+    <rect x="20" y="284" width="180" height="24" fill="rgba(255,255,255,0.02)"/>
+    <rect x="20" y="332" width="180" height="24" fill="rgba(255,255,255,0.02)"/>
+
+    <text x="30" y="300" fill="#f0f4ff" font-size="11">id_region</text>
+    <rect x="118" y="291" width="18" height="12" rx="2" fill="rgba(255,255,255,0.10)"/>
+    <text x="127" y="300" fill="#f0f4ff" font-size="7" font-family="ui-monospace, monospace" text-anchor="middle">PK</text>
+    <text x="192" y="300" fill="#8b9ab5" font-size="9" font-family="ui-monospace, monospace" text-anchor="end">int</text>
+
+    <text x="30" y="324" fill="#f0f4ff" font-size="11">code_insee</text>
+    <rect x="122" y="315" width="18" height="12" rx="2" fill="rgba(255,255,255,0.10)"/>
+    <text x="131" y="324" fill="#f0f4ff" font-size="7" font-family="ui-monospace, monospace" text-anchor="middle">UQ</text>
+    <text x="192" y="324" fill="#8b9ab5" font-size="9" font-family="ui-monospace, monospace" text-anchor="end">varchar(5)</text>
+
+    <text x="30" y="348" fill="#f0f4ff" font-size="11">nom_region</text>
+    <text x="192" y="348" fill="#8b9ab5" font-size="9" font-family="ui-monospace, monospace" text-anchor="end">nvarchar</text>
+
+    <text x="30" y="372" fill="#f0f4ff" font-size="11">status</text>
+    <text x="192" y="372" fill="#8b9ab5" font-size="9" font-family="ui-monospace, monospace" text-anchor="end">varchar(10)</text>
+
+    <text x="30" y="396" fill="#8b9ab5" font-size="9" font-family="ui-monospace, monospace">+ 4 more columns</text>
+  </g>
+
+  <!-- ── DIM_TIME ─────────────────────────────────────────────────────── -->
+  <g>
+    <rect x="240" y="256" width="180" height="148" rx="6" fill="#1c2538" stroke="rgba(255,255,255,0.16)" stroke-width="1"/>
+    <rect x="240" y="256" width="180" height="28" rx="6" fill="rgba(255,255,255,0.05)"/>
+    <rect x="240" y="276" width="180" height="8" fill="rgba(255,255,255,0.05)"/>
+    <text x="250" y="274" fill="#f0f4ff" font-size="11" font-weight="600">public.dim_time</text>
+    <line x1="240" y1="284" x2="420" y2="284" stroke="rgba(255,255,255,0.12)" stroke-width="0.8"/>
+
+    <rect x="240" y="284" width="180" height="24" fill="rgba(255,255,255,0.02)"/>
+    <rect x="240" y="332" width="180" height="24" fill="rgba(255,255,255,0.02)"/>
+
+    <text x="250" y="300" fill="#f0f4ff" font-size="11">id_date</text>
+    <rect x="330" y="291" width="18" height="12" rx="2" fill="rgba(255,255,255,0.10)"/>
+    <text x="339" y="300" fill="#f0f4ff" font-size="7" font-family="ui-monospace, monospace" text-anchor="middle">PK</text>
+    <text x="412" y="300" fill="#8b9ab5" font-size="9" font-family="ui-monospace, monospace" text-anchor="end">int</text>
+
+    <text x="250" y="324" fill="#f0f4ff" font-size="11">horodatage</text>
+    <rect x="336" y="315" width="18" height="12" rx="2" fill="rgba(255,255,255,0.10)"/>
+    <text x="345" y="324" fill="#f0f4ff" font-size="7" font-family="ui-monospace, monospace" text-anchor="middle">UQ</text>
+    <text x="412" y="324" fill="#8b9ab5" font-size="9" font-family="ui-monospace, monospace" text-anchor="end">datetime2</text>
+
+    <text x="250" y="348" fill="#f0f4ff" font-size="11">heure</text>
+    <text x="412" y="348" fill="#8b9ab5" font-size="9" font-family="ui-monospace, monospace" text-anchor="end">int</text>
+
+    <text x="250" y="372" fill="#f0f4ff" font-size="11">jour_semaine</text>
+    <text x="412" y="372" fill="#8b9ab5" font-size="9" font-family="ui-monospace, monospace" text-anchor="end">int</text>
+
+    <text x="250" y="396" fill="#8b9ab5" font-size="9" font-family="ui-monospace, monospace">+ 5 more columns</text>
+  </g>
+
+  <!-- ── DIM_SOURCE ───────────────────────────────────────────────────── -->
+  <g>
+    <rect x="460" y="256" width="180" height="124" rx="6" fill="#1c2538" stroke="rgba(255,255,255,0.16)" stroke-width="1"/>
+    <rect x="460" y="256" width="180" height="28" rx="6" fill="rgba(255,255,255,0.05)"/>
+    <rect x="460" y="276" width="180" height="8" fill="rgba(255,255,255,0.05)"/>
+    <text x="470" y="274" fill="#f0f4ff" font-size="11" font-weight="600">public.dim_source</text>
+    <line x1="460" y1="284" x2="640" y2="284" stroke="rgba(255,255,255,0.12)" stroke-width="0.8"/>
+
+    <rect x="460" y="284" width="180" height="24" fill="rgba(255,255,255,0.02)"/>
+    <rect x="460" y="332" width="180" height="24" fill="rgba(255,255,255,0.02)"/>
+
+    <text x="470" y="300" fill="#f0f4ff" font-size="11">id_source</text>
+    <rect x="556" y="291" width="18" height="12" rx="2" fill="rgba(255,255,255,0.10)"/>
+    <text x="565" y="300" fill="#f0f4ff" font-size="7" font-family="ui-monospace, monospace" text-anchor="middle">PK</text>
+    <text x="632" y="300" fill="#8b9ab5" font-size="9" font-family="ui-monospace, monospace" text-anchor="end">int</text>
+
+    <text x="470" y="324" fill="#f0f4ff" font-size="11">source_name</text>
+    <rect x="562" y="315" width="18" height="12" rx="2" fill="rgba(255,255,255,0.10)"/>
+    <text x="571" y="324" fill="#f0f4ff" font-size="7" font-family="ui-monospace, monospace" text-anchor="middle">UQ</text>
+    <text x="632" y="324" fill="#8b9ab5" font-size="9" font-family="ui-monospace, monospace" text-anchor="end">nvarchar</text>
+
+    <text x="470" y="348" fill="#f0f4ff" font-size="11">is_green</text>
+    <text x="632" y="348" fill="#8b9ab5" font-size="9" font-family="ui-monospace, monospace" text-anchor="end">bit</text>
+
+    <text x="470" y="372" fill="#f0f4ff" font-size="11">category</text>
+    <text x="632" y="372" fill="#8b9ab5" font-size="9" font-family="ui-monospace, monospace" text-anchor="end">nvarchar</text>
+  </g>
+</svg>
