@@ -47,14 +47,25 @@ function aggregateByTimestamp(data) {
   const map = new Map()
   for (const r of data) {
     const ts = r.timestamp
-    if (!map.has(ts)) map.set(ts, { timestamp: ts, sources: {}, consommation_mw: null })
+    if (!map.has(ts)) map.set(ts, { timestamp: ts, sources: {}, consommation_mw: null, regions: new Set() })
     const agg = map.get(ts)
+    agg.regions.add(r.code_insee)
     for (const [src, mw] of Object.entries(r.sources || {})) {
       if (typeof mw === 'number' && mw > 0) agg.sources[src] = (agg.sources[src] || 0) + mw
     }
     if (r.consommation_mw != null) agg.consommation_mw = (agg.consommation_mw || 0) + r.consommation_mw
   }
-  return Array.from(map.values()).sort((a, b) => (a.timestamp < b.timestamp ? -1 : 1))
+
+  const entries = Array.from(map.values())
+  // RTE publishes region-by-region with a short delay — the freshest
+  // timestamps often only have a handful of regions reported so far.
+  // Summing an incomplete region set creates a misleading artificial cliff
+  // at the edge of the chart, so drop any timestamp short of full coverage.
+  const maxRegions = entries.reduce((max, e) => Math.max(max, e.regions.size), 0)
+  return entries
+    .filter(e => e.regions.size === maxRegions)
+    .map(({ regions, ...rest }) => rest)
+    .sort((a, b) => (a.timestamp < b.timestamp ? -1 : 1))
 }
 
 /** Average meteo by timestamp across regions. */

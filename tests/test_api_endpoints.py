@@ -175,8 +175,8 @@ class TestProductionService:
         assert "LIMIT ?" in sql
         assert "OFFSET ?" not in sql
         assert "consommation_mw" in sql
-        # sql_limit = (offset=0 + limit=100) * 10 = 1000
-        assert params[-1] == 1000
+        # No date bounds -> falls back to the fixed MAX_SQL_LIMIT cap
+        assert params[-1] == 700_000
 
     def test_build_query_no_filters_postgres(self):
         sql, params = build_production_query(is_sqlite=False)
@@ -184,7 +184,7 @@ class TestProductionService:
         assert "LIMIT" in sql
         assert "consommation_mw" in sql
         # sql_limit is last param for LIMIT %s
-        assert params[-1] == 1000
+        assert params[-1] == 700_000
 
     def test_build_query_with_region(self):
         sql, params = build_production_query(region_code="11", is_sqlite=True)
@@ -206,8 +206,10 @@ class TestProductionService:
         # Date-only end_date must be expanded to include full day
         assert "2025-06-30 23:59:59" in params
         assert "eolien" in params
-        # sql_limit = (offset=10 + limit=50) * 10 = 600; no OFFSET in SQL params
-        assert params[-1] == 600
+        # 30-day span -> sql_limit sized to cover the whole range
+        # (30 days * 12 regions * 9 sources * 96 slots/day = 311_040),
+        # not just (offset=10 + limit=50) * 10 = 600. No OFFSET in SQL params.
+        assert params[-1] == 311_040
 
     def test_build_query_end_date_only_expanded(self):
         """Date-only end_date (YYYY-MM-DD) must be expanded to 23:59:59."""

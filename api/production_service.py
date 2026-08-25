@@ -10,6 +10,7 @@ AC #2: Parameterized queries for <500ms (NFR-P2), index hint in docstring.
 
 import logging
 import uuid
+from datetime import date
 from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
@@ -65,16 +66,27 @@ def build_production_query(
 
     where = ("WHERE " + " AND ".join(where_clauses)) if where_clauses else ""
 
-    # Multiply SQL LIMIT by 10 (max ~8 sources per aggregated record) so that
-    # enough raw rows are fetched to build `limit` aggregated records after pivot.
-    #
     # ORDER BY ... DESC: fetch the most recent rows in the (optionally
-    # date-bounded) range first. With ASC + LIMIT, a range wider than the
-    # limit would get truncated to its earliest rows instead of its latest —
-    # the API would never surface fresh data. Matches the DESC-then-limit
-    # pattern used by meteo_service/maintenance_service; the frontend
-    # re-sorts ascending for display.
-    sql_limit = (offset + limit) * 10
+    # date-bounded) range first. Matches the DESC-then-limit pattern used by
+    # meteo_service/maintenance_service; the frontend re-sorts ascending for
+    # display.
+    #
+    # sql_limit must cover every raw row in the requested date range, not
+    # just enough for one page — pagination happens in Python, after this
+    # fetch, on the pivoted (region, timestamp) records. A limit sized only
+    # to `(offset + limit)` silently truncates any range wider than one page
+    # to its most recent slice: a caller asking for 14 days of history would
+    # only ever see the last day or two. Size the cap from the actual date
+    # span when both bounds are given (12 regions x ~9 sources x 96 slots/day
+    # for that many days), otherwise fall back to a generous fixed cap.
+    MAX_SQL_LIMIT = 700_000  # ~60 days at full regional/source density
+    sql_limit = MAX_SQL_LIMIT
+    if start_date and end_date:
+        try:
+            span_days = (date.fromisoformat(end_date[:10]) - date.fromisoformat(start_date[:10])).days + 1
+            sql_limit = min(MAX_SQL_LIMIT, max((offset + limit) * 10, span_days * 12 * 9 * 96))
+        except ValueError:
+            pass
 
     if is_sqlite:
         # SQLite: LIMIT clause at end
