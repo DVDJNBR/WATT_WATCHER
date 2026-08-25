@@ -57,7 +57,6 @@ const MOCK_REGIONS = [
 
 describe('App smoke test (Task 6.3)', () => {
   beforeEach(() => {
-    document.documentElement.setAttribute('data-theme', 'dark')
     vi.clearAllMocks()
     fetchProduction.mockResolvedValue({ data: MOCK_DATA, total_records: 2, request_id: 'smoke-1' })
     fetchRegions.mockResolvedValue(MOCK_REGIONS)
@@ -85,7 +84,7 @@ describe('App smoke test (Task 6.3)', () => {
 
   it('renders 4 KPI cards', () => {
     render(<App />)
-    expect(screen.getAllByTestId('kpi-card')).toHaveLength(4)
+    expect(screen.getByTestId('kpi-grid').children).toHaveLength(4)
   })
 
   it('shows last-updated timestamp after data loads (AC #1)', async () => {
@@ -113,10 +112,12 @@ describe('App smoke test (Task 6.3)', () => {
     const user = userEvent.setup()
     render(<App />)
     const toggle = screen.getByTestId('theme-toggle')
+    // matchMedia is mocked to prefers-color-scheme: false → initial theme is 'light'
+    const initial = document.documentElement.getAttribute('data-theme')
+    expect(initial).toBe('light')
+    await user.click(toggle)
     expect(document.documentElement.getAttribute('data-theme')).toBe('dark')
     await user.click(toggle)
     expect(document.documentElement.getAttribute('data-theme')).toBe('light')
-    await user.click(toggle)
-    expect(document.documentElement.getAttribute('data-theme')).toBe('dark')
   })
 })
