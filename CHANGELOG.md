@@ -1,3 +1,10 @@
+## [1.20.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.19.2...v1.20.0) (2026-08-25)
+
+### Features
+
+* **frontend:** add tab navigation with "À propos" page ([7e642b5](https://github.com/DVDJNBR/WATT_WATCHER/commit/7e642b525766076b079969c377af246a380423c7))
+* **frontend:** interactive pipeline tab with data-schema diagram ([3ae49a6](https://github.com/DVDJNBR/WATT_WATCHER/commit/3ae49a6921511bac47db80c3d320a901457848ed))
+
 ## [1.19.2](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.19.1...v1.19.2) (2026-08-21)
 
 ### Bug Fixes
