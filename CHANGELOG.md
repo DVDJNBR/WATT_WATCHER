@@ -1,3 +1,9 @@
+## [1.20.1](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.20.0...v1.20.1) (2026-08-25)
+
+### Bug Fixes
+
+* **api,frontend:** correct wide-range pagination and calibrate surplus threshold ([38040dd](https://github.com/DVDJNBR/WATT_WATCHER/commit/38040dd24d03e3475f5ea925e812945d7bb65172))
+
 ## [1.20.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.19.2...v1.20.0) (2026-08-25)
 
 ### Features
