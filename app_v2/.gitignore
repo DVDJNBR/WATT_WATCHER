@@ -248,3 +248,4 @@ functions/__azurite_db_*.json
 functions/__blobstorage__/
 functions/host.json
 .DS_Store
+CLAUDE.local.md
