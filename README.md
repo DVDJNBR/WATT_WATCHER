@@ -1,8 +1,92 @@
 # WATT_WATCHER
 
-Data engineering portfolio piece: an automated ETL pipeline for regional energy analysis using French Open Data (RTE, Météo-France, ODRE, grid maintenance), landing into a medallion (Bronze/Silver/Gold) architecture and surfaced through a public dataviz dashboard.
+> **Note:** this is the project as it stood at certification time (March 2026) — the
+> original all-Azure architecture (Azure SQL, Static Web Apps, JWT auth). It's kept
+> here as a real, deployable snapshot of that stack. The application currently
+> running in production lives in [`app_v2/`](./app_v2) — migrated to a VPS +
+> Supabase after certification to control ongoing costs, while Azure Functions
+> stayed as the pipeline showcase. See [`app_v2/README.md`](./app_v2/README.md)
+> for the current setup.
 
-**Stack:** Azure Functions (Python 3.11, pipeline only) · ADLS Gen2 (Bronze/Silver) · Supabase/PostgreSQL (Gold) · FastAPI (dataviz API) · React/Vite (frontend) · Docker + Caddy on a VPS · Terraform IaC
+Automated ETL pipeline for regional energy analysis using French Open Data (RTE, INSEE, Météo-France) to monitor grid load and power distribution.
+
+**Stack:** Azure Functions (Python 3.11) · ADLS Gen2 · Azure SQL Serverless · React/Vite frontend · Terraform IaC
+
+---
+
+## First-time setup
+
+### 1. Prerequisites
+
+```bash
+az login
+terraform -version   # >= 1.5
+gh auth login
+```
+
+### 2. Provision infrastructure
+
+```bash
+cd .cloud
+cp terraform.tfvars.example terraform.tfvars
+# Fill in sql_admin_password in terraform.tfvars
+
+terraform init
+terraform apply -auto-approve
+```
+
+### 3. Push infra outputs to GitHub secrets
+
+```bash
+./sync_github_secrets.sh   # reads terraform outputs → sets all GitHub secrets
+```
+
+This sets:
+- `AZURE_FUNCTIONAPP_NAME`
+- `AZURE_FUNCTIONAPP_PUBLISH_PROFILE`
+- `AZURE_FUNCTIONS_URL`
+- `AZURE_FRONTEND_STORAGE_NAME`
+- `AZURE_FRONTEND_STORAGE_KEY`
+
+### 4. Set remaining GitHub secrets manually
+
+In **Settings → Secrets → Actions**:
+
+| Secret | Description |
+|---|---|
+| `AZURE_CLIENT_ID` | App registration client ID (for frontend auth) |
+| `AZURE_TENANT_ID` | Azure AD tenant ID |
+
+### 5. Push to main → deploy
+
+```bash
+git push origin main
+```
+
+GitHub Actions runs tests → deploys Azure Functions (Oryx build) → deploys frontend.
+
+---
+
+## Destroy & recreate
+
+```bash
+cd .cloud
+terraform destroy -auto-approve
+terraform apply -auto-approve
+./sync_github_secrets.sh   # secrets follow the new random name automatically
+git push origin main        # redeploy
+```
+
+---
+
+## Local development
+
+```bash
+uv sync --all-extras
+uv run python -m pytest tests/ -q
+```
+
+**Tests** run against SQLite (no Azure connection needed). Set `LOCAL_GOLD_DB` to point to a local `gold.db`.
 
 ---
 
@@ -10,93 +94,11 @@ Data engineering portfolio piece: an automated ETL pipeline for regional energy 
 
 ```
 RTE API ─┐
-Météo-France ├─→ Bronze (ADLS) ─→ Silver (Parquet) ─→ Gold (Supabase) ─→ FastAPI ─→ Dashboard
-ODRE / Maintenance ┘         [Azure Functions, cron]                    [VPS, Docker]
+CSV      ├─→ Bronze (ADLS) ─→ Silver (Parquet) ─→ Gold (Azure SQL) ─→ API ─→ Dashboard
+ERA5     ┘                                                              ↑
+Maintenance scraping ──────────────────────────────────────────────────┘
 ```
 
-- **`functions/`** — Azure Functions, pipeline only (no HTTP API). Timer triggers ingest RTE/Météo-France/ODRE/maintenance data on a schedule and load it into Supabase. No auth, no alerting — this is a public showroom, not a monitored product.
-- **`api/`** — FastAPI, public read-only dataviz API. Reads Gold data from Supabase. Deployed on the VPS.
-- **`frontend/`** — React/Vite dashboard. Deployed on the VPS (static build served by nginx).
-- **`.cloud/`** — Terraform for the Azure Functions pipeline (Resource Group, ADLS Gen2, Function App, Key Vault, monitoring). No Azure SQL, no Azure Storage Static Website — those are replaced by Supabase and the VPS.
-
----
-
-## Local development
-
-### Pipeline / tests (Python)
-
-```bash
-uv sync --all-extras
-uv run python -m pytest tests/ -q
-```
-
-Tests run against SQLite (no Supabase connection needed). Set `LOCAL_GOLD_DB` to point to a local `gold.db`.
-
-### Dataviz API (FastAPI)
-
-```bash
-export SUPABASE_CONNECTION_STRING="postgresql://..."   # or DB_TYPE=sqlite + SQLITE_PATH=./gold.db
-uv run uvicorn api.main:app --reload --port 8000
-```
-
-Swagger UI at `http://localhost:8000/docs` (FastAPI auto-generated).
-
-### Frontend
-
-```bash
-cd frontend
-npm install
-npm run dev   # proxies /api → http://localhost:8000 (see vite.config.js)
-```
-
----
-
-## VPS deployment (Docker + Caddy)
-
-```bash
-git clone <repo> /opt/watt-watcher && cd /opt/watt-watcher
-cp .env.example .env   # fill in SUPABASE_CONNECTION_STRING
-docker compose up -d --build
-```
-
-This starts two containers:
-- `api` — FastAPI on `127.0.0.1:8002` (internal)
-- `frontend` — nginx static build on `127.0.0.1:8001` (internal)
-
-Point Caddy at these ports for `watt-watcher.dvdjnbr.fr` — `handle_path /api/*` → `localhost:8002`, everything else → `localhost:8001`. Caddyfile and DNS are managed outside this repo.
-
-CI (`.github/workflows/deploy.yml`, job `deploy-vps`) redeploys automatically on push to `main` via SSH: `git pull && docker compose up -d --build`. Requires GitHub secrets `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY`, `VPS_PROJECT_PATH`.
-
----
-
-## Azure Functions (pipeline) deployment
-
-```bash
-cd .cloud
-cp terraform.tfvars.example terraform.tfvars
-# Fill in supabase_connection_string in terraform.tfvars
-
-terraform init
-terraform apply -auto-approve
-./sync_github_secrets.sh   # reads terraform outputs → sets AZURE_FUNCTIONAPP_NAME / AZURE_FUNCTIONAPP_PUBLISH_PROFILE
-```
-
-Also requires the `AZURE_CREDENTIALS` GitHub secret (service principal) for the `deploy-functions` CI job.
-
-Push to `main` → GitHub Actions runs tests → deploys the Functions pipeline.
-
-**Timer triggers:**
-- `*/15 * * * *` — RTE ingestion → Bronze
-- `0 6 * * *` — Grid maintenance scraping → Bronze
-- `0 1 * * *` — SQL reference snapshot → Bronze
-- Full pipeline (Bronze → Silver → Gold, incl. Météo/ODRE/maintenance) runs as part of the RTE ingestion job
-
-### Destroy & recreate
-
-```bash
-cd .cloud
-terraform destroy -auto-approve
-terraform apply -auto-approve
-./sync_github_secrets.sh
-git push origin main
-```
+**Azure Functions triggers:**
+- `*/15 * * * *` — RTE ingestion → Bronze → Silver → Gold
+- HTTP — `/api/health`, `/api/v1/production/regional`, `/api/v1/export/csv`, `/api/v1/alerts`

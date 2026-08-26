@@ -1,0 +1,33 @@
+{
+  "name": "watt_watcher",
+  "version": "1.0.0",
+  "description": "Automated ETL pipeline project for regional energy analysis using French Open Data (RTE, INSEE, Météo-France) to monitor grid load and power distribution.",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs",
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/DVDJNBR/WATT_WATCHER.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/DVDJNBR/WATT_WATCHER/issues"
+  },
+  "homepage": "https://github.com/DVDJNBR/WATT_WATCHER#readme",
+  "devDependencies": {
+    "@semantic-release/changelog": "^6.0.3",
+    "@semantic-release/commit-analyzer": "^13.0.1",
+    "@semantic-release/git": "^10.0.1",
+    "@semantic-release/release-notes-generator": "^14.1.0",
+    "conventional-changelog-conventionalcommits": "^9.1.0",
+    "semantic-release": "^24.2.9"
+  }
+}

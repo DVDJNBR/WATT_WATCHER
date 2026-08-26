@@ -1,0 +1,50 @@
+{
+  "gates": [
+    {
+      "name": "silver_rte_null_check",
+      "layer": "silver",
+      "table": "rte_production",
+      "check": "null_check",
+      "columns": ["code_insee_region", "date_heure"],
+      "severity": "CRITICAL"
+    },
+    {
+      "name": "silver_rte_mw_range",
+      "layer": "silver",
+      "table": "rte_production",
+      "check": "range_check",
+      "column": "consommation_mw",
+      "min": 0,
+      "max": 100000,
+      "severity": "WARNING"
+    },
+    {
+      "name": "silver_rte_freshness",
+      "layer": "silver",
+      "table": "rte_production",
+      "check": "freshness",
+      "time_column": "date_heure",
+      "max_age_hours": 24,
+      "severity": "WARNING"
+    },
+    {
+      "name": "gold_fk_integrity",
+      "layer": "gold",
+      "table": "FACT_ENERGY_FLOW",
+      "check": "fk_exists",
+      "fk_columns": {
+        "id_region": "DIM_REGION",
+        "id_date": "DIM_TIME",
+        "id_source": "DIM_SOURCE"
+      },
+      "severity": "CRITICAL"
+    },
+    {
+      "name": "gold_facteur_charge_range",
+      "layer": "gold",
+      "table": "FACT_ENERGY_FLOW",
+      "check": "facteur_charge_range",
+      "severity": "WARNING"
+    }
+  ]
+}

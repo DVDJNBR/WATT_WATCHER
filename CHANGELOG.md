@@ -1,34 +1,3 @@
-## [1.20.1](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.20.0...v1.20.1) (2026-08-25)
-
-### Bug Fixes
-
-* **api,frontend:** correct wide-range pagination and calibrate surplus threshold ([38040dd](https://github.com/DVDJNBR/WATT_WATCHER/commit/38040dd24d03e3475f5ea925e812945d7bb65172))
-
-## [1.20.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.19.2...v1.20.0) (2026-08-25)
-
-### Features
-
-* **frontend:** add tab navigation with "À propos" page ([7e642b5](https://github.com/DVDJNBR/WATT_WATCHER/commit/7e642b525766076b079969c377af246a380423c7))
-* **frontend:** interactive pipeline tab with data-schema diagram ([3ae49a6](https://github.com/DVDJNBR/WATT_WATCHER/commit/3ae49a6921511bac47db80c3d320a901457848ed))
-
-## [1.19.2](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.19.1...v1.19.2) (2026-08-21)
-
-### Bug Fixes
-
-* **api:** order production query by most-recent instead of oldest ([a66d1fd](https://github.com/DVDJNBR/WATT_WATCHER/commit/a66d1fdf0c62533e403dd1eb6de1e4b9abad1417))
-
-## [1.19.1](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.19.0...v1.19.1) (2026-08-20)
-
-### Bug Fixes
-
-* **ci:** align VPS deploy job with the shared deploy-user convention ([3c670c4](https://github.com/DVDJNBR/WATT_WATCHER/commit/3c670c440ccb444180816d8a9bc776e5b41008df))
-
-## [1.19.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.18.0...v1.19.0) (2026-08-18)
-
-### Features
-
-* move app off Azure to VPS, pipeline-only Functions, drop auth/alerting ([0a5d456](https://github.com/DVDJNBR/WATT_WATCHER/commit/0a5d456ec93dd19523f917701098f5411ad1d2a0))
-
 ## [1.18.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.17.0...v1.18.0) (2026-03-17)
 
 ### Features

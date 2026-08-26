@@ -1,0 +1,13 @@
+# Azure Functions Python worker dependencies
+# Keep in sync with pyproject.toml [dependencies]
+azure-functions>=1.24.0
+azure-identity>=1.25.2
+azure-keyvault-secrets>=4.10.0
+azure-storage-file-datalake>=12.23.0
+parsel>=1.11.0
+polars>=1.38.1
+pyarrow>=23.0.1
+pyodbc>=5.2.0
+requests>=2.32.5
+PyJWT>=2.8.0
+bcrypt>=4.1.0

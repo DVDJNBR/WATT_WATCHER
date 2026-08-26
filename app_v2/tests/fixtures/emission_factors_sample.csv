@@ -1,0 +1,13 @@
+filiere,source_energie,facteur_emission_co2_kg_mwh,facteur_emission_ch4_kg_mwh,facteur_emission_n2o_kg_mwh,source,annee,date_mise_a_jour
+nucleaire,nucleaire,6.0,0.001,0.0001,ADEME Base Carbone v22,2024,2024-01-15
+eolien,eolien_terrestre,14.1,0.02,0.001,ADEME Base Carbone v22,2024,2024-01-15
+eolien,eolien_offshore,15.6,0.02,0.001,ADEME Base Carbone v22,2024,2024-01-15
+solaire,solaire_photovoltaique,43.9,0.06,0.003,ADEME Base Carbone v22,2024,2024-01-15
+hydraulique,hydraulique_fil_eau,6.0,0.001,0.0001,ADEME Base Carbone v22,2024,2024-01-15
+hydraulique,hydraulique_barrage,6.0,0.001,0.0001,ADEME Base Carbone v22,2024,2024-01-15
+thermique,gaz_naturel,418.0,0.6,0.003,ADEME Base Carbone v22,2024,2024-01-15
+thermique,charbon,1060.0,1.5,0.02,ADEME Base Carbone v22,2024,2024-01-15
+thermique,fioul,730.0,1.0,0.01,ADEME Base Carbone v22,2024,2024-01-15
+bioenergies,biomasse,32.0,0.05,0.004,ADEME Base Carbone v22,2024,2024-01-15
+bioenergies,biogaz,44.0,0.07,0.003,ADEME Base Carbone v22,2024,2024-01-15
+geothermie,geothermie,45.0,0.05,0.003,ADEME Base Carbone v22,2024,2024-01-15

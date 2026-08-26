@@ -104,6 +104,38 @@ resource "azurerm_storage_management_policy" "retention" {
   }
 }
 
+# ─── Azure SQL Serverless ───────────────────────────────────────────────────
+resource "azurerm_mssql_server" "main" {
+  name                         = "sql-server-watt-watcher"
+  resource_group_name          = azurerm_resource_group.main.name
+  location                     = azurerm_resource_group.main.location
+  version                      = "12.0"
+  administrator_login          = var.sql_admin_login
+  administrator_login_password = var.sql_admin_password
+
+  tags = local.tags
+}
+
+resource "azurerm_mssql_database" "warehouse" {
+  name      = "database-watt-watcher"
+  server_id = azurerm_mssql_server.main.id
+  sku_name  = "GP_S_Gen5_1"  # Serverless Gen5, 1 vCore
+
+  auto_pause_delay_in_minutes = var.sql_auto_pause_delay
+  min_capacity                = 0.5
+  max_size_gb                 = 32
+
+  tags = local.tags
+}
+
+# SQL firewall — allow Azure services
+resource "azurerm_mssql_firewall_rule" "azure_services" {
+  name             = "AllowAzureServices"
+  server_id        = azurerm_mssql_server.main.id
+  start_ip_address = "0.0.0.0"
+  end_ip_address   = "0.0.0.0"
+}
+
 # ─── Azure Key Vault ────────────────────────────────────────────────────────
 resource "azurerm_key_vault" "main" {
   name                       = "watt-watcher-key-vault"  # 22 chars — fits 24 char limit
@@ -162,15 +194,22 @@ resource "azurerm_linux_function_app" "main" {
     application_stack {
       python_version = "3.11"
     }
-    # No CORS needed — the Function App has no HTTP routes (pipeline/timers only).
-    # The dataviz API + frontend live separately on the VPS (api/, frontend/).
+    cors {
+      allowed_origins = [
+        "https://${azurerm_storage_account.frontend.name}.z28.web.core.windows.net",
+        "http://localhost:5173",
+        "http://localhost:4173",
+      ]
+    }
   }
 
   app_settings = {
-    "KEY_VAULT_URL"              = azurerm_key_vault.main.vault_uri
-    "STORAGE_ACCOUNT_NAME"       = azurerm_storage_account.datalake.name
-    "SUPABASE_CONNECTION_STRING" = var.supabase_connection_string
-    "AzureWebJobsFeatureFlags"   = "EnableWorkerIndexing"  # required for Python v2 decorator model
+    "KEY_VAULT_URL"            = azurerm_key_vault.main.vault_uri
+    "STORAGE_ACCOUNT_NAME"     = azurerm_storage_account.datalake.name
+    "SQL_SERVER"               = azurerm_mssql_server.main.fully_qualified_domain_name
+    "SQL_DATABASE"             = azurerm_mssql_database.warehouse.name
+    "SQL_CONNECTION_STRING"    = "Driver={ODBC Driver 18 for SQL Server};Server=${azurerm_mssql_server.main.fully_qualified_domain_name};Database=${azurerm_mssql_database.warehouse.name};Uid=${var.sql_admin_login};Pwd=${var.sql_admin_password};Encrypt=yes;TrustServerCertificate=no;"
+    "AzureWebJobsFeatureFlags" = "EnableWorkerIndexing"  # required for Python v2 decorator model
   }
 
   tags = local.tags
@@ -216,6 +255,39 @@ resource "azurerm_application_insights" "main" {
   tags = local.tags
 }
 
-# Frontend + API are no longer hosted on Azure — they run on the VPS
-# (docker-compose.yml, api/, frontend/) behind Caddy. Gold data lives in
-# Supabase (SUPABASE_CONNECTION_STRING), not Azure SQL.
+# ─── Frontend Static Website (Azure Storage) ────────────────────────────────
+# Azure Static Web Apps is blocked on Student subscriptions (all regions 403)
+# → Storage Account with static website hosting = free, no region restriction
+resource "azurerm_storage_account" "frontend" {
+  name                     = "wattwatcher"  # no hyphens allowed, 24 char max
+  resource_group_name      = azurerm_resource_group.main.name
+  location                 = azurerm_resource_group.main.location
+  account_tier             = "Standard"
+  account_replication_type = "LRS"
+  account_kind             = "StorageV2"
+
+  static_website {
+    index_document     = "index.html"
+    error_404_document = "index.html"  # SPA fallback for React Router
+  }
+
+  tags = local.tags
+}
+
+# ─── SQL Schema Initialization ──────────────────────────────────────────────
+# Schema is initialized at runtime by ensure_schema() in dim_loader.py
+# Manual init: az sql db connect or Azure Cloud Shell with init_schema.sql
+resource "null_resource" "sql_seed" {
+  triggers = {
+    seed_hash = filesha256("${path.module}/sql/seed_dimensions.sql")
+  }
+
+  provisioner "local-exec" {
+    command = <<-EOT
+      echo "SQL seed skipped — run manually via Azure Cloud Shell or sqlcmd"
+      echo "File: ${path.module}/sql/seed_dimensions.sql"
+    EOT
+  }
+
+  depends_on = [azurerm_mssql_database.warehouse]
+}

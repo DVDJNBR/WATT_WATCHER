@@ -28,9 +28,11 @@ jobs:
         run: uv python install 3.11
 
       - name: Install dependencies
+        working-directory: app_v2
         run: uv sync --all-extras
 
       - name: Run tests
+        working-directory: app_v2
         run: uv run python -m pytest tests/ -q --tb=short
 
   # ── Semantic release (version bump + changelog) ─────────────────────────────
@@ -50,9 +52,11 @@ jobs:
           node-version: 20
 
       - name: Install dependencies
+        working-directory: app_v2
         run: npm ci
 
       - name: Semantic Release
+        working-directory: app_v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: npx semantic-release
@@ -74,8 +78,8 @@ jobs:
 
       - name: Prepare deployment package
         run: |
-          cp host.json functions/
-          TARGET=functions/.python_packages/lib/site-packages
+          cp app_v2/host.json app_v2/functions/
+          TARGET=app_v2/functions/.python_packages/lib/site-packages
           # Most packages: manylinux_2_28 avoids glibc 2.33/2.34 incompatibility on Azure
           pip install \
             --platform manylinux_2_28_x86_64 \
@@ -84,7 +88,7 @@ jobs:
             --abi cp311 \
             --only-binary=:all: \
             --target $TARGET \
-            $(grep -v 'psycopg2' functions/requirements.txt | grep -v '^#' | grep -v '^$' | tr '\n' ' ')
+            $(grep -v 'psycopg2' app_v2/functions/requirements.txt | grep -v '^#' | grep -v '^$' | tr '\n' ' ')
           # psycopg2-binary ships manylinux_2_17 wheels (glibc 2.17, fine on Azure glibc 2.31)
           pip install \
             --platform manylinux_2_17_x86_64 \
@@ -94,7 +98,7 @@ jobs:
             --only-binary=:all: \
             --target $TARGET \
             "psycopg2-binary>=2.9.0"
-          cd functions && zip -r /tmp/functions.zip . && cd ..
+          cd app_v2/functions && zip -r /tmp/functions.zip . && cd ../..
 
       - name: Login to Azure
         uses: azure/login@v1
@@ -126,4 +130,5 @@ jobs:
           script: |
             cd /home/ubuntu/dev/WATT_WATCHER
             git pull origin main
+            cd app_v2
             docker compose up --build -d

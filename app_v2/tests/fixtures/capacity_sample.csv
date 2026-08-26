@@ -1,0 +1,17 @@
+code_insee_region,libelle_region,filiere,source_energie,puissance_installee_mw,date_mise_a_jour,annee
+11,Île-de-France,thermique,gaz,2850.5,2025-06-30,2025
+11,Île-de-France,nucleaire,nucleaire,0.0,2025-06-30,2025
+11,Île-de-France,eolien,eolien_terrestre,312.4,2025-06-30,2025
+11,Île-de-France,solaire,solaire,456.8,2025-06-30,2025
+11,Île-de-France,hydraulique,hydraulique,18.2,2025-06-30,2025
+11,Île-de-France,bioenergies,biomasse,189.3,2025-06-30,2025
+24,Centre-Val de Loire,nucleaire,nucleaire,11780.0,2025-06-30,2025
+24,Centre-Val de Loire,eolien,eolien_terrestre,1842.6,2025-06-30,2025
+24,Centre-Val de Loire,solaire,solaire,1205.3,2025-06-30,2025
+24,Centre-Val de Loire,hydraulique,hydraulique,95.0,2025-06-30,2025
+84,Auvergne-Rhône-Alpes,nucleaire,nucleaire,14520.0,2025-06-30,2025
+84,Auvergne-Rhône-Alpes,hydraulique,hydraulique,11340.5,2025-06-30,2025
+84,Auvergne-Rhône-Alpes,eolien,eolien_terrestre,456.0,2025-06-30,2025
+84,Auvergne-Rhône-Alpes,solaire,solaire,2103.7,2025-06-30,2025
+93,Provence-Alpes-Côte d'Azur,solaire,solaire,3250.0,2025-06-30,2025
+93,Provence-Alpes-Côte d'Azur,hydraulique,hydraulique,6820.0,2025-06-30,2025

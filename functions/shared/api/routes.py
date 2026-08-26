@@ -1,0 +1,49 @@
+"""
+Route Definitions — Story 4.1 (Task 1.2) / Story 4.2 (Task 2.3) / Story 4.3 (Task 2)
+
+URL path constants for the production API.
+AC #3: RESTful conventions, /v1/ prefix for versioning.
+Story 4.2 AC #4: PUBLIC_ROUTES lists endpoints exempt from @require_auth.
+Story 4.3: /docs (Swagger UI) and /openapi.json (spec) are public.
+"""
+
+API_VERSION = "v1"
+PREFIX = f"/{API_VERSION}"
+
+# Protected endpoints (require Azure AD JWT)
+PRODUCTION_REGIONAL = f"{PREFIX}/production/regional"
+EXPORT_CSV = f"{PREFIX}/export/csv"
+
+# Azure Functions route suffixes (without leading slash, per Azure SDK convention)
+ROUTE_PRODUCTION = f"{API_VERSION}/production/regional"
+ROUTE_EXPORT = f"{API_VERSION}/export/csv"
+
+# Alerts endpoint
+ALERTS = f"{PREFIX}/alerts"
+ROUTE_ALERTS = f"{API_VERSION}/alerts"
+
+# Public endpoints — exempt from @require_auth
+ROUTE_HEALTH = "health"
+ROUTE_DOCS = "docs"
+ROUTE_OPENAPI_JSON = "openapi.json"
+
+PUBLIC_ROUTES = {ROUTE_HEALTH, ROUTE_DOCS, ROUTE_OPENAPI_JSON}
+
+# Pipeline refresh — protected, callable from frontend
+ROUTE_PIPELINE_REFRESH = "v1/pipeline/refresh"
+
+# Auth endpoints — public (no @require_auth, no @require_jwt)
+ROUTE_AUTH_REGISTER = "v1/auth/register"
+ROUTE_AUTH_CONFIRM = "v1/auth/confirm"
+ROUTE_AUTH_RESEND = "v1/auth/resend-confirmation"
+ROUTE_AUTH_LOGIN = "v1/auth/login"
+ROUTE_AUTH_LOGOUT = "v1/auth/logout"
+ROUTE_AUTH_RESET_REQUEST = "v1/auth/reset-password/request"
+ROUTE_AUTH_RESET_CONFIRM = "v1/auth/reset-password/confirm"
+ROUTE_AUTH_ACCOUNT = "v1/auth/account"
+ROUTE_SUBSCRIPTIONS = "v1/subscriptions"
+
+# New data-source endpoints
+ROUTE_METEO = "v1/meteo/regional"
+ROUTE_CAPACITY = "v1/capacity/regional"
+ROUTE_MAINTENANCE = "v1/maintenance"

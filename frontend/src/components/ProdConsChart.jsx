@@ -4,8 +4,7 @@
  * Shows two lines over time:
  *   • Production totale (somme des sources) — bleu accent
  *   • Consommation MW                       — orange ambre
- * Zone shaded rouge quand la production dépasse largement la consommation
- * (excédent export — cf. THRESHOLD dans buildInsightTitle).
+ * Zone shaded rouge quand production > consommation (sur-production).
  */
 import {
   ComposedChart, Line, Area,
@@ -13,15 +12,6 @@ import {
   ReferenceLine, ResponsiveContainer,
 } from 'recharts'
 import { useMemo } from 'react'
-
-// Calibrated on a full year (2025) of RTE's consolidated regional data:
-// nationally, production exceeds consumption by more than 5% about 98% of
-// the time (France is a structural net exporter — 92 TWh net in 2025), so a
-// 5%-style threshold never turns off. 40% fires ~8% of the time, close to
-// the ~9% of hours EPEX recorded negative prices over H1 2026 — the closest
-// proxy we have, absent price/export data, for actual oversupply rather
-// than routine export.
-const THRESHOLD = 0.40
 
 function formatTs(ts) {
   const d = new Date(ts)
@@ -31,7 +21,7 @@ function formatTs(ts) {
 
 /**
  * Compute a dynamic insight title from the latest data.
- * e.g. "Excédent export depuis 14h45" or "Équilibre prod/conso"
+ * e.g. "Sur-production depuis 14h45" or "Équilibre prod/conso"
  */
 function buildInsightTitle(chartData, region) {
   const base = region ? `Production — ${region}` : 'Production — France'
@@ -40,6 +30,7 @@ function buildInsightTitle(chartData, region) {
   const last = chartData[chartData.length - 1]
   if (last.conso == null || last.conso === 0) return base
 
+  const THRESHOLD = 0.05  // ±5% = équilibre
   const ratio = (last.prod - last.conso) / last.conso
 
   let state  // 'surplus' | 'deficit' | 'balanced'
@@ -65,7 +56,7 @@ function buildInsightTitle(chartData, region) {
     ? new Date(sinceTs).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
     : null
 
-  const label = state === 'surplus' ? 'Excédent export' : 'Import net'
+  const label = state === 'surplus' ? 'Sur-production' : 'Sous-production'
   const suffix = sinceTime ? ` depuis ${sinceTime}` : ''
   return `${label}${suffix}${region ? ` — ${region}` : ' — France'}`
 }
@@ -76,8 +67,8 @@ function buildChartData(data) {
       Object.values(r.sources || {}).reduce((s, v) => s + (v > 0 ? v : 0), 0)
     )
     const conso = r.consommation_mw != null ? Math.round(r.consommation_mw) : null
-    // surplusZone: zone rouge seulement au-delà du seuil calibré (cf. THRESHOLD)
-    const surplusZone = (conso != null && conso > 0 && (prod - conso) / conso > THRESHOLD) ? prod : null
+    // surplusZone: zone rouge quand prod > conso
+    const surplusZone = (conso != null && prod > conso) ? prod : null
     return { timestamp: formatTs(r.timestamp), rawTs: r.timestamp, prod, conso, surplusZone }
   })
 }
@@ -97,7 +88,7 @@ function CustomLegend() {
     <div style={{ display: 'flex', gap: 16, justifyContent: 'center', fontSize: '0.8rem', paddingTop: 8 }}>
       <span style={{ color: '#4f8ef7' }}>⎯ Production</span>
       <span style={{ color: '#f59e0b' }}>⎯ Consommation</span>
-      <span style={{ color: '#ef4444', opacity: 0.7 }}>▪ Excédent export</span>
+      <span style={{ color: '#ef4444', opacity: 0.7 }}>▪ Sur-production</span>
     </div>
   )
 }
@@ -164,7 +155,7 @@ export function ProdConsChart({ data = [], region, loading = false }) {
               dataKey="surplusZone"
               fill="url(#surplusGrad)"
               stroke="none"
-              name="Excédent export"
+              name="Sur-production"
               legendType="none"
               activeDot={false}
             />

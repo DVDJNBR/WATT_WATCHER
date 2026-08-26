@@ -1,11 +1,15 @@
 """
-WATT_WATCHER — Azure Function App Entry Point (pipeline only)
+WATT_WATCHER — Azure Function App Entry Point
 
-Ingests RTE eCO2mix, Météo-France, ODRE capacity, and grid maintenance data
-on a schedule and loads it into Supabase (Gold layer). The dashboard/API that
-reads this data lives separately in api/ (FastAPI, deployed on the VPS).
+Story 1.1: Timer trigger — RTE eCO2mix ingestion → Bronze layer.
+Story 2.1: Timer trigger — Maintenance scraping → Bronze layer.
+Story 3.4: Timer trigger — SQL reference snapshot → Bronze layer.
+Story 4.1: HTTP triggers — /v1/production/regional, /v1/export/csv.
+Story 4.3: HTTP triggers — /health, /docs, /openapi.json.
+Story 5.2: HTTP trigger — /v1/alerts.
 """
 
+import json
 import logging
 import os
 import uuid
@@ -24,6 +28,36 @@ from shared.rte_client import RTEClient, RTEClientError
 from shared.bronze_storage import BronzeStorage
 from shared.maintenance_scraper import MaintenanceScraper
 from shared.audit_logger import AuditLogger
+from shared.api.models import parse_production_request, parse_export_request
+from shared.api.production_service import query_production
+from shared.api.export_service import export_to_csv
+from shared.api.error_handlers import bad_request, not_found, server_error, conflict, forbidden
+from shared.api.routes import (
+    ROUTE_PRODUCTION, ROUTE_EXPORT, ROUTE_HEALTH, ROUTE_DOCS, ROUTE_OPENAPI_JSON, ROUTE_ALERTS,
+    ROUTE_AUTH_REGISTER, ROUTE_AUTH_CONFIRM, ROUTE_AUTH_RESEND,
+    ROUTE_AUTH_LOGIN, ROUTE_AUTH_LOGOUT,
+    ROUTE_AUTH_RESET_REQUEST, ROUTE_AUTH_RESET_CONFIRM,
+    ROUTE_AUTH_ACCOUNT,
+    ROUTE_PIPELINE_REFRESH,
+    ROUTE_SUBSCRIPTIONS,
+    ROUTE_METEO,
+    ROUTE_CAPACITY,
+    ROUTE_MAINTENANCE,
+)
+from shared.api.auth import require_auth, require_jwt
+from shared.api.openapi_spec import build_spec, build_swagger_ui_html
+from shared.api.alert_service import query_alerts
+from shared.api.auth_service import (
+    register, confirm_email, resend_confirmation,
+    login, logout,
+    request_password_reset, confirm_password_reset,
+    delete_account,
+    ConflictError, TokenError, AlreadyConfirmedError, AuthError, UnconfirmedError,
+)
+from shared.api.email_service import EmailService
+from shared.api.subscription_service import get_subscriptions, update_subscriptions
+from shared.alerting.alert_dispatcher import dispatch_alerts
+from shared.alerting.rgpd_service import run_rgpd_cleanup
 
 logger = logging.getLogger(__name__)
 
@@ -73,7 +107,7 @@ def _get_db_connection() -> Any:
 if AZURE_FUNCTIONS_AVAILABLE:
     app = func.FunctionApp()
 
-    # ── RTE ingestion timer ──────────────────────────────────────────────────
+    # ── Story 1.1: RTE ingestion timer ──────────────────────────────────────
 
     @app.timer_trigger(
         schedule="0 */15 * * * *",  # every 15 minutes
@@ -81,12 +115,12 @@ if AZURE_FUNCTIONS_AVAILABLE:
         run_on_startup=False,
     )
     def rte_ingestion(timer: func.TimerRequest) -> None:
-        """Timer-triggered full pipeline run: RTE/Météo/ODRE Bronze → Silver → Gold (Supabase)."""
+        """Timer-triggered RTE eCO2mix ingestion to Bronze layer."""
         job_id = str(uuid.uuid4())
-        logger.info("Starting pipeline job: %s", job_id)
-        run_full_pipeline(job_id=job_id, minutes=240)
+        logger.info("Starting RTE ingestion job: %s", job_id)
+        run_ingestion(job_id=job_id, minutes=240)
 
-    # ── Maintenance scraping timer ───────────────────────────────────────────
+    # ── Story 2.1: Maintenance scraping timer ────────────────────────────────
 
     @app.timer_trigger(
         schedule="0 0 6 * * *",  # every day at 06:00 UTC
@@ -109,7 +143,7 @@ if AZURE_FUNCTIONS_AVAILABLE:
         except Exception as exc:
             logger.error("[%s] Maintenance scraping failed: %s", job_id, exc, exc_info=True)
 
-    # ── SQL reference snapshot timer ─────────────────────────────────────────
+    # ── Story 3.4: SQL reference snapshot timer ───────────────────────────────
 
     @app.timer_trigger(
         schedule="0 0 1 * * *",  # every day at 01:00 UTC
@@ -135,6 +169,944 @@ if AZURE_FUNCTIONS_AVAILABLE:
             logger.info("[%s] SQL snapshot written → %s", job_id, path)
         except Exception as exc:
             logger.error("[%s] SQL snapshot failed: %s", job_id, exc, exc_info=True)
+        finally:
+            if conn:
+                conn.close()
+
+    # ── Story 5.3: Alert dispatch timer ──────────────────────────────────────
+
+    @app.timer_trigger(
+        schedule="0 0 * * * *",  # every hour
+        arg_name="timer",
+        run_on_startup=False,
+    )
+    def alert_dispatch_timer(timer: func.TimerRequest) -> None:
+        """Hourly alert dispatch: detect → match subscribers → dedup → send."""
+        job_id = str(uuid.uuid4())
+        logger.info("[%s] Alert dispatch starting", job_id)
+        conn = None
+        try:
+            conn = _get_db_connection()
+            svc = EmailService()
+            result = dispatch_alerts(conn, svc)
+            logger.info(
+                "[%s] Alert dispatch done: detected=%d sent=%d skipped=%d errors=%d",
+                job_id, result["detected"], result["sent"], result["skipped_dedup"], result["errors"],
+            )
+        except Exception as exc:
+            logger.error("[%s] Alert dispatch failed: %s", job_id, exc, exc_info=True)
+        finally:
+            if conn:
+                conn.close()
+
+    # ── Story 6.1: RGPD daily cleanup timer ──────────────────────────────────
+
+    @app.timer_trigger(
+        schedule="0 0 0 * * *",  # every day at midnight UTC
+        arg_name="timer",
+        run_on_startup=False,
+    )
+    def rgpd_cleanup_timer(timer: func.TimerRequest) -> None:
+        """Daily RGPD cleanup: warn inactive accounts (11 months) and delete (12 months)."""
+        job_id = str(uuid.uuid4())
+        logger.info("[%s] RGPD cleanup starting", job_id)
+        conn = None
+        try:
+            conn = _get_db_connection()
+            svc = EmailService()
+            result = run_rgpd_cleanup(conn, svc)
+            logger.info(
+                "[%s] RGPD cleanup done: warned=%d deleted=%d errors=%d",
+                job_id, result["warned"], result["deleted"], result["errors"],
+            )
+        except Exception as exc:
+            logger.error("[%s] RGPD cleanup failed: %s", job_id, exc, exc_info=True)
+        finally:
+            if conn:
+                conn.close()
+
+    # ── Story 4.1: Production regional endpoint ──────────────────────────────
+
+    @app.route(route=ROUTE_PRODUCTION, methods=["GET"], auth_level=func.AuthLevel.ANONYMOUS)
+    @require_auth
+    def get_production_regional(req: func.HttpRequest) -> func.HttpResponse:
+        """
+        GET /v1/production/regional
+
+        AC #1: Returns aggregated production metrics from Gold SQL.
+        AC #2: <500ms target (parameterized queries + SQL indexes).
+        AC #3: RESTful — 200, 400, 404, 500.
+        """
+        request_id = str(uuid.uuid4())
+
+        prod_req, validation_error = parse_production_request(dict(req.params))
+        if validation_error:
+            body = bad_request(validation_error, request_id)
+            return func.HttpResponse(
+                json.dumps(body), status_code=400,
+                mimetype="application/json",
+                headers={"X-Request-Id": request_id},
+            )
+
+        try:
+            conn = _get_db_connection()
+            result = query_production(
+                conn,
+                region_code=prod_req.region_code,
+                start_date=prod_req.start_date,
+                end_date=prod_req.end_date,
+                source_type=prod_req.source_type,
+                limit=prod_req.limit,
+                offset=prod_req.offset,
+                request_id=request_id,
+            )
+
+            if not result["data"]:
+                body = not_found(request_id=request_id)
+                return func.HttpResponse(
+                    json.dumps(body), status_code=404,
+                    mimetype="application/json",
+                    headers={"X-Request-Id": request_id},
+                )
+
+            return func.HttpResponse(
+                json.dumps(result), status_code=200,
+                mimetype="application/json",
+                headers={"X-Request-Id": request_id},
+            )
+
+        except Exception as exc:
+            logger.error("production endpoint error [%s]: %s", request_id, exc, exc_info=True)
+            body = server_error(request_id=request_id)
+            return func.HttpResponse(
+                json.dumps(body), status_code=500,
+                mimetype="application/json",
+                headers={"X-Request-Id": request_id},
+            )
+
+    # ── Story 4.3: Health check (public) ────────────────────────────────────
+
+    @app.route(route=ROUTE_HEALTH, methods=["GET"], auth_level=func.AuthLevel.ANONYMOUS)
+    def get_health(req: func.HttpRequest) -> func.HttpResponse:
+        """GET /health — liveness probe, no auth required."""
+        from shared.api.openapi_spec import API_VERSION as _API_VERSION
+        return func.HttpResponse(
+            json.dumps({"status": "healthy", "version": _API_VERSION}),
+            status_code=200,
+            mimetype="application/json",
+        )
+
+    # ── Story 4.3: OpenAPI JSON spec (public) ────────────────────────────────
+
+    @app.route(route=ROUTE_OPENAPI_JSON, methods=["GET"], auth_level=func.AuthLevel.ANONYMOUS)
+    def get_openapi_json(req: func.HttpRequest) -> func.HttpResponse:
+        """GET /openapi.json — serves the OpenAPI 3.0.3 spec."""
+        return func.HttpResponse(
+            json.dumps(build_spec(), indent=2),
+            status_code=200,
+            mimetype="application/json",
+            headers={"Cache-Control": "max-age=300"},
+        )
+
+    # ── Story 4.3: Swagger UI (public) ───────────────────────────────────────
+
+    # ── Story 7.0: Manual pipeline trigger (Bronze → Silver → Gold) ─────────
+
+    @app.route(route=ROUTE_PIPELINE_REFRESH, methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
+    @require_auth
+    def run_pipeline_now(req: func.HttpRequest) -> func.HttpResponse:
+        """
+        POST /v1/pipeline/refresh
+
+        User-triggered full ETL pipeline: Bronze → Silver → Gold.
+        Protected by @require_auth (X-Api-Key). Callable from the frontend.
+        Accepts optional JSON body: {"minutes": 60, "backfill_days": 0}
+        """
+        request_id = str(uuid.uuid4())
+        try:
+            body = req.get_json() if req.get_body() else {}
+        except Exception:
+            body = {}
+
+        minutes = int(body.get("minutes", 30))
+        backfill_days = int(body.get("backfill_days", 0))
+
+        try:
+            result = run_full_pipeline(
+                job_id=request_id,
+                minutes=minutes,
+                backfill_days=backfill_days,
+            )
+            return func.HttpResponse(
+                json.dumps(result), status_code=200, mimetype="application/json",
+                headers={"X-Request-Id": request_id},
+            )
+        except Exception as exc:
+            logger.error("pipeline trigger error [%s]: %s", request_id, exc, exc_info=True)
+            body_err = server_error(request_id=request_id)
+            return func.HttpResponse(
+                json.dumps(body_err), status_code=500, mimetype="application/json",
+                headers={"X-Request-Id": request_id},
+            )
+
+    @app.route(route="v1/admin/pipeline/run", methods=["GET"], auth_level=func.AuthLevel.FUNCTION)
+    def pipeline_status(req: func.HttpRequest) -> func.HttpResponse:
+        """GET /v1/admin/pipeline/run — liveness check for pipeline endpoint."""
+        return func.HttpResponse(
+            json.dumps({"status": "ready", "endpoint": "POST /api/v1/admin/pipeline/run"}),
+            status_code=200, mimetype="application/json",
+        )
+
+    @app.route(route=ROUTE_DOCS, methods=["GET"], auth_level=func.AuthLevel.ANONYMOUS)
+    def get_docs(req: func.HttpRequest) -> func.HttpResponse:
+        """GET /docs — Swagger UI HTML, loads spec from /api/openapi.json."""
+        html = build_swagger_ui_html(openapi_json_url="/api/openapi.json")
+        return func.HttpResponse(
+            html,
+            status_code=200,
+            mimetype="text/html; charset=utf-8",
+        )
+
+    # ── Story 4.1: CSV export endpoint ──────────────────────────────────────
+
+    @app.route(route=ROUTE_EXPORT, methods=["GET"], auth_level=func.AuthLevel.ANONYMOUS)
+    @require_auth
+    def get_export_csv(req: func.HttpRequest) -> func.HttpResponse:
+        """
+        GET /v1/export/csv
+
+        AC #4: Returns downloadable CSV with UTF-8 BOM, semicolon separator.
+        AC #3: RESTful — 200, 400, 404, 500.
+        """
+        request_id = str(uuid.uuid4())
+        export_req = parse_export_request(dict(req.params))
+
+        try:
+            conn = _get_db_connection()
+            csv_bytes, filename, row_count = export_to_csv(
+                conn,
+                region_code=export_req.region_code,
+                start_date=export_req.start_date,
+                end_date=export_req.end_date,
+                source_type=export_req.source_type,
+                request_id=request_id,
+            )
+
+            if row_count == 0:
+                body = not_found(request_id=request_id)
+                return func.HttpResponse(
+                    json.dumps(body), status_code=404,
+                    mimetype="application/json",
+                    headers={"X-Request-Id": request_id},
+                )
+
+            return func.HttpResponse(
+                csv_bytes,
+                status_code=200,
+                mimetype="text/csv; charset=utf-8",
+                headers={
+                    "Content-Disposition": f'attachment; filename="{filename}"',
+                    "X-Request-Id": request_id,
+                },
+            )
+
+        except Exception as exc:
+            logger.error("export endpoint error [%s]: %s", request_id, exc, exc_info=True)
+            body = server_error(request_id=request_id)
+            return func.HttpResponse(
+                json.dumps(body), status_code=500,
+                mimetype="application/json",
+                headers={"X-Request-Id": request_id},
+            )
+
+    # ── Story 2.2: Auth — Register ───────────────────────────────────────────
+
+    @app.route(route=ROUTE_AUTH_REGISTER, methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
+    def post_auth_register(req: func.HttpRequest) -> func.HttpResponse:
+        """POST /v1/auth/register — create new user account."""
+        request_id = str(uuid.uuid4())
+        try:
+            body = req.get_json()
+        except Exception:
+            body = {}
+
+        email = (body.get("email") or "").strip() if body else ""
+        password = (body.get("password") or "") if body else ""
+
+        if not email or not password:
+            return func.HttpResponse(
+                json.dumps(bad_request("email and password are required", request_id)),
+                status_code=400, mimetype="application/json",
+                headers={"X-Request-Id": request_id},
+            )
+
+        conn = None
+        try:
+            conn = _get_db_connection()
+            svc = EmailService()
+            result = register(conn, email, password, svc)
+            token = login(conn, email, password)
+            return func.HttpResponse(
+                json.dumps({
+                    "request_id": request_id,
+                    "user_id": result["user_id"],
+                    "email": result["email"],
+                    "token": token["token"],
+                }),
+                status_code=201, mimetype="application/json",
+                headers={"X-Request-Id": request_id},
+            )
+        except ValueError as exc:
+            return func.HttpResponse(
+                json.dumps(bad_request(str(exc), request_id)),
+                status_code=400, mimetype="application/json",
+                headers={"X-Request-Id": request_id},
+            )
+        except ConflictError as exc:
+            return func.HttpResponse(
+                json.dumps(conflict(str(exc), request_id)),
+                status_code=409, mimetype="application/json",
+                headers={"X-Request-Id": request_id},
+            )
+        except Exception as exc:
+            logger.error("register error [%s]: %s", request_id, exc, exc_info=True)
+            return func.HttpResponse(
+                json.dumps(server_error(request_id=request_id)),
+                status_code=500, mimetype="application/json",
+                headers={"X-Request-Id": request_id},
+            )
+        finally:
+            if conn:
+                conn.close()
+
+    # ── Story 2.2: Auth — Confirm email ──────────────────────────────────────
+
+    @app.route(route=ROUTE_AUTH_CONFIRM, methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
+    def post_auth_confirm(req: func.HttpRequest) -> func.HttpResponse:
+        """POST /v1/auth/confirm — confirm email with UUID token."""
+        request_id = str(uuid.uuid4())
+        try:
+            body = req.get_json()
+        except Exception:
+            body = {}
+
+        token = (body.get("token") or "").strip() if body else ""
+        if not token:
+            return func.HttpResponse(
+                json.dumps(bad_request("token is required", request_id)),
+                status_code=400, mimetype="application/json",
+                headers={"X-Request-Id": request_id},
+            )
+
+        conn = None
+        try:
+            conn = _get_db_connection()
+            result = confirm_email(conn, token)
+            return func.HttpResponse(
+                json.dumps({
+                    "request_id": request_id,
+                    "message": "Account confirmed",
+                    "user_id": result["user_id"],
+                }),
+                status_code=200, mimetype="application/json",
+                headers={"X-Request-Id": request_id},
+            )
+        except TokenError as exc:
+            return func.HttpResponse(
+                json.dumps(bad_request(str(exc), request_id)),
+                status_code=400, mimetype="application/json",
+                headers={"X-Request-Id": request_id},
+            )
+        except Exception as exc:
+            logger.error("confirm error [%s]: %s", request_id, exc, exc_info=True)
+            return func.HttpResponse(
+                json.dumps(server_error(request_id=request_id)),
+                status_code=500, mimetype="application/json",
+                headers={"X-Request-Id": request_id},
+            )
+        finally:
+            if conn:
+                conn.close()
+
+    # ── Story 2.2: Auth — Resend confirmation ─────────────────────────────────
+
+    @app.route(route=ROUTE_AUTH_RESEND, methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
+    def post_auth_resend(req: func.HttpRequest) -> func.HttpResponse:
+        """POST /v1/auth/resend-confirmation — resend confirmation email."""
+        request_id = str(uuid.uuid4())
+        try:
+            body = req.get_json()
+        except Exception:
+            body = {}
+
+        email = (body.get("email") or "").strip() if body else ""
+        if not email:
+            return func.HttpResponse(
+                json.dumps(bad_request("email is required", request_id)),
+                status_code=400, mimetype="application/json",
+                headers={"X-Request-Id": request_id},
+            )
+
+        conn = None
+        try:
+            conn = _get_db_connection()
+            svc = EmailService()
+            result = resend_confirmation(conn, email, svc)
+            return func.HttpResponse(
+                json.dumps({"request_id": request_id, "message": result["message"]}),
+                status_code=200, mimetype="application/json",
+                headers={"X-Request-Id": request_id},
+            )
+        except AlreadyConfirmedError as exc:
+            return func.HttpResponse(
+                json.dumps(bad_request(str(exc), request_id)),
+                status_code=400, mimetype="application/json",
+                headers={"X-Request-Id": request_id},
+            )
+        except Exception as exc:
+            logger.error("resend error [%s]: %s", request_id, exc, exc_info=True)
+            return func.HttpResponse(
+                json.dumps(server_error(request_id=request_id)),
+                status_code=500, mimetype="application/json",
+                headers={"X-Request-Id": request_id},
+            )
+        finally:
+            if conn:
+                conn.close()
+
+    # ── Story 2.3: Auth — Login ───────────────────────────────────────────────
+
+    @app.route(route=ROUTE_AUTH_LOGIN, methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
+    def post_auth_login(req: func.HttpRequest) -> func.HttpResponse:
+        """POST /v1/auth/login — authenticate and return JWT."""
+        request_id = str(uuid.uuid4())
+        try:
+            body = req.get_json()
+        except Exception:
+            body = {}
+
+        email = (body.get("email") or "").strip() if body else ""
+        password = (body.get("password") or "") if body else ""
+
+        if not email or not password:
+            return func.HttpResponse(
+                json.dumps(bad_request("email and password are required", request_id)),
+                status_code=400, mimetype="application/json",
+                headers={"X-Request-Id": request_id},
+            )
+
+        conn = None
+        try:
+            conn = _get_db_connection()
+            result = login(conn, email, password)
+            return func.HttpResponse(
+                json.dumps({"request_id": request_id, **result}),
+                status_code=200, mimetype="application/json",
+                headers={"X-Request-Id": request_id},
+            )
+        except AuthError as exc:
+            return func.HttpResponse(
+                json.dumps({
+                    "request_id": request_id,
+                    "status_code": 401,
+                    "error": "Unauthorized",
+                    "message": str(exc),
+                    "details": {},
+                }),
+                status_code=401, mimetype="application/json",
+                headers={"X-Request-Id": request_id, "WWW-Authenticate": 'Bearer realm="watt-watcher"'},
+            )
+        except UnconfirmedError as exc:
+            return func.HttpResponse(
+                json.dumps(forbidden(str(exc), request_id)),
+                status_code=403, mimetype="application/json",
+                headers={"X-Request-Id": request_id},
+            )
+        except Exception as exc:
+            logger.error("login error [%s]: %s", request_id, exc, exc_info=True)
+            return func.HttpResponse(
+                json.dumps(server_error(request_id=request_id)),
+                status_code=500, mimetype="application/json",
+                headers={"X-Request-Id": request_id},
+            )
+        finally:
+            if conn:
+                conn.close()
+
+    # ── Story 2.3: Auth — Logout ──────────────────────────────────────────────
+
+    @app.route(route=ROUTE_AUTH_LOGOUT, methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
+    def post_auth_logout(req: func.HttpRequest) -> func.HttpResponse:
+        """POST /v1/auth/logout — stateless JWT logout (no-op server-side)."""
+        request_id = str(uuid.uuid4())
+        result = logout()
+        return func.HttpResponse(
+            json.dumps({"request_id": request_id, "message": result["message"]}),
+            status_code=200, mimetype="application/json",
+            headers={"X-Request-Id": request_id},
+        )
+
+    # ── Story 2.4: Auth — Reset Password ─────────────────────────────────────
+
+    @app.route(route=ROUTE_AUTH_RESET_REQUEST, methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
+    def post_auth_reset_request(req: func.HttpRequest) -> func.HttpResponse:
+        """POST /v1/auth/reset-password/request — initiate password reset (always 200)."""
+        request_id = str(uuid.uuid4())
+        try:
+            body = req.get_json()
+        except Exception:
+            body = {}
+
+        email = (body.get("email") or "").strip() if body else ""
+
+        if not email:
+            return func.HttpResponse(
+                json.dumps(bad_request("email is required", request_id)),
+                status_code=400, mimetype="application/json",
+                headers={"X-Request-Id": request_id},
+            )
+
+        email_svc = EmailService()
+        conn = None
+        try:
+            conn = _get_db_connection()
+            result = request_password_reset(conn, email, email_svc)
+            return func.HttpResponse(
+                json.dumps({"request_id": request_id, **result}),
+                status_code=200, mimetype="application/json",
+                headers={"X-Request-Id": request_id},
+            )
+        except Exception as exc:
+            logger.error("reset-request error [%s]: %s", request_id, exc, exc_info=True)
+            return func.HttpResponse(
+                json.dumps(server_error(request_id=request_id)),
+                status_code=500, mimetype="application/json",
+                headers={"X-Request-Id": request_id},
+            )
+        finally:
+            if conn:
+                conn.close()
+
+    @app.route(route=ROUTE_AUTH_RESET_CONFIRM, methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
+    def post_auth_reset_confirm(req: func.HttpRequest) -> func.HttpResponse:
+        """POST /v1/auth/reset-password/confirm — apply new password via token."""
+        request_id = str(uuid.uuid4())
+        try:
+            body = req.get_json()
+        except Exception:
+            body = {}
+
+        token = (body.get("token") or "").strip() if body else ""
+        new_password = (body.get("new_password") or "") if body else ""
+
+        if not token or not new_password:
+            return func.HttpResponse(
+                json.dumps(bad_request("token and new_password are required", request_id)),
+                status_code=400, mimetype="application/json",
+                headers={"X-Request-Id": request_id},
+            )
+
+        conn = None
+        try:
+            conn = _get_db_connection()
+            result = confirm_password_reset(conn, token, new_password)
+            return func.HttpResponse(
+                json.dumps({"request_id": request_id, **result}),
+                status_code=200, mimetype="application/json",
+                headers={"X-Request-Id": request_id},
+            )
+        except (TokenError, ValueError) as exc:
+            return func.HttpResponse(
+                json.dumps(bad_request(str(exc), request_id)),
+                status_code=400, mimetype="application/json",
+                headers={"X-Request-Id": request_id},
+            )
+        except Exception as exc:
+            logger.error("reset-confirm error [%s]: %s", request_id, exc, exc_info=True)
+            return func.HttpResponse(
+                json.dumps(server_error(request_id=request_id)),
+                status_code=500, mimetype="application/json",
+                headers={"X-Request-Id": request_id},
+            )
+        finally:
+            if conn:
+                conn.close()
+
+    # ── Story 2.5: Auth — Delete Account ─────────────────────────────────────
+
+    @app.route(route=ROUTE_AUTH_ACCOUNT, methods=["DELETE"], auth_level=func.AuthLevel.ANONYMOUS)
+    @require_jwt
+    def delete_auth_account(req: func.HttpRequest, user: dict) -> func.HttpResponse:
+        """DELETE /v1/auth/account — permanently delete authenticated user's account (RGPD)."""
+        request_id = str(uuid.uuid4())
+        user_id = user.get("user_id")
+        if not user_id:
+            return func.HttpResponse(
+                json.dumps(bad_request("Invalid token claims", request_id)),
+                status_code=400, mimetype="application/json",
+                headers={"X-Request-Id": request_id},
+            )
+        conn = None
+        try:
+            conn = _get_db_connection()
+            delete_account(conn, user_id)
+            return func.HttpResponse(
+                body="",
+                status_code=204,
+                headers={"X-Request-Id": request_id},
+            )
+        except Exception as exc:
+            logger.error("delete-account error [%s]: %s", request_id, exc, exc_info=True)
+            return func.HttpResponse(
+                json.dumps(server_error(request_id=request_id)),
+                status_code=500, mimetype="application/json",
+                headers={"X-Request-Id": request_id},
+            )
+        finally:
+            if conn:
+                conn.close()
+
+    # ── Story 4.1: Subscriptions API ─────────────────────────────────────────
+
+    @app.route(route=ROUTE_SUBSCRIPTIONS, methods=["GET"], auth_level=func.AuthLevel.ANONYMOUS)
+    @require_jwt
+    def get_subscriptions_endpoint(req: func.HttpRequest, user: dict) -> func.HttpResponse:
+        """GET /v1/subscriptions — list active alert subscriptions for authenticated user."""
+        request_id = str(uuid.uuid4())
+        user_id = user.get("user_id")
+        if not user_id:
+            return func.HttpResponse(
+                json.dumps(bad_request("Invalid token claims", request_id)),
+                status_code=400, mimetype="application/json",
+                headers={"X-Request-Id": request_id},
+            )
+        conn = None
+        try:
+            conn = _get_db_connection()
+            result = get_subscriptions(conn, user_id)
+            return func.HttpResponse(
+                json.dumps({"request_id": request_id, "subscriptions": result}),
+                status_code=200, mimetype="application/json",
+                headers={"X-Request-Id": request_id},
+            )
+        except Exception as exc:
+            logger.error("get-subscriptions error [%s]: %s", request_id, exc, exc_info=True)
+            return func.HttpResponse(
+                json.dumps(server_error(request_id=request_id)),
+                status_code=500, mimetype="application/json",
+                headers={"X-Request-Id": request_id},
+            )
+        finally:
+            if conn:
+                conn.close()
+
+    @app.route(route=ROUTE_SUBSCRIPTIONS, methods=["PUT"], auth_level=func.AuthLevel.ANONYMOUS)
+    @require_jwt
+    def put_subscriptions_endpoint(req: func.HttpRequest, user: dict) -> func.HttpResponse:
+        """PUT /v1/subscriptions — replace all alert subscriptions for authenticated user."""
+        request_id = str(uuid.uuid4())
+        user_id = user.get("user_id")
+        if not user_id:
+            return func.HttpResponse(
+                json.dumps(bad_request("Invalid token claims", request_id)),
+                status_code=400, mimetype="application/json",
+                headers={"X-Request-Id": request_id},
+            )
+        try:
+            body = req.get_json()
+        except Exception:
+            return func.HttpResponse(
+                json.dumps(bad_request("Body must be valid JSON", request_id)),
+                status_code=400, mimetype="application/json",
+                headers={"X-Request-Id": request_id},
+            )
+        if not isinstance(body, list):
+            return func.HttpResponse(
+                json.dumps(bad_request("Body must be a JSON array", request_id)),
+                status_code=400, mimetype="application/json",
+                headers={"X-Request-Id": request_id},
+            )
+        conn = None
+        try:
+            conn = _get_db_connection()
+            result = update_subscriptions(conn, user_id, body)
+            return func.HttpResponse(
+                json.dumps({"request_id": request_id, "subscriptions": result}),
+                status_code=200, mimetype="application/json",
+                headers={"X-Request-Id": request_id},
+            )
+        except ValueError as exc:
+            return func.HttpResponse(
+                json.dumps(bad_request(str(exc), request_id)),
+                status_code=400, mimetype="application/json",
+                headers={"X-Request-Id": request_id},
+            )
+        except Exception as exc:
+            logger.error("put-subscriptions error [%s]: %s", request_id, exc, exc_info=True)
+            return func.HttpResponse(
+                json.dumps(server_error(request_id=request_id)),
+                status_code=500, mimetype="application/json",
+                headers={"X-Request-Id": request_id},
+            )
+        finally:
+            if conn:
+                conn.close()
+
+    # ── Story 5.2: Alerts endpoint ───────────────────────────────────────────
+
+    @app.route(route=ROUTE_ALERTS, methods=["GET"], auth_level=func.AuthLevel.ANONYMOUS)
+    def get_alerts(req: func.HttpRequest) -> func.HttpResponse:
+        """
+        GET /v1/alerts?region_code={}&status=active&days=7&limit=50
+
+        AC #1: Returns active alerts for dashboard display.
+        AC #2: Reads from audit trail written by AlertEngine.
+        """
+        request_id = str(uuid.uuid4())
+        try:
+            region_code = req.params.get("region_code") or None
+            status = req.params.get("status", "active") or None
+            days = int(req.params.get("days", 7))
+            limit = min(int(req.params.get("limit", 50)), 200)
+
+            result = query_alerts(
+                region_code=region_code,
+                status=status,
+                days=days,
+                limit=limit,
+            )
+            return func.HttpResponse(
+                json.dumps(result, ensure_ascii=False),
+                status_code=200,
+                mimetype="application/json",
+                headers={"X-Request-Id": request_id},
+            )
+        except Exception as exc:
+            logger.error("alerts endpoint error [%s]: %s", request_id, exc, exc_info=True)
+            body = server_error(request_id=request_id)
+            return func.HttpResponse(
+                json.dumps(body), status_code=500,
+                mimetype="application/json",
+                headers={"X-Request-Id": request_id},
+            )
+
+    # ── Météo endpoint ────────────────────────────────────────────────────────
+
+    @app.route(route=ROUTE_METEO, methods=["GET"], auth_level=func.AuthLevel.ANONYMOUS)
+    @require_auth
+    def get_meteo_regional(req: func.HttpRequest) -> func.HttpResponse:
+        """GET /v1/meteo/regional — hourly temperature + wind per region from fact_meteo."""
+        request_id = str(uuid.uuid4())
+        region_code = req.params.get("region_code") or None
+        start_date  = req.params.get("start_date") or None
+        end_date    = req.params.get("end_date") or None
+        limit = min(int(req.params.get("limit", 500)), 5000)
+
+        conn = None
+        try:
+            conn = _get_db_connection()
+            import sqlite3 as _sqlite3
+            is_sqlite = isinstance(conn, _sqlite3.Connection)
+            ph = "?" if is_sqlite else "%s"
+            tbl_meteo = "FACT_METEO" if is_sqlite else "fact_meteo"
+            tbl_time  = "DIM_TIME"   if is_sqlite else "dim_time"
+            tbl_reg   = "DIM_REGION" if is_sqlite else "dim_region"
+
+            conditions = []
+            params: list = []
+            if region_code:
+                conditions.append(f"r.code_insee = {ph}")
+                params.append(region_code)
+            if start_date:
+                conditions.append(f"t.horodatage >= {ph}")
+                params.append(start_date)
+            if end_date:
+                conditions.append(f"t.horodatage <= {ph}")
+                params.append(end_date)
+
+            where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
+            query = f"""
+                SELECT t.horodatage, r.code_insee, r.nom_region,
+                       m.temperature_c, m.wind_speed_10m, m.cloudcover_pct
+                FROM {tbl_meteo} m
+                JOIN {tbl_time} t   ON t.id_date   = m.id_date
+                JOIN {tbl_reg}  r   ON r.id_region = m.id_region
+                {where}
+                ORDER BY t.horodatage DESC
+                LIMIT {ph}
+            """
+            params.append(limit)
+
+            cursor = conn.cursor()
+            cursor.execute(query, params)
+            rows = cursor.fetchall()
+            data = [
+                {
+                    "timestamp": str(row[0]),
+                    "code_insee": row[1],
+                    "region": row[2],
+                    "temperature_c":  float(row[3]) if row[3] is not None else None,
+                    "wind_speed_10m": float(row[4]) if row[4] is not None else None,
+                    "cloudcover_pct": float(row[5]) if row[5] is not None else None,
+                }
+                for row in rows
+            ]
+            return func.HttpResponse(
+                json.dumps({"data": data, "total_records": len(data), "request_id": request_id}),
+                status_code=200, mimetype="application/json",
+                headers={"X-Request-Id": request_id},
+            )
+        except Exception as exc:
+            logger.error("meteo endpoint error [%s]: %s", request_id, exc, exc_info=True)
+            return func.HttpResponse(
+                json.dumps(server_error(request_id=request_id)),
+                status_code=500, mimetype="application/json",
+                headers={"X-Request-Id": request_id},
+            )
+        finally:
+            if conn:
+                conn.close()
+
+    # ── Capacity endpoint ─────────────────────────────────────────────────────
+
+    @app.route(route=ROUTE_CAPACITY, methods=["GET"], auth_level=func.AuthLevel.ANONYMOUS)
+    @require_auth
+    def get_capacity_regional(req: func.HttpRequest) -> func.HttpResponse:
+        """GET /v1/capacity/regional — installed capacity per region+source from fact_capacity."""
+        request_id = str(uuid.uuid4())
+        region_code = req.params.get("region_code") or None
+        annee = req.params.get("annee") or None
+
+        conn = None
+        try:
+            conn = _get_db_connection()
+            import sqlite3 as _sqlite3
+            is_sqlite = isinstance(conn, _sqlite3.Connection)
+            ph = "?" if is_sqlite else "%s"
+            tbl_cap  = "FACT_CAPACITY" if is_sqlite else "fact_capacity"
+            tbl_reg  = "DIM_REGION"    if is_sqlite else "dim_region"
+            tbl_src  = "DIM_SOURCE"    if is_sqlite else "dim_source"
+
+            conditions = []
+            params: list = []
+            if region_code:
+                conditions.append(f"r.code_insee = {ph}")
+                params.append(region_code)
+            if annee:
+                conditions.append(f"c.annee = {ph}")
+                params.append(int(annee))
+
+            where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
+            query = f"""
+                SELECT r.code_insee, r.nom_region, s.source_name,
+                       c.puissance_installee_mw, c.annee
+                FROM {tbl_cap} c
+                JOIN {tbl_reg} r ON r.id_region = c.id_region
+                JOIN {tbl_src} s ON s.id_source = c.id_source
+                {where}
+                ORDER BY r.code_insee, c.annee DESC, s.source_name
+            """
+
+            cursor = conn.cursor()
+            cursor.execute(query, params)
+            rows = cursor.fetchall()
+            data = [
+                {
+                    "code_insee": row[0],
+                    "region": row[1],
+                    "source": row[2],
+                    "puissance_installee_mw": float(row[3]) if row[3] is not None else None,
+                    "annee": row[4],
+                }
+                for row in rows
+            ]
+            return func.HttpResponse(
+                json.dumps({"data": data, "total_records": len(data), "request_id": request_id}),
+                status_code=200, mimetype="application/json",
+                headers={"X-Request-Id": request_id},
+            )
+        except Exception as exc:
+            logger.error("capacity endpoint error [%s]: %s", request_id, exc, exc_info=True)
+            return func.HttpResponse(
+                json.dumps(server_error(request_id=request_id)),
+                status_code=500, mimetype="application/json",
+                headers={"X-Request-Id": request_id},
+            )
+        finally:
+            if conn:
+                conn.close()
+
+    # ── Maintenance endpoint ──────────────────────────────────────────────────
+
+    @app.route(route=ROUTE_MAINTENANCE, methods=["GET"], auth_level=func.AuthLevel.ANONYMOUS)
+    @require_auth
+    def get_maintenance(req: func.HttpRequest) -> func.HttpResponse:
+        """GET /v1/maintenance — grid maintenance events from fact_maintenance."""
+        request_id = str(uuid.uuid4())
+        region_code = req.params.get("region_code") or None
+        limit = min(int(req.params.get("limit", 100)), 500)
+
+        conn = None
+        try:
+            conn = _get_db_connection()
+            import sqlite3 as _sqlite3
+            is_sqlite = isinstance(conn, _sqlite3.Connection)
+            ph = "?" if is_sqlite else "%s"
+            tbl_mnt = "FACT_MAINTENANCE" if is_sqlite else "fact_maintenance"
+            tbl_reg = "DIM_REGION"       if is_sqlite else "dim_region"
+
+            if region_code:
+                query = f"""
+                    SELECT m.event_id, r.code_insee, r.nom_region,
+                           m.unit_name, m.event_type,
+                           m.start_date, m.end_date, m.unavailable_mw
+                    FROM {tbl_mnt} m
+                    LEFT JOIN {tbl_reg} r ON r.id_region = m.id_region
+                    WHERE r.code_insee = {ph}
+                    ORDER BY m.start_date DESC
+                    LIMIT {ph}
+                """
+                params = [region_code, limit]
+            else:
+                query = f"""
+                    SELECT m.event_id, r.code_insee, r.nom_region,
+                           m.unit_name, m.event_type,
+                           m.start_date, m.end_date, m.unavailable_mw
+                    FROM {tbl_mnt} m
+                    LEFT JOIN {tbl_reg} r ON r.id_region = m.id_region
+                    ORDER BY m.start_date DESC
+                    LIMIT {ph}
+                """
+                params = [limit]
+
+            cursor = conn.cursor()
+            cursor.execute(query, params)
+            rows = cursor.fetchall()
+            data = [
+                {
+                    "event_id": row[0],
+                    "code_insee": row[1],
+                    "region": row[2],
+                    "unit_name": row[3],
+                    "event_type": row[4],
+                    "start_date": str(row[5]) if row[5] else None,
+                    "end_date": str(row[6]) if row[6] else None,
+                    "unavailable_mw": float(row[7]) if row[7] is not None else None,
+                }
+                for row in rows
+            ]
+            return func.HttpResponse(
+                json.dumps({"data": data, "total_records": len(data), "request_id": request_id}),
+                status_code=200, mimetype="application/json",
+                headers={"X-Request-Id": request_id},
+            )
+        except Exception as exc:
+            logger.error("maintenance endpoint error [%s]: %s", request_id, exc, exc_info=True)
+            return func.HttpResponse(
+                json.dumps(server_error(request_id=request_id)),
+                status_code=500, mimetype="application/json",
+                headers={"X-Request-Id": request_id},
+            )
         finally:
             if conn:
                 conn.close()
@@ -211,7 +1183,7 @@ def run_full_pipeline(
 
     1. Ingest from RTE API → Bronze (ADLS or local)
     2. Transform Bronze JSON → Silver Parquet (in-memory for Azure, local for dev)
-    3. Load Silver → Gold (Supabase or SQLite)
+    3. Load Silver → Gold (Azure SQL or SQLite)
 
     Args:
         job_id: Trace ID.

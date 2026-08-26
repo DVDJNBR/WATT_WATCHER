@@ -1,0 +1,527 @@
+## [1.20.1](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.20.0...v1.20.1) (2026-08-25)
+
+### Bug Fixes
+
+* **api,frontend:** correct wide-range pagination and calibrate surplus threshold ([38040dd](https://github.com/DVDJNBR/WATT_WATCHER/commit/38040dd24d03e3475f5ea925e812945d7bb65172))
+
+## [1.20.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.19.2...v1.20.0) (2026-08-25)
+
+### Features
+
+* **frontend:** add tab navigation with "À propos" page ([7e642b5](https://github.com/DVDJNBR/WATT_WATCHER/commit/7e642b525766076b079969c377af246a380423c7))
+* **frontend:** interactive pipeline tab with data-schema diagram ([3ae49a6](https://github.com/DVDJNBR/WATT_WATCHER/commit/3ae49a6921511bac47db80c3d320a901457848ed))
+
+## [1.19.2](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.19.1...v1.19.2) (2026-08-21)
+
+### Bug Fixes
+
+* **api:** order production query by most-recent instead of oldest ([a66d1fd](https://github.com/DVDJNBR/WATT_WATCHER/commit/a66d1fdf0c62533e403dd1eb6de1e4b9abad1417))
+
+## [1.19.1](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.19.0...v1.19.1) (2026-08-20)
+
+### Bug Fixes
+
+* **ci:** align VPS deploy job with the shared deploy-user convention ([3c670c4](https://github.com/DVDJNBR/WATT_WATCHER/commit/3c670c440ccb444180816d8a9bc776e5b41008df))
+
+## [1.19.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.18.0...v1.19.0) (2026-08-18)
+
+### Features
+
+* move app off Azure to VPS, pipeline-only Functions, drop auth/alerting ([0a5d456](https://github.com/DVDJNBR/WATT_WATCHER/commit/0a5d456ec93dd19523f917701098f5411ad1d2a0))
+
+## [1.18.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.17.0...v1.18.0) (2026-03-17)
+
+### Features
+
+* **dashboard:** 2x2 grid layout — prod/conso | sources / carte | météo ([5657294](https://github.com/DVDJNBR/WATT_WATCHER/commit/56572949f910ec2859ff3058e07926863a668301))
+
+## [1.17.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.16.1...v1.17.0) (2026-03-17)
+
+### Features
+
+* **dashboard:** show stacked-by-source chart (HistoryChart) always visible ([2696365](https://github.com/DVDJNBR/WATT_WATCHER/commit/2696365c1f2ce9d9a03d58fd445f3bc911b6942c))
+
+## [1.16.1](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.16.0...v1.16.1) (2026-03-17)
+
+### Bug Fixes
+
+* **build:** resolve recharts v3 circular dep TDZ via CJS alias ([28e308f](https://github.com/DVDJNBR/WATT_WATCHER/commit/28e308fa0088271461302cf7aae00c67de5ead69))
+
+## [1.16.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.15.6...v1.16.0) (2026-03-17)
+
+### Features
+
+* **dashboard:** UX overhaul + cloudcover meteo + fix recharts TDZ crash ([732517f](https://github.com/DVDJNBR/WATT_WATCHER/commit/732517ffe8c0b0a5d8535141bb7f590243f9136c))
+
+## [1.15.6](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.15.5...v1.15.6) (2026-03-17)
+
+### Bug Fixes
+
+* **build:** lazy-load all recharts components to prevent TDZ init crash ([bb9288e](https://github.com/DVDJNBR/WATT_WATCHER/commit/bb9288ee1a7ac2852393d0571d8c5297a7943ec6))
+
+## [1.15.5](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.15.4...v1.15.5) (2026-03-17)
+
+### Bug Fixes
+
+* **build:** force recharts side-effect import first in main.jsx ([8559cb9](https://github.com/DVDJNBR/WATT_WATCHER/commit/8559cb9245ceea31f703050c9ad955ce033c90e3))
+
+## [1.15.4](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.15.3...v1.15.4) (2026-03-17)
+
+### Bug Fixes
+
+* **build:** hoistTransitiveImports=false + merge recharts+d3 in one chunk ([3016bf2](https://github.com/DVDJNBR/WATT_WATCHER/commit/3016bf28e688a4161f02ca269179f94c0b65b6aa))
+
+## [1.15.3](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.15.2...v1.15.3) (2026-03-17)
+
+### Bug Fixes
+
+* **build:** split d3/recharts/react into separate chunks to resolve circular dep crash ([1459a1e](https://github.com/DVDJNBR/WATT_WATCHER/commit/1459a1eff1b176d007c74323dc5b3e2dde3928c7))
+
+## [1.15.2](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.15.1...v1.15.2) (2026-03-17)
+
+### Bug Fixes
+
+* **app:** merge duplicate api.js imports — fixes lexical init crash in prod bundle ([61d749e](https://github.com/DVDJNBR/WATT_WATCHER/commit/61d749e826f2f68fc63f44c76e6882d53b13b713))
+
+## [1.15.1](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.15.0...v1.15.1) (2026-03-17)
+
+### Bug Fixes
+
+* **dashboard:** kpi-title class + memoize aggregations to fix runtime crash ([fc2d3d0](https://github.com/DVDJNBR/WATT_WATCHER/commit/fc2d3d0e62e9990481555e4278d0080b21e3da68))
+
+## [1.15.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.14.0...v1.15.0) (2026-03-17)
+
+### Features
+
+* **meteo:** add cloud cover (cloudcover_pct) to meteo pipeline + chart ([bee5d17](https://github.com/DVDJNBR/WATT_WATCHER/commit/bee5d17e0cd535741e4aa3e9fe8e11990a9600b7))
+
+## [1.14.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.13.4...v1.14.0) (2026-03-17)
+
+### Features
+
+* **dashboard:** stable layout — KPIs top, source chips, meteo always visible, fix spikes ([ac27cb8](https://github.com/DVDJNBR/WATT_WATCHER/commit/ac27cb85f86d852bf1655e4a53883b7fbf86d562))
+
+## [1.13.4](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.13.3...v1.13.4) (2026-03-17)
+
+### Bug Fixes
+
+* **subscriptions:** align alert_type keys with backend expected values ([2a0c8cc](https://github.com/DVDJNBR/WATT_WATCHER/commit/2a0c8cca0fa4c2721482961ecbce03e086c0ca43))
+
+## [1.13.3](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.13.2...v1.13.3) (2026-03-17)
+
+### Bug Fixes
+
+* **odre:** fix region code float→int, convert kW→MW ([24fa268](https://github.com/DVDJNBR/WATT_WATCHER/commit/24fa26835fd81829f388e5e419c55f1684f7d5f6))
+
+## [1.13.2](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.13.1...v1.13.2) (2026-03-17)
+
+### Bug Fixes
+
+* cast NUMERIC→float before json.dumps (psycopg2 returns Decimal) ([42a94a7](https://github.com/DVDJNBR/WATT_WATCHER/commit/42a94a721b66964697260d04e8f50770e8d7e558))
+
+## [1.13.1](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.13.0...v1.13.1) (2026-03-17)
+
+### Bug Fixes
+
+* **odre:** correct dataset ID and column names for capacity CSV ([ad6b0ac](https://github.com/DVDJNBR/WATT_WATCHER/commit/ad6b0ac499d8580b4e732745a17958d6d23bf6bb))
+
+## [1.13.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.12.3...v1.13.0) (2026-03-17)
+
+### Features
+
+* add 3 new data sources — Météo, Capacité, Maintenance (full pipeline) ([e8cbccd](https://github.com/DVDJNBR/WATT_WATCHER/commit/e8cbccd56e51c866d0c028ec6bb124ff984e38d1))
+
+## [1.12.3](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.12.2...v1.12.3) (2026-03-17)
+
+### Bug Fixes
+
+* **subscriptions:** send array directly instead of wrapping object ([55ea10a](https://github.com/DVDJNBR/WATT_WATCHER/commit/55ea10a4196e3a3d4ee66de303ed843a3fbeff94))
+
+## [1.12.2](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.12.1...v1.12.2) (2026-03-17)
+
+### Bug Fixes
+
+* **db:** use Python bool for est_weekend in dim_time (PostgreSQL boolean) ([66fa7c1](https://github.com/DVDJNBR/WATT_WATCHER/commit/66fa7c172082a9e206f13d51da2f4373cb7302f5))
+
+## [1.12.1](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.12.0...v1.12.1) (2026-03-17)
+
+### Bug Fixes
+
+* **db:** use Python bool True/False for is_green in dim_source (PostgreSQL boolean) ([5373292](https://github.com/DVDJNBR/WATT_WATCHER/commit/537329277b96a8246de4d5609ad1af2afc6e7042))
+
+## [1.12.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.11.6...v1.12.0) (2026-03-17)
+
+### Features
+
+* **auth:** auto-confirm on register + redirect to dashboard ([aa1dd3f](https://github.com/DVDJNBR/WATT_WATCHER/commit/aa1dd3f493b4a6a92602a3a48a0cb95da9060c00))
+
+### Bug Fixes
+
+* **tests:** update test fixtures for auto-confirm register flow ([284ccb8](https://github.com/DVDJNBR/WATT_WATCHER/commit/284ccb80902afb2b93c713a1fc06afa2236c4319))
+
+## [1.11.6](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.11.5...v1.11.6) (2026-03-17)
+
+### Bug Fixes
+
+* **db:** replace boolean integer literals (0/1) with FALSE/TRUE for PostgreSQL ([3237299](https://github.com/DVDJNBR/WATT_WATCHER/commit/323729922fbf96fd0778d876ce196a3ae658ba8a))
+
+## [1.11.5](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.11.4...v1.11.5) (2026-03-17)
+
+### Bug Fixes
+
+* **db:** parse Supabase pooler URL manually to preserve dot-username ([e7d0e3f](https://github.com/DVDJNBR/WATT_WATCHER/commit/e7d0e3f0601beb4343cc2c99f0d9bb59eb08e071))
+
+## [1.11.4](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.11.3...v1.11.4) (2026-03-17)
+
+### Bug Fixes
+
+* **ci:** use service principal for azure/login@v1 (publish-profile dropped in v2) ([836c833](https://github.com/DVDJNBR/WATT_WATCHER/commit/836c83324023c9cfaeec3bdb000e436df6285f3a))
+
+## [1.11.3](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.11.2...v1.11.3) (2026-03-17)
+
+### Bug Fixes
+
+* **ci:** replace functions-action ZipDeploy with az config-zip (Linux Consumption plan) ([aabc2f2](https://github.com/DVDJNBR/WATT_WATCHER/commit/aabc2f2f00a82afef93c9fd1ddf31c4382573f6c))
+
+## [1.11.2](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.11.1...v1.11.2) (2026-03-17)
+
+### Bug Fixes
+
+* **ci:** install psycopg2-binary with manylinux_2_17 wheel (no manylinux_2_28 available) ([b1c2842](https://github.com/DVDJNBR/WATT_WATCHER/commit/b1c28426c27ae2b01ed977480d87c572a7a4b02e))
+
+## [1.11.1](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.11.0...v1.11.1) (2026-03-17)
+
+### Bug Fixes
+
+* **db:** rename DATABASE_URL → SUPABASE_CONNECTION_STRING ([461ff9e](https://github.com/DVDJNBR/WATT_WATCHER/commit/461ff9e8a90b8f094c8027366bb9071901d138ae))
+
+## [1.11.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.10.0...v1.11.0) (2026-03-17)
+
+### Features
+
+* **db:** migrate Azure SQL → Supabase/PostgreSQL ([9bf390a](https://github.com/DVDJNBR/WATT_WATCHER/commit/9bf390a83b668b721df0bc2515946c642db68eac)), closes [#stg](https://github.com/DVDJNBR/WATT_WATCHER/issues/stg)
+
+## [1.10.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.9.1...v1.10.0) (2026-03-16)
+
+### Features
+
+* **a11y:** WCAG AA compliance — light mode contrast, focus-visible, skip link, prefers-color-scheme ([dafc253](https://github.com/DVDJNBR/WATT_WATCHER/commit/dafc253caebaa510d5ac904cc7367e86a830bb93))
+* **auth:** login, register + alert subscriptions pages ([e14754b](https://github.com/DVDJNBR/WATT_WATCHER/commit/e14754ba0a69d9bf1bebfc52207dce0616a92285))
+* **dashboard:** dynamic insight title on ProdConsChart (BMAD spec) ([608e7aa](https://github.com/DVDJNBR/WATT_WATCHER/commit/608e7aa27b27fa388beaa8bbc0ace3842aa0ecd2))
+* **dashboard:** hero layout 50/50 carte+prod-conso, coloration delta map, region selector in header ([ff5aa69](https://github.com/DVDJNBR/WATT_WATCHER/commit/ff5aa69f0a9ee8c7bd1a8981027a703a00ae36fc))
+* **dashboard:** replace CarbonGauge radial with badge + sparkline (BMAD spec) ([a5c62d2](https://github.com/DVDJNBR/WATT_WATCHER/commit/a5c62d2b4a9cec862be32cb3cffc97070e334c57))
+
+### Bug Fixes
+
+* **dev:** pass X-Api-Key from VITE_API_KEY env var for local dev against Azure ([da4d6ea](https://github.com/DVDJNBR/WATT_WATCHER/commit/da4d6ea3143aff46da66e4eaeb583a6257280a5d))
+* **frontend:** add france-regions.geojson to public/ for Vite dev server ([66965ce](https://github.com/DVDJNBR/WATT_WATCHER/commit/66965ce6ef57abe8a232bd210728fc32d37907f4))
+* **frontend:** add missing RegionSelector import to App.jsx ([c04e763](https://github.com/DVDJNBR/WATT_WATCHER/commit/c04e763fe691a6ef794546a6386c25e04c36d98d))
+* restore api.js and auth.js from main (fetchAlerts, triggerPipeline) ([35ebd46](https://github.com/DVDJNBR/WATT_WATCHER/commit/35ebd46d41884f68f0c2681325c1c4e18ff38632))
+
+## [1.9.1](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.9.0...v1.9.1) (2026-03-16)
+
+### Bug Fixes
+
+* **gold:** write consommation_mw to FACT_ENERGY_FLOW ([2acadcc](https://github.com/DVDJNBR/WATT_WATCHER/commit/2acadcca9348d4d05beb4765f5896a67d28b9321))
+
+## [1.9.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.8.9...v1.9.0) (2026-03-12)
+
+### Features
+
+* **c8:** wire maintenance scraping + SQL reference snapshot timers ([f317570](https://github.com/DVDJNBR/WATT_WATCHER/commit/f3175705df42cf67830a384555be39abee7ff9ce))
+
+## [1.8.9](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.8.8...v1.8.9) (2026-03-12)
+
+### Bug Fixes
+
+* **ci:** target manylinux_2_28 wheels for Azure Functions glibc 2.31 compatibility ([a8e3687](https://github.com/DVDJNBR/WATT_WATCHER/commit/a8e36875843f52e23e9ca0ffd4c5894564a144ec))
+
+## [1.8.8](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.8.7...v1.8.8) (2026-03-12)
+
+### Bug Fixes
+
+* **deps:** pin cryptography <44.0.0 to avoid GLIBC_2.33 incompatibility on Azure Functions Linux (glibc 2.31) ([ced55e7](https://github.com/DVDJNBR/WATT_WATCHER/commit/ced55e788e359c6ef7d05c283188b55a3665b7f1))
+
+## [1.8.7](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.8.6...v1.8.7) (2026-03-12)
+
+### Bug Fixes
+
+* **deps:** pin bcrypt <5.0.0 to avoid manylinux_2_34 glibc incompatibility ([d71e8df](https://github.com/DVDJNBR/WATT_WATCHER/commit/d71e8dfeff9e4836c5d2e6aead8905f2d845fc2e))
+
+## [1.8.6](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.8.5...v1.8.6) (2026-03-12)
+
+### Bug Fixes
+
+* preserve handler __name__ in auth decorators for Azure Functions v2 ([4bdd9bc](https://github.com/DVDJNBR/WATT_WATCHER/commit/4bdd9bca4f0554d314df77c6fb37a996f47a78b1))
+* use getattr for handler __name__ to support mock objects in tests ([b9bc29a](https://github.com/DVDJNBR/WATT_WATCHER/commit/b9bc29a8b4b3cf2f6a7e127d68b7de02c3e5e87e))
+
+## [1.8.5](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.8.4...v1.8.5) (2026-03-12)
+
+### Bug Fixes
+
+* **ci:** use Python 3.11 for pip install to match Azure Functions runtime ([f2759e2](https://github.com/DVDJNBR/WATT_WATCHER/commit/f2759e28647807bed0774f4207f4156d5bdf1af4))
+
+## [1.8.4](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.8.3...v1.8.4) (2026-03-12)
+
+### Bug Fixes
+
+* **ci:** pre-install packages in CI instead of Oryx remote build ([5d39a16](https://github.com/DVDJNBR/WATT_WATCHER/commit/5d39a1682ae0ea444fe62632069b8977007044dc))
+
+## [1.8.3](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.8.2...v1.8.3) (2026-03-12)
+
+### Bug Fixes
+
+* **ci:** enable-oryx-build: true to actually run pip install on Azure ([d250695](https://github.com/DVDJNBR/WATT_WATCHER/commit/d2506951c833e642c1b58a6fa254d2e65d908bf9))
+
+## [1.8.2](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.8.1...v1.8.2) (2026-03-12)
+
+### Bug Fixes
+
+* remove polars from requirements.txt (lazy import, ~100MB wheel causes deploy timeout) ([fb95cf3](https://github.com/DVDJNBR/WATT_WATCHER/commit/fb95cf3974705d0d37cba552ba83fad0125cb16c))
+
+## [1.8.1](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.8.0...v1.8.1) (2026-03-12)
+
+### Bug Fixes
+
+* add PyJWT, bcrypt, polars to requirements.txt for Azure deploy ([8682ca1](https://github.com/DVDJNBR/WATT_WATCHER/commit/8682ca1e4dfdb792aeea1b35dba177c6b3fca9fa))
+
+## [1.8.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.7.3...v1.8.0) (2026-03-12)
+
+### Features
+
+* add JWT auth, subscriptions API, alerting and RGPD services ([360e09e](https://github.com/DVDJNBR/WATT_WATCHER/commit/360e09ebd246cc330320639a56e5c8cdf3c1afb4))
+
+## [1.7.3](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.7.2...v1.7.3) (2026-03-11)
+
+### Bug Fixes
+
+* add PyJWT and bcrypt to requirements for auth_service ([7229c24](https://github.com/DVDJNBR/WATT_WATCHER/commit/7229c242191b7a6e4a198f75cfd2c90a26b3414b))
+
+## [1.7.2](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.7.1...v1.7.2) (2026-03-11)
+
+### Bug Fixes
+
+* commit missing modules causing startup crash → 404 ([d528d3b](https://github.com/DVDJNBR/WATT_WATCHER/commit/d528d3b9245a4eb239c1d965a1edf1fb775f41a3))
+
+## [1.7.1](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.7.0...v1.7.1) (2026-03-11)
+
+### Bug Fixes
+
+* commit missing subscription_service module ([b92a00a](https://github.com/DVDJNBR/WATT_WATCHER/commit/b92a00a8bcf51d0024549e38c8dd49b7fb6844db))
+
+## [1.7.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.6.0...v1.7.0) (2026-03-11)
+
+### Features
+
+* add user-triggered pipeline refresh button ([cd00cc4](https://github.com/DVDJNBR/WATT_WATCHER/commit/cd00cc46cdd8979a980d70c46448917ef1828d09))
+
+## [1.6.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.5.2...v1.6.0) (2026-03-08)
+
+### Features
+
+* **map:** add pan + zoom with ZoomableGroup (drag to pan, scroll to zoom) ([39c4832](https://github.com/DVDJNBR/WATT_WATCHER/commit/39c483213393dcc319b10b938de2d6ba873db0b7))
+
+## [1.5.2](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.5.1...v1.5.2) (2026-03-08)
+
+### Bug Fixes
+
+* **pipeline:** pass minutes param through ingestion chain, raise default to 240min ([db877c4](https://github.com/DVDJNBR/WATT_WATCHER/commit/db877c4e27796a8c4879c3c4afb0375c74878238))
+
+## [1.5.1](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.5.0...v1.5.1) (2026-03-07)
+
+### Bug Fixes
+
+* **dashboard:** cap map height + fix API URL /api suffix in sync script ([96366ae](https://github.com/DVDJNBR/WATT_WATCHER/commit/96366ae30c1a8ebd745b3eb3a17700759dbebaeb))
+
+## [1.5.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.4.4...v1.5.0) (2026-03-07)
+
+### Features
+
+* **dashboard:** interactive France choropleth map + history chart ([e46a1f1](https://github.com/DVDJNBR/WATT_WATCHER/commit/e46a1f16ebacb2ebec9dc74f22b23dc29eab939a))
+
+## [1.4.4](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.4.3...v1.4.4) (2026-03-06)
+
+### Bug Fixes
+
+* **api:** expand date-only end_date to 23:59:59 to include full day ([d5d49f8](https://github.com/DVDJNBR/WATT_WATCHER/commit/d5d49f8cc6866a578eca516905541e47f3c50c77))
+
+## [1.4.3](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.4.2...v1.4.3) (2026-03-06)
+
+### Bug Fixes
+
+* **infra:** add CORS allowed origins to Azure Function App ([10aec27](https://github.com/DVDJNBR/WATT_WATCHER/commit/10aec27e79c1cb62fcf8d82943c2cf6760685e93))
+
+## [1.4.2](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.4.1...v1.4.2) (2026-03-06)
+
+### Bug Fixes
+
+* **api:** convert pyodbc datetime/Decimal to JSON-serializable types ([fda3d74](https://github.com/DVDJNBR/WATT_WATCHER/commit/fda3d74d7685b18dedc14765f1c2db062478cc1c))
+
+## [1.4.1](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.4.0...v1.4.1) (2026-03-06)
+
+### Bug Fixes
+
+* **db:** increase pyodbc connection timeout for Azure SQL auto-resume ([dbddca4](https://github.com/DVDJNBR/WATT_WATCHER/commit/dbddca44bdc511c90a351644162737afc72de7d3))
+
+## [1.4.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.3.4...v1.4.0) (2026-03-06)
+
+### Features
+
+* **dashboard:** add date range picker, empty state, and visual polish ([9b5f946](https://github.com/DVDJNBR/WATT_WATCHER/commit/9b5f946f70f120d719ebef6b83b096bd0c736a1a))
+
+## [1.3.4](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.3.3...v1.3.4) (2026-03-06)
+
+### Bug Fixes
+
+* **deps:** add pyodbc to Azure Function requirements ([babf1b9](https://github.com/DVDJNBR/WATT_WATCHER/commit/babf1b941d6144ccce474316f2c1a954fd58af79))
+
+## [1.3.3](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.3.2...v1.3.3) (2026-03-05)
+
+### Bug Fixes
+
+* **deps:** add pyarrow to Azure Function requirements ([cd4a44b](https://github.com/DVDJNBR/WATT_WATCHER/commit/cd4a44b86502b50fcc8fd94dbd04d4f417d7df2f))
+
+## [1.3.2](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.3.1...v1.3.2) (2026-03-05)
+
+### Bug Fixes
+
+* **pipeline:** create SQL Server schema on first run + download bronze from ADLS for silver stage ([dcdab1b](https://github.com/DVDJNBR/WATT_WATCHER/commit/dcdab1bf61329d1fc752d0303048ea74fb078d1f))
+
+## [1.3.1](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.3.0...v1.3.1) (2026-03-05)
+
+### Bug Fixes
+
+* **api:** use TOP(?) for SQL Server instead of LIMIT (SQLite-only syntax) ([19f1e84](https://github.com/DVDJNBR/WATT_WATCHER/commit/19f1e84b3d08eab0f3ffa626dd1dd8ad2190799f))
+
+## [1.3.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.2.12...v1.3.0) (2026-03-05)
+
+### Features
+
+* **auth:** replace JWT/Azure AD with API key authentication ([3e96b1e](https://github.com/DVDJNBR/WATT_WATCHER/commit/3e96b1ebd8e17e3d90dc4968b97816abfd578e5c))
+
+## [1.2.12](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.2.11...v1.2.12) (2026-03-04)
+
+### Bug Fixes
+
+* **terraform:** provision SQL_CONNECTION_STRING in function app settings ([8e19b10](https://github.com/DVDJNBR/WATT_WATCHER/commit/8e19b1002d2d55857f81ff7d7931a2804ce6dbcf))
+
+## [1.2.11](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.2.10...v1.2.11) (2026-03-04)
+
+### Bug Fixes
+
+* resolve ~40 Pyright type-checking errors across 10 files ([1ff50e5](https://github.com/DVDJNBR/WATT_WATCHER/commit/1ff50e5c04924412a36e1fff57cbc4b9fd85c166))
+
+## [1.2.10](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.2.9...v1.2.10) (2026-03-03)
+
+### Bug Fixes
+
+* correct all bad absolute imports and add AzureWebJobsFeatureFlags ([56c30ae](https://github.com/DVDJNBR/WATT_WATCHER/commit/56c30aeba8d5e2934c6e6cda25bc4eaddaad30e9))
+* **deploy:** switch to Oryx remote build now that polars is removed ([cd81d4c](https://github.com/DVDJNBR/WATT_WATCHER/commit/cd81d4c4c4f6565870917d5c079f8bbd050877f5))
+* **terraform:** add AzureWebJobsFeatureFlags to infra definition ([4fdb1ef](https://github.com/DVDJNBR/WATT_WATCHER/commit/4fdb1eff906a9bcf9eef1feb47edf000bf47d145))
+
+## [1.2.9](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.2.8...v1.2.9) (2026-03-03)
+
+## [1.2.8](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.2.7...v1.2.8) (2026-03-03)
+
+### Bug Fixes
+
+* **deploy:** pre-install 7 packages on CI — polars kills Oryx even alone ([2d2e035](https://github.com/DVDJNBR/WATT_WATCHER/commit/2d2e035b60c1b597118fb549b25c4ce006c70e63))
+
+## [1.2.7](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.2.6...v1.2.7) (2026-03-03)
+
+### Bug Fixes
+
+* **deploy:** isolate Azure Functions deps in functions/requirements.txt ([b0f0dfe](https://github.com/DVDJNBR/WATT_WATCHER/commit/b0f0dfe01e9c23357fe2ed1894a0c33ae555a656))
+
+## [1.2.6](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.2.5...v1.2.6) (2026-03-03)
+
+### Bug Fixes
+
+* **deploy:** native pip install instead of cross-platform --platform flag ([480bf57](https://github.com/DVDJNBR/WATT_WATCHER/commit/480bf570358cdf75ec24252989b62fd12f024e20))
+
+## [1.2.5](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.2.4...v1.2.5) (2026-03-03)
+
+### Bug Fixes
+
+* **deploy:** use manylinux_2_28 platform — pyarrow 23.x dropped manylinux2014 ([ed897ef](https://github.com/DVDJNBR/WATT_WATCHER/commit/ed897efaf6cf8b904f58261e5f141b193cd1da22))
+
+## [1.2.4](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.2.3...v1.2.4) (2026-03-03)
+
+### Bug Fixes
+
+* **deploy:** pre-install manylinux2014 wheels to bypass Oryx memory limit ([ad89a5b](https://github.com/DVDJNBR/WATT_WATCHER/commit/ad89a5baa35f14d676507db681ab62bbbe5be910))
+
+## [1.2.3](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.2.2...v1.2.3) (2026-03-03)
+
+### Bug Fixes
+
+* **deploy:** Oryx remote build only — no local .python_packages ([8643ddb](https://github.com/DVDJNBR/WATT_WATCHER/commit/8643ddbd7208452a22ac0be3e44e6d8d88303f77))
+
+## [1.2.2](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.2.1...v1.2.2) (2026-03-03)
+
+### Bug Fixes
+
+* **deploy:** pre-install deps locally for Linux Consumption plan ([c101a73](https://github.com/DVDJNBR/WATT_WATCHER/commit/c101a73afcd8cef8904534c8b6bf77528a208c60))
+
+## [1.2.1](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.2.0...v1.2.1) (2026-03-03)
+
+### Bug Fixes
+
+* **deploy:** set package root to functions/ — function_app.py was not at ZIP root ([ee08637](https://github.com/DVDJNBR/WATT_WATCHER/commit/ee0863752127fca40584b9c7b8c77c495ce4c1b3))
+
+## [1.2.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.1.3...v1.2.0) (2026-03-02)
+
+### Features
+
+* **5.2:** merge Over-Production & Negative Price Alerts ([b203839](https://github.com/DVDJNBR/WATT_WATCHER/commit/b203839d0366d650fe085e10bcebcff4670b54d6))
+* **5.2:** Over-Production & Negative Price Alerts ([a133ac3](https://github.com/DVDJNBR/WATT_WATCHER/commit/a133ac3947a6e720351f4345ad82408e7e281434))
+
+## [1.1.3](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.1.2...v1.1.3) (2026-03-02)
+
+### Bug Fixes
+
+* **gold:** bulk-load fact_loader with staging table + fix test failures ([9d0b782](https://github.com/DVDJNBR/WATT_WATCHER/commit/9d0b78293404ba094b31463dc3b7ed5073fdb685)), closes [#stg](https://github.com/DVDJNBR/WATT_WATCHER/issues/stg)
+
+## [1.1.2](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.1.1...v1.1.2) (2026-03-01)
+
+### Bug Fixes
+
+* **deploy:** replace Azure SWA with Storage static website (student sub restriction) ([2033d14](https://github.com/DVDJNBR/WATT_WATCHER/commit/2033d144babb6ce490bb54cb5981f4315768f211))
+
+## [1.1.1](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.1.0...v1.1.1) (2026-02-28)
+
+## [1.1.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.0.0...v1.1.0) (2026-02-28)
+
+### Features
+
+* **7.0:** Azure deployment — full pipeline, SWA, deploy workflow ([b600b20](https://github.com/DVDJNBR/WATT_WATCHER/commit/b600b20e1e437d1551d9ee667f73c7894118c68f))
+
+## 1.0.0 (2026-02-28)
+
+### Features
+
+* **0.1:** API exploration & schema discovery ([164b351](https://github.com/DVDJNBR/WATT_WATCHER/commit/164b351e448d4d7728360b33191c21459c6fb7b1))
+* **1.0:** Infrastructure as Code with Terraform ([dbc0013](https://github.com/DVDJNBR/WATT_WATCHER/commit/dbc0013ca948b8cdaafb8e0e5044faae84ba4f5b))
+* **1.1:** RTE eCO2mix API ingestion pipeline ([374dc47](https://github.com/DVDJNBR/WATT_WATCHER/commit/374dc476ad85a2768b66e331c1eeec8e0f5f642a))
+* **1.2:** CSV capacity ingestion pipeline ([8f2f9e8](https://github.com/DVDJNBR/WATT_WATCHER/commit/8f2f9e86fba1bf335054eef5fd0c6942624149cf))
+* **1.3:** dynamic asset discovery & lifecycle management ([65d5bd1](https://github.com/DVDJNBR/WATT_WATCHER/commit/65d5bd1741ea0e95843f706f65466e907d89edb9))
+* **2.1:** web scraping grid maintenance portals ([7a31102](https://github.com/DVDJNBR/WATT_WATCHER/commit/7a31102e3be2cb32f12786e7988d0c13f118ad49))
+* **2.2:** ERA5 climate Parquet ingestion with Polars streaming ([47fe5c3](https://github.com/DVDJNBR/WATT_WATCHER/commit/47fe5c30c3e5cfa3a3b46710ce5410934712267c))
+* **2.3:** government emission factor ingestion ([18212aa](https://github.com/DVDJNBR/WATT_WATCHER/commit/18212aa5345a56b3f530f36fde02954333e717df)), closes [#3](https://github.com/DVDJNBR/WATT_WATCHER/issues/3) [#2](https://github.com/DVDJNBR/WATT_WATCHER/issues/2)
+* **3.1:** Bronze→Silver transformation layer ([05789e9](https://github.com/DVDJNBR/WATT_WATCHER/commit/05789e989e223f96d53f6d8c1bb583d2b6a252f3))
+* **3.2:** Silver→Gold Star Schema + lint cleanup ([b6d0cda](https://github.com/DVDJNBR/WATT_WATCHER/commit/b6d0cda4812b6f6a651bee8021a6c8509e1520f2))
+* **3.3:** data quality gates — config-driven integrity checks ([aaf0501](https://github.com/DVDJNBR/WATT_WATCHER/commit/aaf0501ce28ba6eda54446116166894518b50ec9))
+* **4.1:** Production API endpoints & CSV export ([21e4f97](https://github.com/DVDJNBR/WATT_WATCHER/commit/21e4f97f3197b397f28ba7ba4a68ec5a468e201a))
+* **4.2:** Azure AD JWT security implementation ([c3ddce4](https://github.com/DVDJNBR/WATT_WATCHER/commit/c3ddce40b35d9cdbc2a49c529a224e6025f49f1e))
+* **4.3:** Automated Swagger/OpenAPI Documentation & code quality fixes ([b7dc0e5](https://github.com/DVDJNBR/WATT_WATCHER/commit/b7dc0e5b5691c840ff50de26a0a4b5a99fbe78cf))
+* **5.1:** Grid Monitoring Dashboard — Vite + React frontend ([573ef74](https://github.com/DVDJNBR/WATT_WATCHER/commit/573ef749b66549ea6055f09aabaa696a8db83aa3))
+* **6.1-6.2:** Epic 6 discovery — data brief, UX spec, benchmark & regulatory stories ([718a88d](https://github.com/DVDJNBR/WATT_WATCHER/commit/718a88de4d1483066172bc052ed04d7514a7d368))
+
+### Bug Fixes
+
+* **5.1:** code review fixes — 58 Vitest tests passing ([90fbecf](https://github.com/DVDJNBR/WATT_WATCHER/commit/90fbecfc4536e3a3a9459e8453e04ae5efcfb611))
+* **5.1:** data pipeline, API aggregation, port 8765 & Pyright fixes ([65458e6](https://github.com/DVDJNBR/WATT_WATCHER/commit/65458e608e508f9b68f63b5db55ca8a523e78c79))
+* correct _bmad gitignore pattern to _bmad/ ([7cdc259](https://github.com/DVDJNBR/WATT_WATCHER/commit/7cdc25970a4eef06b0161856bead8cfaf97547eb))
+* resolve Pyright lint errors in ERA5 modules ([f3631bd](https://github.com/DVDJNBR/WATT_WATCHER/commit/f3631bd633854ac8d19a98346885af2825b62c71))
+* resolve Pyright type errors in quality checks ([639a119](https://github.com/DVDJNBR/WATT_WATCHER/commit/639a119ae0b552bc9abeedf5c9611cee5226404b))
+* **tests:** update test_api_endpoints to match new pagination logic ([e48acc2](https://github.com/DVDJNBR/WATT_WATCHER/commit/e48acc28a4eedbcc3cbe4944b3d97abd90021b3c))

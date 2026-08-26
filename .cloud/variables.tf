@@ -8,10 +8,22 @@ variable "location" {
   default     = "francecentral"
 }
 
-variable "supabase_connection_string" {
-  description = "Supabase PostgreSQL connection string, injected into the Function App as SUPABASE_CONNECTION_STRING"
+variable "sql_admin_login" {
+  description = "SQL Server administrator login"
+  type        = string
+  default     = "wwadmin"
+}
+
+variable "sql_admin_password" {
+  description = "SQL Server administrator password"
   type        = string
   sensitive   = true
+}
+
+variable "sql_auto_pause_delay" {
+  description = "Minutes of inactivity before SQL auto-pause (-1 to disable)"
+  type        = number
+  default     = -1
 }
 
 variable "retention_bronze_days" {
