@@ -1,3 +1,9 @@
+## [1.20.3](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.20.2...v1.20.3) (2026-08-26)
+
+### Bug Fixes
+
+* **frontend:** drop misleading per-region surproduction coloring on map ([e90a08b](https://github.com/DVDJNBR/WATT_WATCHER/commit/e90a08b2764661c6fcff9d37fb4b873c4a5511e7))
+
 ## [1.20.2](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.20.1...v1.20.2) (2026-08-26)
 
 ## [1.20.1](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.20.0...v1.20.1) (2026-08-25)
