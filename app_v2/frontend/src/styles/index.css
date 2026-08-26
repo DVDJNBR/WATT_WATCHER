@@ -893,6 +893,14 @@ input[type="date"] {
 .map-legend__item {
   font-size: 0.72rem;
   font-weight: 500;
+  color: var(--color-text-muted);
+}
+
+.map-legend__gradient {
+  width: 64px;
+  height: 8px;
+  border-radius: 4px;
+  border: 1px solid var(--color-border);
 }
 
 /* ── Content pages (À propos, etc.) ───────────────────────────────────────── */

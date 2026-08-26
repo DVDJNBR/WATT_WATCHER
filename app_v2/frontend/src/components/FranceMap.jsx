@@ -12,22 +12,28 @@ const GEO_URL = '/france-regions.geojson'
 
 const PROJECTION_CONFIG = { center: [2.5, 46.5], scale: 2200 }
 
-/**
- * Map delta (prod - conso) / conso to a semantic colour.
- *   > +15% → rouge   (sur-production, risque prix négatifs)
- *   ±15%   → vert    (équilibre)
- *   < -15% → orange  (sous-production, dépendance import)
- *   no data → gris
- */
-function deltaColor(prod, conso) {
-  if (conso == null || conso === 0) {
-    // No consumption data — fall back to neutral blue gradient hint
-    return prod > 0 ? '#2d6bcd' : '#1c2538'
-  }
-  const ratio = (prod - conso) / conso
-  if (ratio > 0.15)  return '#ef4444'  // sur-production — rouge
-  if (ratio < -0.15) return '#f59e0b'  // sous-production — orange
-  return '#10b981'                      // équilibre — vert
+// A per-region prod/conso ratio isn't a meaningful "surproduction" signal:
+// French regions aren't independent grids — nuclear-heavy regions
+// structurally export several times their own consumption to neighbouring
+// regions as their permanent, normal state (e.g. Centre-Val de Loire sits
+// around +300% essentially always), while import-dependent regions like
+// Île-de-France sit permanently around -95%. There is no fixed threshold
+// that means "anomaly" across regions this different — so the map colours
+// by production volume instead, and the one place that surfaces a
+// (nationally calibrated) surplus signal is the production/consumption
+// chart, where prod-vs-conso is at least measured on the same national
+// market the French price actually clears on.
+
+const LOW_COLOR  = [30, 58, 95]     // #1e3a5f — dim navy
+const HIGH_COLOR = [79, 142, 247]   // #4f8ef7 — accent blue
+
+function lerp(a, b, t) { return Math.round(a + (b - a) * t) }
+
+/** Interpolate a blue intensity from production volume relative to the region max. */
+function volumeColor(prod, maxProd) {
+  const t = maxProd > 0 ? Math.min(1, Math.max(0, prod / maxProd)) : 0
+  const [r, g, b] = LOW_COLOR.map((c, i) => lerp(c, HIGH_COLOR[i], t))
+  return `rgb(${r}, ${g}, ${b})`
 }
 
 /**
@@ -53,6 +59,10 @@ export const FranceMap = memo(function FranceMap({
 
   const availableCodes = useMemo(() => new Set(regions.map(r => r.code_insee)), [regions])
   const selectedRegionName = regions.find(r => r.code_insee === selectedCode)?.region
+  const maxProd = useMemo(
+    () => Math.max(0, ...Object.values(regionTotals)),
+    [regionTotals]
+  )
 
   return (
     <section className="glass-card map-card" data-testid="france-map">
@@ -104,7 +114,7 @@ export const FranceMap = memo(function FranceMap({
                   const fill       = isSelected
                     ? '#4f8ef7'
                     : hasData
-                    ? deltaColor(prod, conso)
+                    ? volumeColor(prod, maxProd)
                     : '#1c2538'
 
                   return (
@@ -166,12 +176,15 @@ export const FranceMap = memo(function FranceMap({
         </div>
       )}
 
-      {/* Semantic legend */}
+      {/* Volume legend */}
       {!loading && (
         <div className="map-legend">
-          <span className="map-legend__item" style={{ color: '#10b981' }}>● Équilibre</span>
-          <span className="map-legend__item" style={{ color: '#ef4444' }}>● Sur-production</span>
-          <span className="map-legend__item" style={{ color: '#f59e0b' }}>● Sous-production</span>
+          <span className="map-legend__item">Production</span>
+          <span
+            className="map-legend__gradient"
+            style={{ background: `linear-gradient(90deg, rgb(${LOW_COLOR.join(',')}), rgb(${HIGH_COLOR.join(',')}))` }}
+          />
+          <span className="map-legend__item">faible → élevée</span>
           <span className="map-legend__item" style={{ color: '#4a5568' }}>● Pas de données</span>
         </div>
       )}
