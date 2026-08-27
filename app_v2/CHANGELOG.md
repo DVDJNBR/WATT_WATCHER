@@ -1,3 +1,9 @@
+## [1.22.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.21.0...v1.22.0) (2026-08-27)
+
+### Features
+
+* **app_v2:** document ENTSO-E, satellite fact tables, and threshold calibration on the Pipeline page ([693f9ad](https://github.com/DVDJNBR/WATT_WATCHER/commit/693f9ad22c8da6e9190a08387288eee010537cef))
+
 ## [1.21.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.20.3...v1.21.0) (2026-08-27)
 
 ### Features
