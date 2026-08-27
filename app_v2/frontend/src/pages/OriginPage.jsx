@@ -18,11 +18,19 @@ export default function OriginPage() {
           prise tôt.
         </p>
         <p>
-          Ainsi, ce dashboard permet de l'anticiper régionalement en surveillant la
+          Ainsi, ce dashboard permet de l'anticiper au niveau national en surveillant la
           production et la consommation de l'énergie toutes sources confondues. Pour ce
           faire, il recueille toutes les 15 minutes les données publiées par RTE et les
           croise avec la météo et les alertes de maintenance, qui sont stockées dans un
           data lake pour être nettoyées avant d'être mises en base de données.
+        </p>
+        <p className="content-caption">
+          Ce signal reste une estimation, pas une certitude : calibré sur l'année 2025
+          en croisant notre indicateur avec les vrais prix du marché (EPEX/ENTSO-E), il
+          ne s'avère juste qu'environ 1 fois sur 3 quand il se déclenche — la vraie
+          décision d'arrêt d'une éolienne se prend à une échelle bien plus locale (poste
+          par poste) que ce que les données publiques permettent de voir. Détails du
+          calcul dans le pipeline de données.
         </p>
       </section>
     </main>
