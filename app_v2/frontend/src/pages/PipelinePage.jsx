@@ -33,6 +33,11 @@ const SOURCES = [
     desc: 'Événements de maintenance planifiée par région.',
     tag: 'API REST',
   },
+  {
+    name: 'ENTSO-E Transparency',
+    desc: "Prix du marché day-ahead — France entière, pas de découpage régional.",
+    tag: 'API REST',
+  },
 ]
 
 const SAMPLE_RECORD = {
@@ -53,7 +58,7 @@ function CollectePanel() {
   return (
     <>
       <p>
-        Toutes les 15 minutes, le pipeline interroge trois sources publiques et
+        Toutes les 15 minutes, le pipeline interroge quatre sources publiques et
         rapatrie tout ce qu'elles ont de nouveau :
       </p>
       <div className="content-grid">
@@ -137,6 +142,21 @@ function NettoyagePanel() {
   )
 }
 
+const SATELLITE_FACTS = [
+  ['fact_meteo', 'région × horodatage', 'Open-Meteo — température, vent, nébulosité'],
+  ['fact_capacity', 'région × filière × année', 'RTE — puissance installée de référence'],
+  ['fact_maintenance', '1 ligne / événement', "RTE — arrêts et maintenances planifiés"],
+  ['fact_market_price', 'horodatage seul', 'ENTSO-E — prix day-ahead, France entière'],
+]
+
+const THRESHOLD_CALIBRATION = [
+  ['5 % (ancien)', '100 %', '17 %', '100 %'],
+  ['20 %', '91 %', '19 %', '100 %'],
+  ['30 %', '71 %', '24 %', '97 %'],
+  ['40 % (actuel)', '45 %', '31 %', '81 %'],
+  ['50 %', '11 %', '36 %', '22 %'],
+]
+
 function BasePanel() {
   return (
     <>
@@ -152,6 +172,61 @@ function BasePanel() {
           alt="Schéma de la base : la table de faits fact_energy_flow référence dim_region, dim_time et dim_source via des clés étrangères sur id_region, id_date et id_source."
         />
       </div>
+      <p className="content-caption">
+        Ce schéma est le cœur du modèle. Quatre autres tables de faits se sont
+        greffées dessus au fil du projet, chacune simple — une mesure de plus
+        accrochée aux mêmes dimensions (<code>dim_region</code>,{' '}
+        <code>dim_time</code>) plutôt qu'un nouveau schéma :
+      </p>
+      <table className="content-table">
+        <tbody>
+          {SATELLITE_FACTS.map(([name, grain, desc]) => (
+            <tr key={name}>
+              <td><code>{name}</code></td>
+              <td>{grain}</td>
+              <td>{desc}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      <p style={{ marginTop: 24 }}>
+        <code>fact_market_price</code> mérite un mot à part : c'est la seule table
+        qui ne référence jamais <code>dim_region</code>. La France est une zone de
+        marché day-ahead unique sur ENTSO-E — il n'existe tout simplement pas de
+        prix par région à stocker. C'est cette table qui a servi à calibrer
+        honnêtement le seuil « excédent export » affiché sur le dashboard : en
+        croisant, jour par jour sur l'année 2025, le ratio production/consommation
+        national avec les vrais prix négatifs du marché.
+      </p>
+      <table className="content-table content-table--stats">
+        <thead>
+          <tr>
+            <th>Seuil</th>
+            <th>Jours déclenchés / an</th>
+            <th>Précision</th>
+            <th>Rappel</th>
+          </tr>
+        </thead>
+        <tbody>
+          {THRESHOLD_CALIBRATION.map(([seuil, jours, precision, rappel]) => (
+            <tr key={seuil} className={seuil.includes('actuel') ? 'is-current' : undefined}>
+              <td>{seuil}</td>
+              <td>{jours}</td>
+              <td>{precision}</td>
+              <td>{rappel}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <p className="content-caption">
+        Précision = part des jours où le seuil est dépassé qui coïncident vraiment
+        avec un prix négatif. Rappel = part des jours à prix négatif effectivement
+        détectés par le seuil. 40 % reste le meilleur compromis testé, mais aucun
+        seuil ne rend ce signal fiable au sens strict : c'est un indicateur bruité,
+        pas un détecteur — la vraie décision d'arrêt se prend poste par poste, à une
+        échelle que les données publiques ne permettent pas de voir.
+      </p>
     </>
   )
 }
@@ -213,7 +288,7 @@ export default function PipelinePage() {
       <section className="glass-card content-card">
         <p className="content-kicker">Pipeline de données</p>
         <p>
-          Trois sources publiques, un nettoyage automatisé, une base prête à
+          Quatre sources publiques, un nettoyage automatisé, une base prête à
           l'emploi. Clique sur une étape pour voir ce qui s'y passe :
         </p>
 
