@@ -1,3 +1,13 @@
+## [1.21.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.20.3...v1.21.0) (2026-08-27)
+
+### Features
+
+* **app_v2:** integrate ENTSO-E day-ahead market prices into the pipeline ([b47a2ad](https://github.com/DVDJNBR/WATT_WATCHER/commit/b47a2add1bf1259b8c71fc750650ff8511da3665))
+
+### Bug Fixes
+
+* **app_v2:** rewrite init_schema.sql to match the real Supabase/PostgreSQL schema ([7abe4cf](https://github.com/DVDJNBR/WATT_WATCHER/commit/7abe4cf7926037a3681a5a877fe16e04bbb3edd9))
+
 ## [1.20.3](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.20.2...v1.20.3) (2026-08-26)
 
 ### Bug Fixes
