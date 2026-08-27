@@ -249,3 +249,6 @@ functions/__blobstorage__/
 functions/host.json
 .DS_Store
 CLAUDE.local.md
+
+# Internal review reports — for local consultation, not meant for GitHub
+docs/*_report.md
