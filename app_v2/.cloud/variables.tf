@@ -31,3 +31,16 @@ variable "retention_audit_days" {
   type        = number
   default     = 365
 }
+
+variable "entsoe_api_token" {
+  description = "ENTSO-E Transparency Platform security token, injected into the Function App as ENTSOE_API_TOKEN (day-ahead market price ingestion)"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "price_retention_days" {
+  description = "FACT_MARKET_PRICE retention in days (purged daily by price_retention_timer)"
+  type        = number
+  default     = 7
+}

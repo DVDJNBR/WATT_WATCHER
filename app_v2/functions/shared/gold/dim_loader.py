@@ -98,6 +98,14 @@ class DimLoader:
                     unavailable_mw REAL,
                     scraped_at TEXT
                 );
+
+                CREATE TABLE IF NOT EXISTS FACT_MARKET_PRICE (
+                    id_fact INTEGER PRIMARY KEY AUTOINCREMENT,
+                    id_date INTEGER NOT NULL REFERENCES DIM_TIME(id_date),
+                    price_eur_mwh REAL NOT NULL,
+                    retrieved_at TEXT NOT NULL,
+                    UNIQUE(id_date)
+                );
             """)
             self.conn.commit()
             logger.info("Gold schema ensured (SQLite)")
@@ -180,6 +188,14 @@ class DimLoader:
                        unavailable_mw  NUMERIC(10,2),
                        scraped_at      TIMESTAMPTZ     NOT NULL DEFAULT NOW()
                    )""",
+                """CREATE TABLE IF NOT EXISTS fact_market_price (
+                       id_fact         BIGSERIAL       PRIMARY KEY,
+                       id_date         INT             NOT NULL REFERENCES dim_time(id_date),
+                       price_eur_mwh   NUMERIC(10,2)   NOT NULL,
+                       retrieved_at    TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
+                       UNIQUE (id_date)
+                   )""",
+                "CREATE INDEX IF NOT EXISTS ix_fact_market_price_date ON fact_market_price (id_date)",
             ]
             for stmt in statements:
                 cursor.execute(stmt)

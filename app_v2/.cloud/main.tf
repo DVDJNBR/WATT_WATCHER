@@ -170,6 +170,8 @@ resource "azurerm_linux_function_app" "main" {
     "KEY_VAULT_URL"              = azurerm_key_vault.main.vault_uri
     "STORAGE_ACCOUNT_NAME"       = azurerm_storage_account.datalake.name
     "SUPABASE_CONNECTION_STRING" = var.supabase_connection_string
+    "ENTSOE_API_TOKEN"           = var.entsoe_api_token
+    "PRICE_RETENTION_DAYS"       = var.price_retention_days
     "AzureWebJobsFeatureFlags"   = "EnableWorkerIndexing"  # required for Python v2 decorator model
   }
 

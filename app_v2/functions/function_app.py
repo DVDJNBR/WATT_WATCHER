@@ -109,6 +109,29 @@ if AZURE_FUNCTIONS_AVAILABLE:
         except Exception as exc:
             logger.error("[%s] Maintenance scraping failed: %s", job_id, exc, exc_info=True)
 
+    # ── Price retention timer ────────────────────────────────────────────────
+
+    @app.timer_trigger(
+        schedule="0 15 2 * * *",  # every day at 02:15 UTC
+        arg_name="timer",
+        run_on_startup=False,
+    )
+    def price_retention_timer(timer: func.TimerRequest) -> None:
+        """Daily purge of FACT_MARKET_PRICE rows older than PRICE_RETENTION_DAYS."""
+        job_id = str(uuid.uuid4())
+        logger.info("[%s] Price retention starting", job_id)
+        conn = None
+        try:
+            from shared.price_retention import purge_old_prices
+            conn = _get_db_connection()
+            deleted = purge_old_prices(conn)
+            logger.info("[%s] Price retention: purged %d rows", job_id, deleted)
+        except Exception as exc:
+            logger.error("[%s] Price retention failed: %s", job_id, exc, exc_info=True)
+        finally:
+            if conn:
+                conn.close()
+
     # ── SQL reference snapshot timer ─────────────────────────────────────────
 
     @app.timer_trigger(
@@ -585,6 +608,88 @@ def run_full_pipeline(
     except Exception as exc:
         logger.error("[%s] Maintenance stage failed: %s", job_id, exc, exc_info=True)
         results["stages"]["maintenance"] = {"status": "failure", "error": str(exc)}
+
+    # ── Stage 7: Prix marché (ENTSO-E) — non-fatal ────────────────────────────
+    logger.info("[%s] Stage 7: Prix marché ingestion (ENTSO-E)", job_id)
+    try:
+        from datetime import datetime as _datetime_p, timezone as _tz_p, timedelta as _td_p
+        from shared.entsoe_client import EntsoeClient, EntsoeClientError
+        from shared.transformations.price_silver import transform_price_to_silver
+        from shared.gold.dim_loader import DimLoader as _DimLoader4
+
+        entsoe_token = os.environ.get("ENTSOE_API_TOKEN", "")
+        if not entsoe_token:
+            results["stages"]["price"] = {"status": "skipped", "reason": "no ENTSOE_API_TOKEN"}
+        else:
+            now_p = _datetime_p.now(_tz_p.utc)
+            # 26h lookback comfortably covers the current market day regardless
+            # of DST offset; ON CONFLICT(id_date) DO UPDATE below makes
+            # re-fetching overlapping slots on every run harmless.
+            period_start_p = now_p - _td_p(hours=26)
+            price_client = EntsoeClient(api_token=entsoe_token)
+            price_records = price_client.fetch_day_ahead_prices(period_start_p, now_p)
+            df_price = transform_price_to_silver(price_records)
+
+            if df_price.empty:
+                results["stages"]["price"] = {"status": "empty", "rows": 0}
+            else:
+                conn_p = _get_db_connection()
+                try:
+                    dim_p = _DimLoader4(conn_p)
+                    dim_p.ensure_schema()
+                    timestamps_p = df_price["timestamp"].apply(
+                        lambda t: t.strftime("%Y-%m-%dT%H:%M:00")
+                    ).tolist()
+                    dim_p.upsert_time(timestamps_p)
+
+                    import sqlite3 as _sqlite3_p
+                    is_sqlite_p = isinstance(conn_p, _sqlite3_p.Connection)
+                    ph_p = "?" if is_sqlite_p else "%s"
+                    tbl_pr = "FACT_MARKET_PRICE" if is_sqlite_p else "fact_market_price"
+                    tbl_dt_p = "DIM_TIME" if is_sqlite_p else "dim_time"
+                    now_str_p = now_p.isoformat()
+
+                    cursor_p = conn_p.cursor()
+                    rows_loaded_p = 0
+                    for _, row in df_price.iterrows():
+                        ts_str_p = row["timestamp"].strftime("%Y-%m-%dT%H:%M:00")
+                        cursor_p.execute(
+                            f"SELECT id_date FROM {tbl_dt_p} WHERE horodatage = {ph_p}", (ts_str_p,)
+                        )
+                        id_date_p = cursor_p.fetchone()
+                        if not id_date_p:
+                            continue
+                        if is_sqlite_p:
+                            cursor_p.execute(
+                                f"""INSERT INTO {tbl_pr} (id_date, price_eur_mwh, retrieved_at)
+                                    VALUES (?, ?, ?)
+                                    ON CONFLICT(id_date) DO UPDATE SET
+                                        price_eur_mwh = excluded.price_eur_mwh,
+                                        retrieved_at  = excluded.retrieved_at""",
+                                (id_date_p[0], row["price_eur_mwh"], now_str_p),
+                            )
+                        else:
+                            cursor_p.execute(
+                                f"""INSERT INTO {tbl_pr} (id_date, price_eur_mwh, retrieved_at)
+                                    VALUES (%s, %s, %s)
+                                    ON CONFLICT (id_date) DO UPDATE SET
+                                        price_eur_mwh = EXCLUDED.price_eur_mwh,
+                                        retrieved_at  = EXCLUDED.retrieved_at""",
+                                (id_date_p[0], row["price_eur_mwh"], now_str_p),
+                            )
+                        rows_loaded_p += 1
+                    conn_p.commit()
+                    results["stages"]["price"] = {"status": "success", "rows": rows_loaded_p}
+                    logger.info("[%s] Prix marché: %d rows loaded", job_id, rows_loaded_p)
+                finally:
+                    conn_p.close()
+
+    except EntsoeClientError as exc:
+        logger.warning("[%s] Prix marché stage failed (non-fatal): %s", job_id, exc)
+        results["stages"]["price"] = {"status": "failure", "error": str(exc)}
+    except Exception as exc:
+        logger.error("[%s] Prix marché stage failed: %s", job_id, exc, exc_info=True)
+        results["stages"]["price"] = {"status": "failure", "error": str(exc)}
 
     return results
 

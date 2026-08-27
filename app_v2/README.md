@@ -89,7 +89,10 @@ Push to `main` → GitHub Actions runs tests → deploys the Functions pipeline.
 - `*/15 * * * *` — RTE ingestion → Bronze
 - `0 6 * * *` — Grid maintenance scraping → Bronze
 - `0 1 * * *` — SQL reference snapshot → Bronze
-- Full pipeline (Bronze → Silver → Gold, incl. Météo/ODRE/maintenance) runs as part of the RTE ingestion job
+- `0 2:15 * * *` — Price retention: purge `FACT_MARKET_PRICE` beyond `PRICE_RETENTION_DAYS` (default 7)
+- Full pipeline (Bronze → Silver → Gold, incl. Météo/ODRE/maintenance/prix marché) runs as part of the RTE ingestion job
+
+**Day-ahead market prices (ENTSO-E):** optional — set `ENTSOE_API_TOKEN` (see `.cloud/terraform.tfvars.example`) to enable. Ingestion is non-fatal and silently skipped if unset. See `docs/entsoe_price_integration_report.md` for the full write-up (schema, retention, how the 40% surplus threshold on the dashboard was calibrated against real prices).
 
 ### Destroy & recreate
 

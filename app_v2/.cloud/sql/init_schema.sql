@@ -68,3 +68,32 @@ CREATE INDEX IX_FACT_region_date ON FACT_ENERGY_FLOW (id_region, id_date);
 CREATE INDEX IX_FACT_source ON FACT_ENERGY_FLOW (id_source);
 CREATE INDEX IX_DIM_TIME_horodatage ON DIM_TIME (horodatage);
 CREATE INDEX IX_DIM_REGION_insee ON DIM_REGION (code_insee);
+
+-- ─── FACT_MARKET_PRICE ───────────────────────────────────────────────────────
+-- Source: ENTSO-E Transparency Platform, documentType=A44 (day-ahead prices).
+-- One row per market time unit — France is a single national bidding zone
+-- (no per-region split), so this ties to DIM_TIME only, never DIM_REGION.
+-- Resolution: hourly (PT60M) before 2025-10-01, 15-minute (PT15M) since
+-- (European SDAC market-time-unit transition) — DIM_TIME already supports
+-- 15-min granularity, no schema change needed for that shift.
+-- Refreshed every 15 min alongside FACT_ENERGY_FLOW; purged daily beyond
+-- PRICE_RETENTION_DAYS (see functions/shared/price_retention.py) — this
+-- table is a short-lived live/calibration cache, not a historical archive
+-- (ENTSO-E remains the durable source of truth for that).
+CREATE TABLE FACT_MARKET_PRICE (
+    id_fact         BIGINT          PRIMARY KEY IDENTITY(1,1),
+    id_date         INT             NOT NULL UNIQUE REFERENCES DIM_TIME(id_date),
+    price_eur_mwh   DECIMAL(10,2)   NOT NULL,
+    retrieved_at    DATETIME2       NOT NULL DEFAULT GETDATE()
+);
+
+CREATE INDEX IX_FACT_MARKET_PRICE_date ON FACT_MARKET_PRICE (id_date);
+
+-- NOTE (documentation drift, pre-existing — not introduced by this change):
+-- this file predates the Supabase/PostgreSQL migration and the
+-- fact_meteo / fact_capacity / fact_maintenance tables, all three already
+-- live in production (created at runtime by
+-- functions/shared/gold/dim_loader.py DimLoader.ensure_schema(), which is
+-- the actual schema source of truth) but never backfilled here. Left as-is
+-- to keep this change scoped to FACT_MARKET_PRICE; worth a follow-up pass
+-- if this file is meant to stay authoritative documentation.
