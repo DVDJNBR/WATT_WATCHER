@@ -1,3 +1,9 @@
+## [1.23.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.22.0...v1.23.0) (2026-08-28)
+
+### Features
+
+* **app_v2:** real Bronze/Silver medallion for every source, drop price retention ([2cf4206](https://github.com/DVDJNBR/WATT_WATCHER/commit/2cf4206edfe7e433fcb6176e30e762518bcfc4bc))
+
 ## [1.22.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.21.0...v1.22.0) (2026-08-27)
 
 ### Features
