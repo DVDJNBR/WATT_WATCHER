@@ -104,6 +104,7 @@ class RTEClient:
         since = datetime.now(timezone.utc) - timedelta(minutes=minutes)
         all_records = []
         offset = 0
+        pages = 0
 
         while True:
             response = self.fetch_eco2mix_regional(
@@ -114,6 +115,14 @@ class RTEClient:
 
             total = response.get("total_count", 0)
             offset += len(records)
+            pages += 1
+
+            # A wide lookback (a historical backfill, not the normal ~30min
+            # live poll) can mean hundreds of sequential paginated requests —
+            # without this, that stretch produces zero output until the very
+            # end and looks identical to a hung process.
+            if pages % 20 == 0 or (total and offset >= total):
+                logger.info("Fetched %d / %d records", offset, total)
 
             if not records or offset >= total:
                 break
