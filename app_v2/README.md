@@ -97,6 +97,28 @@ Bronze/Silver blobs are auto-purged by ADLS lifecycle policies (`retention_bronz
 
 **Day-ahead prices + generation outages (ENTSO-E):** optional — set `ENTSOE_API_TOKEN` (see `.cloud/terraform.tfvars.example`) to enable both. Ingestion is non-fatal and silently skipped if unset. `fact_maintenance` is fed from ENTSO-E outages (A77) now, not RTE web scraping — the scraper's target URL was never actually wired into Terraform, so it never ran in production; ENTSO-E reuses the same credentials/infra already in place for prices. See `docs/entsoe_price_integration_report.md` for the price-side write-up (schema, how the 40% surplus threshold on the dashboard was calibrated against real prices).
 
+### Manual data population (bootstrap / backfill)
+
+`scripts/` holds one-off, hand-run Python scripts — deliberately not Azure
+Functions. They exist for two cases the timers above don't cover: seeding a
+brand-new environment with history that predates the automation, and
+one-time reference data that has no business running on a schedule. Both
+still write through the same Bronze → Silver → Gold path as the timers —
+`scripts/backfill_market_prices.py` calls `shared/stages/price_stage.py`'s
+own `run()` directly, just with a wider date range, so a manual run can
+never diverge from what the automation would have produced. This is what
+makes the whole thing reproducible from scratch: point a fresh repo at a
+fresh Supabase database, and these scripts (not ad-hoc DB surgery) are what
+rebuild the history.
+
+Bootstrap sequence for a brand-new environment:
+1. `terraform apply` (above) — Function App + ADLS Gen2, pointed at a fresh Supabase DB.
+2. Let `pipeline_15min`/`pipeline_weekly` run naturally for a bit (RTE, météo, capacity — no useful history to backfill, they only ever cared about "now").
+3. `uv run python scripts/backfill_market_prices.py` — one-time ENTSO-E day-ahead price backfill, from `fact_energy_flow`'s earliest timestamp up to now, so `fact_market_price` has history overlapping the RTE data from day one instead of trickling in one day at a time from `pipeline_daily`'s 26h lookback.
+4. `uv run python scripts/geocode_production_units.py` — one-time (well, occasional) geocoding of ENTSO-E's named production units, for reference data not tied to any fact table.
+
+From that point on, `pipeline_daily`/`pipeline_15min`/`pipeline_weekly` keep everything current; the manual scripts only need re-running if a genuinely new gap opens up (a fresh Supabase DB, a long outage, a new data source).
+
 ### Destroy & recreate
 
 ```bash
