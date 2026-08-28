@@ -30,8 +30,22 @@ BASE_URL = "https://web-api.tp.entsoe.eu/api"
 FRANCE_DOMAIN = "10YFR-RTE------C"  # single national bidding zone (EIC code)
 DOCUMENT_TYPE_DAY_AHEAD_PRICES = "A44"
 DOCUMENT_TYPE_UNAVAILABILITY_PRODUCTION = "A77"
+DOCUMENT_TYPE_ACTUAL_GENERATION_PER_UNIT = "A73"
+PROCESS_TYPE_REALISED = "A16"
 BUSINESS_TYPE_LABELS = {"A53": "planned", "A54": "unplanned"}
 REQUEST_TIMEOUT = 30
+
+# ENTSO-E PSR (Power System Resource) type codes, EIC standard — used to
+# label each unit's fuel/technology on the A73 generation-unit registry.
+PSR_TYPE_LABELS = {
+    "B01": "biomass", "B02": "fossil_brown_coal", "B03": "fossil_coal_gas",
+    "B04": "fossil_gas", "B05": "fossil_hard_coal", "B06": "fossil_oil",
+    "B07": "fossil_oil_shale", "B08": "fossil_peat", "B09": "geothermal",
+    "B10": "hydro_pumped_storage", "B11": "hydro_run_of_river",
+    "B12": "hydro_water_reservoir", "B13": "marine", "B14": "nuclear",
+    "B15": "other_renewable", "B16": "solar", "B17": "waste",
+    "B18": "wind_offshore", "B19": "wind_onshore", "B20": "other",
+}
 
 # ENTSO-E's IEC 62325 namespace — the exact URI is stable across document
 # types/versions in practice but pinned here rather than wildcarded, since a
@@ -183,6 +197,95 @@ class EntsoeClient:
             records.extend(self._parse_unavailability_document(xml_text))
         logger.info("Parsed %d outage records from ENTSO-E response", len(records))
         return records
+
+    def fetch_generation_unit_registry(
+        self, period_start: datetime, period_end: datetime
+    ) -> list[dict]:
+        """
+        Fetch the roster of large (>100MW, EU transparency threshold) French
+        production units via A73 "Actual generation per generation unit".
+
+        Unlike fetch_unavailability_of_production_units(), this reports every
+        unit that generated in the window *regardless* of outage status —
+        it's the master list a map needs (named + typed units that exist),
+        with A77 layered on top only to say which of them are currently down.
+        A single day is enough to see the full roster (units report daily
+        whether they're impacted by an outage or not); a wider period_start/
+        period_end just re-confirms the same units, deduplicated below.
+
+        ENTSO-E caps this endpoint's own window at 1 day per request (unlike
+        outages, which allows a wide window but caps item *count*) — a
+        multi-day request here is split into daily calls and merged rather
+        than left to the caller to chunk.
+
+        Returns:
+            List of {"unit_mrid", "unit_name", "psr_type"} — one entry per
+            distinct registered unit seen across the whole period.
+
+        Raises:
+            EntsoeClientError: missing token, HTTP failure, or a request
+                ENTSO-E itself rejected.
+        """
+        if not self.api_token:
+            raise EntsoeClientError("ENTSOE_API_TOKEN not configured")
+
+        units: dict[str, dict] = {}
+        day_start = period_start
+        while day_start < period_end:
+            day_end = min(day_start + timedelta(days=1), period_end)
+            params = {
+                "securityToken": self.api_token,
+                "documentType": DOCUMENT_TYPE_ACTUAL_GENERATION_PER_UNIT,
+                "processType": PROCESS_TYPE_REALISED,
+                "in_Domain": FRANCE_DOMAIN,
+                "periodStart": day_start.strftime("%Y%m%d%H%M"),
+                "periodEnd": day_end.strftime("%Y%m%d%H%M"),
+            }
+
+            try:
+                response = self.session.get(BASE_URL, params=params, timeout=REQUEST_TIMEOUT)
+            except requests.exceptions.RequestException as exc:
+                raise EntsoeClientError(f"Request failed: {exc}") from exc
+
+            if response.status_code == 401:
+                raise EntsoeClientError("Invalid or missing ENTSO-E security token")
+            if response.status_code != 200:
+                raise EntsoeClientError(f"HTTP {response.status_code}: {response.text[:200]}")
+
+            for unit in self._parse_generation_unit_registry(response.text):
+                units[unit["unit_mrid"]] = unit
+
+            day_start = day_end
+
+        return list(units.values())
+
+    @staticmethod
+    def _parse_generation_unit_registry(xml_text: str) -> list[dict]:
+        """Parse an A73 GL_MarketDocument into deduplicated unit registry rows."""
+        try:
+            root = ET.fromstring(xml_text)
+        except ET.ParseError as exc:
+            raise EntsoeClientError(f"Malformed XML response: {exc}") from exc
+
+        if root.tag.endswith("Acknowledgement_MarketDocument"):
+            reason = root.findtext(".//{*}Reason/{*}text") or "no reason given"
+            logger.info("ENTSO-E generation registry: %s", reason)
+            return []
+
+        units: dict[str, dict] = {}
+        for ts in root.findall(".//{*}TimeSeries"):
+            unit_mrid = ts.findtext(".//{*}MktPSRType/{*}PowerSystemResources/{*}mRID")
+            unit_name = ts.findtext(".//{*}MktPSRType/{*}PowerSystemResources/{*}name")
+            psr_type = ts.findtext(".//{*}MktPSRType/{*}psrType")
+            if not unit_mrid or not unit_name:
+                continue
+            units[unit_mrid] = {
+                "unit_mrid": unit_mrid,
+                "unit_name": unit_name,
+                "psr_type": PSR_TYPE_LABELS.get(psr_type or "", psr_type or "unknown"),
+            }
+
+        return list(units.values())
 
     @staticmethod
     def _parse_over_limit_count(xml_text: str) -> int | None:

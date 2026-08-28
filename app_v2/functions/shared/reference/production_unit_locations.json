@@ -1,4 +1,44 @@
 {
+  "A1 DE PARC EOLIEN EN MER DE LA BAIE DE ST-BRIEUC": {
+    "class": "boundary",
+    "label": "Saint-Brieuc, Côtes-d'Armor, Bretagne, France métropolitaine, 22000, France",
+    "lat": 48.5141134,
+    "lon": -2.7603283,
+    "needs_review": false,
+    "psr_type": "wind_offshore",
+    "query_used": "ST-BRIEUC",
+    "type": "administrative"
+  },
+  "A2 DE PARC EOLIEN EN MER DE LA BAIE DE ST-BRIEUC": {
+    "class": "boundary",
+    "label": "Saint-Brieuc, Côtes-d'Armor, Bretagne, France métropolitaine, 22000, France",
+    "lat": 48.5141134,
+    "lon": -2.7603283,
+    "needs_review": false,
+    "psr_type": "wind_offshore",
+    "query_used": "ST-BRIEUC",
+    "type": "administrative"
+  },
+  "ADP 01 DE LA FERME EOLIENNE DE VENT-DES-ILES": {
+    "class": "tourism",
+    "label": "Musée de Tahiti et des Îles, Servitude du Musée de Tahiti et des Iles, Teoneanini, Punaʻauiʻa, Îles du Vent, Polynésie Française, 98703, France",
+    "lat": -17.6319534,
+    "lon": -149.6135812,
+    "needs_review": false,
+    "psr_type": "wind_offshore",
+    "query_used": "VENT-DES-ILES",
+    "type": "museum"
+  },
+  "ADP 02 DE LA FERME EOLIENNE DE VENT-DES-ILES": {
+    "class": "tourism",
+    "label": "Musée de Tahiti et des Îles, Servitude du Musée de Tahiti et des Iles, Teoneanini, Punaʻauiʻa, Îles du Vent, Polynésie Française, 98703, France",
+    "lat": -17.6319534,
+    "lon": -149.6135812,
+    "needs_review": false,
+    "psr_type": "wind_offshore",
+    "query_used": "VENT-DES-ILES",
+    "type": "museum"
+  },
   "AIGLE": {
     "class": "waterway",
     "label": "Barrage de l'Aigle, Le Breuil, Soursac, Ussel, Corrèze, Nouvelle-Aquitaine, France métropolitaine, France",
@@ -8,6 +48,36 @@
     "query_used": "Barrage de l'Aigle Corrèze (manually verified — auto match was wrong)",
     "type": "dam"
   },
+  "AIGLE 6": {
+    "class": "boundary",
+    "label": "Saint-Pierre-Aigle, Soissons, Aisne, Hauts-de-France, France métropolitaine, 02600, France",
+    "lat": 49.3208333,
+    "lon": 3.1866667,
+    "needs_review": false,
+    "psr_type": "hydro_water_reservoir",
+    "query_used": "AIGLE",
+    "type": "administrative"
+  },
+  "ARRIGHI 1": {
+    "class": "highway",
+    "label": "Rue Paul Arrighi, Le Petit Sauilly, Moulins-sur-Ouanne, Auxerre, Yonne, Bourgogne-Franche-Comté, France métropolitaine, 89130, France",
+    "lat": 47.7072628,
+    "lon": 3.3365692,
+    "needs_review": false,
+    "psr_type": "fossil_oil",
+    "query_used": "ARRIGHI",
+    "type": "secondary"
+  },
+  "ARRIGHI 2": {
+    "class": "highway",
+    "label": "Rue Paul Arrighi, Le Petit Sauilly, Moulins-sur-Ouanne, Auxerre, Yonne, Bourgogne-Franche-Comté, France métropolitaine, 89130, France",
+    "lat": 47.7072628,
+    "lon": 3.3365692,
+    "needs_review": false,
+    "psr_type": "fossil_oil",
+    "query_used": "ARRIGHI",
+    "type": "secondary"
+  },
   "BANC DE GUERANDE": {
     "class": "boundary",
     "label": "Guérande, Saint-Nazaire, Loire-Atlantique, Pays de la Loire, France métropolitaine, 44350, France",
@@ -15,6 +85,24 @@
     "lon": -2.4293843,
     "needs_review": false,
     "query_used": "GUERANDE",
+    "type": "administrative"
+  },
+  "BANC DE GUERANDE 1": {
+    "class": "boundary",
+    "label": "Guérande, Saint-Nazaire, Loire-Atlantique, Pays de la Loire, France métropolitaine, 44350, France",
+    "lat": 47.3278442,
+    "lon": -2.4293843,
+    "needs_review": false,
+    "query_used": "reused BANC DE GUERANDE's coords (per-turbine-group variant)",
+    "type": "administrative"
+  },
+  "BANC DE GUERANDE 2": {
+    "class": "boundary",
+    "label": "Guérande, Saint-Nazaire, Loire-Atlantique, Pays de la Loire, France métropolitaine, 44350, France",
+    "lat": 47.3278442,
+    "lon": -2.4293843,
+    "needs_review": false,
+    "query_used": "reused BANC DE GUERANDE's coords (per-turbine-group variant)",
     "type": "administrative"
   },
   "BATHIE": {
@@ -26,14 +114,95 @@
     "query_used": "BATHIE",
     "type": "reservoir"
   },
+  "BATHIE 1": {
+    "class": "water",
+    "label": "Bassin compensateur de La Bathie, Biorges, La Bâthie, Albertville, Savoie, Auvergne-Rhône-Alpes, France métropolitaine, 73540, France",
+    "lat": 45.6456361,
+    "lon": 6.4397826,
+    "needs_review": false,
+    "psr_type": "hydro_water_reservoir",
+    "query_used": "BATHIE",
+    "type": "reservoir"
+  },
+  "BATHIE 2": {
+    "class": "water",
+    "label": "Bassin compensateur de La Bathie, Biorges, La Bâthie, Albertville, Savoie, Auvergne-Rhône-Alpes, France métropolitaine, 73540, France",
+    "lat": 45.6456361,
+    "lon": 6.4397826,
+    "needs_review": false,
+    "psr_type": "hydro_water_reservoir",
+    "query_used": "BATHIE",
+    "type": "reservoir"
+  },
+  "BATHIE 3": {
+    "class": "water",
+    "label": "Bassin compensateur de La Bathie, Biorges, La Bâthie, Albertville, Savoie, Auvergne-Rhône-Alpes, France métropolitaine, 73540, France",
+    "lat": 45.6456361,
+    "lon": 6.4397826,
+    "needs_review": false,
+    "psr_type": "hydro_water_reservoir",
+    "query_used": "BATHIE",
+    "type": "reservoir"
+  },
+  "BATHIE 4": {
+    "class": "water",
+    "label": "Bassin compensateur de La Bathie, Biorges, La Bâthie, Albertville, Savoie, Auvergne-Rhône-Alpes, France métropolitaine, 73540, France",
+    "lat": 45.6456361,
+    "lon": 6.4397826,
+    "needs_review": false,
+    "psr_type": "hydro_water_reservoir",
+    "query_used": "BATHIE",
+    "type": "reservoir"
+  },
+  "BATHIE 5": {
+    "class": "water",
+    "label": "Bassin compensateur de La Bathie, Biorges, La Bâthie, Albertville, Savoie, Auvergne-Rhône-Alpes, France métropolitaine, 73540, France",
+    "lat": 45.6456361,
+    "lon": 6.4397826,
+    "needs_review": false,
+    "psr_type": "hydro_water_reservoir",
+    "query_used": "BATHIE",
+    "type": "reservoir"
+  },
+  "BATHIE 6": {
+    "class": "water",
+    "label": "Bassin compensateur de La Bathie, Biorges, La Bâthie, Albertville, Savoie, Auvergne-Rhône-Alpes, France métropolitaine, 73540, France",
+    "lat": 45.6456361,
+    "lon": 6.4397826,
+    "needs_review": false,
+    "psr_type": "hydro_water_reservoir",
+    "query_used": "BATHIE",
+    "type": "reservoir"
+  },
   "BAYET MORANDES (LES)": {
     "class": "landuse",
     "label": "Centrale à cycle combiné gaz de Bayet (3CB), Bayet, Vichy, Allier, Auvergne-Rhône-Alpes, France métropolitaine, 03500, France",
     "lat": 46.2713809,
     "lon": 3.3026024,
     "needs_review": false,
+    "psr_type": "fossil_gas",
     "query_used": "Centrale Bayet Allier (found via web search: \"Morandes\" is the site/lieu-dit name for this gas plant, not a separate location)",
     "type": "industrial"
+  },
+  "BELLEVILLE 1": {
+    "class": "boundary",
+    "label": "Belleville, Nancy, Meurthe-et-Moselle, Grand Est, France métropolitaine, 54940, France",
+    "lat": 48.8176714,
+    "lon": 6.0982683,
+    "needs_review": false,
+    "psr_type": "nuclear",
+    "query_used": "BELLEVILLE",
+    "type": "administrative"
+  },
+  "BELLEVILLE 2": {
+    "class": "boundary",
+    "label": "Belleville, Nancy, Meurthe-et-Moselle, Grand Est, France métropolitaine, 54940, France",
+    "lat": 48.8176714,
+    "lon": 6.0982683,
+    "needs_review": false,
+    "psr_type": "nuclear",
+    "query_used": "BELLEVILLE",
+    "type": "administrative"
   },
   "BESS_AFD7_BARBAN_SAUCATS": {
     "class": "boundary",
@@ -42,6 +211,105 @@
     "lon": -0.5958896,
     "needs_review": false,
     "query_used": "SAUCATS",
+    "type": "administrative"
+  },
+  "BESS_AFD7_BARBAN_SAUCATS_1": {
+    "class": "boundary",
+    "label": "Saucats, Bordeaux, Gironde, Nouvelle-Aquitaine, France métropolitaine, 33650, France",
+    "lat": 44.652798,
+    "lon": -0.5958896,
+    "needs_review": false,
+    "query_used": "reused BESS_AFD7_BARBAN_SAUCATS's coords (per-unit variant)",
+    "type": "administrative"
+  },
+  "BLAYAIS 1": {
+    "class": "highway",
+    "label": "Blayais, Avenue du Maréchal De Lattre de Tassigny, Le Bleu, Toctoucau, Pessac, Bordeaux, Gironde, Nouvelle-Aquitaine, France métropolitaine, 33600, France",
+    "lat": 44.7683263,
+    "lon": -0.719487,
+    "needs_review": false,
+    "psr_type": "nuclear",
+    "query_used": "BLAYAIS",
+    "type": "bus_stop"
+  },
+  "BLAYAIS 2": {
+    "class": "highway",
+    "label": "Blayais, Avenue du Maréchal De Lattre de Tassigny, Le Bleu, Toctoucau, Pessac, Bordeaux, Gironde, Nouvelle-Aquitaine, France métropolitaine, 33600, France",
+    "lat": 44.7683263,
+    "lon": -0.719487,
+    "needs_review": false,
+    "psr_type": "nuclear",
+    "query_used": "BLAYAIS",
+    "type": "bus_stop"
+  },
+  "BLAYAIS 3": {
+    "class": "highway",
+    "label": "Blayais, Avenue du Maréchal De Lattre de Tassigny, Le Bleu, Toctoucau, Pessac, Bordeaux, Gironde, Nouvelle-Aquitaine, France métropolitaine, 33600, France",
+    "lat": 44.7683263,
+    "lon": -0.719487,
+    "needs_review": false,
+    "psr_type": "nuclear",
+    "query_used": "BLAYAIS",
+    "type": "bus_stop"
+  },
+  "BLAYAIS 4": {
+    "class": "highway",
+    "label": "Blayais, Avenue du Maréchal De Lattre de Tassigny, Le Bleu, Toctoucau, Pessac, Bordeaux, Gironde, Nouvelle-Aquitaine, France métropolitaine, 33600, France",
+    "lat": 44.7683263,
+    "lon": -0.719487,
+    "needs_review": false,
+    "psr_type": "nuclear",
+    "query_used": "BLAYAIS",
+    "type": "bus_stop"
+  },
+  "BLENOD 5": {
+    "class": "boundary",
+    "label": "Blénod-lès-Pont-à-Mousson, Nancy, Meurthe-et-Moselle, Grand Est, France métropolitaine, 54700, France",
+    "lat": 48.8811732,
+    "lon": 6.0530227,
+    "needs_review": false,
+    "psr_type": "fossil_gas",
+    "query_used": "BLENOD",
+    "type": "administrative"
+  },
+  "BORT 1": {
+    "class": "boundary",
+    "label": "Bort-les-Orgues, Ussel, Corrèze, Nouvelle-Aquitaine, France métropolitaine, 19110, France",
+    "lat": 45.4010305,
+    "lon": 2.4992935,
+    "needs_review": false,
+    "psr_type": "hydro_water_reservoir",
+    "query_used": "BORT",
+    "type": "administrative"
+  },
+  "BORT 2": {
+    "class": "boundary",
+    "label": "Bort-les-Orgues, Ussel, Corrèze, Nouvelle-Aquitaine, France métropolitaine, 19110, France",
+    "lat": 45.4010305,
+    "lon": 2.4992935,
+    "needs_review": false,
+    "psr_type": "hydro_water_reservoir",
+    "query_used": "BORT",
+    "type": "administrative"
+  },
+  "BOUCHAIN 7": {
+    "class": "boundary",
+    "label": "Bouchain, Valenciennes, Nord, Hauts-de-France, France métropolitaine, 59111, France",
+    "lat": 50.2810049,
+    "lon": 3.3196824,
+    "needs_review": false,
+    "psr_type": "fossil_gas",
+    "query_used": "BOUCHAIN",
+    "type": "administrative"
+  },
+  "BRENNILIS 3": {
+    "class": "boundary",
+    "label": "Brennilis, Châteaulin, Finistère, Bretagne, France métropolitaine, 29690, France",
+    "lat": 48.3575696,
+    "lon": -3.8512079,
+    "needs_review": false,
+    "psr_type": "fossil_oil",
+    "query_used": "BRENNILIS",
     "type": "administrative"
   },
   "BROMMAT": {
@@ -53,12 +321,132 @@
     "query_used": "BROMMAT",
     "type": "administrative"
   },
+  "BROMMAT 7": {
+    "class": "boundary",
+    "label": "Brommat, Rodez, Aveyron, Occitanie, France métropolitaine, 12600, France",
+    "lat": 44.8288,
+    "lon": 2.68482,
+    "needs_review": false,
+    "psr_type": "hydro_water_reservoir",
+    "query_used": "BROMMAT",
+    "type": "administrative"
+  },
+  "BUGEY 2": {
+    "class": "boundary",
+    "label": "Bugey, Auvergne-Rhône-Alpes, France métropolitaine, France",
+    "lat": 45.9779838,
+    "lon": 5.5447649,
+    "needs_review": false,
+    "psr_type": "nuclear",
+    "query_used": "BUGEY",
+    "type": "natural"
+  },
+  "BUGEY 3": {
+    "class": "boundary",
+    "label": "Bugey, Auvergne-Rhône-Alpes, France métropolitaine, France",
+    "lat": 45.9779838,
+    "lon": 5.5447649,
+    "needs_review": false,
+    "psr_type": "nuclear",
+    "query_used": "BUGEY",
+    "type": "natural"
+  },
+  "BUGEY 4": {
+    "class": "boundary",
+    "label": "Bugey, Auvergne-Rhône-Alpes, France métropolitaine, France",
+    "lat": 45.9779838,
+    "lon": 5.5447649,
+    "needs_review": false,
+    "psr_type": "nuclear",
+    "query_used": "BUGEY",
+    "type": "natural"
+  },
+  "BUGEY 5": {
+    "class": "boundary",
+    "label": "Bugey, Auvergne-Rhône-Alpes, France métropolitaine, France",
+    "lat": 45.9779838,
+    "lon": 5.5447649,
+    "needs_review": false,
+    "psr_type": "nuclear",
+    "query_used": "BUGEY",
+    "type": "natural"
+  },
+  "CATTENOM 1": {
+    "class": "boundary",
+    "label": "Cattenom, Thionville, Moselle, Grand Est, France métropolitaine, 57570, France",
+    "lat": 49.4074405,
+    "lon": 6.244669,
+    "needs_review": false,
+    "psr_type": "nuclear",
+    "query_used": "CATTENOM",
+    "type": "administrative"
+  },
+  "CATTENOM 2": {
+    "class": "boundary",
+    "label": "Cattenom, Thionville, Moselle, Grand Est, France métropolitaine, 57570, France",
+    "lat": 49.4074405,
+    "lon": 6.244669,
+    "needs_review": false,
+    "psr_type": "nuclear",
+    "query_used": "CATTENOM",
+    "type": "administrative"
+  },
+  "CATTENOM 3": {
+    "class": "boundary",
+    "label": "Cattenom, Thionville, Moselle, Grand Est, France métropolitaine, 57570, France",
+    "lat": 49.4074405,
+    "lon": 6.244669,
+    "needs_review": false,
+    "psr_type": "nuclear",
+    "query_used": "CATTENOM",
+    "type": "administrative"
+  },
+  "CATTENOM 4": {
+    "class": "boundary",
+    "label": "Cattenom, Thionville, Moselle, Grand Est, France métropolitaine, 57570, France",
+    "lat": 49.4074405,
+    "lon": 6.244669,
+    "needs_review": false,
+    "psr_type": "nuclear",
+    "query_used": "CATTENOM",
+    "type": "administrative"
+  },
+  "CERNAY": {
+    "class": "boundary",
+    "label": "Cernay, Lisieux, Calvados, Normandie, France métropolitaine, 14290, France",
+    "lat": 49.0211111,
+    "lon": 0.325,
+    "needs_review": false,
+    "psr_type": "other",
+    "query_used": "CERNAY",
+    "type": "administrative"
+  },
   "CHASTANG": {
     "class": "waterway",
     "label": "Barrage du Chastang, Lavastroux, Saint-Martin-la-Méanne, Tulle, Corrèze, Nouvelle-Aquitaine, France métropolitaine, 19320, France",
     "lat": 45.1515884,
     "lon": 2.0099407,
     "needs_review": false,
+    "query_used": "CHASTANG",
+    "type": "dam"
+  },
+  "CHASTANG 2": {
+    "class": "waterway",
+    "label": "Barrage du Chastang, Lavastroux, Saint-Martin-la-Méanne, Tulle, Corrèze, Nouvelle-Aquitaine, France métropolitaine, 19320, France",
+    "lat": 45.1515884,
+    "lon": 2.0099407,
+    "needs_review": false,
+    "psr_type": "hydro_run_of_river",
+    "query_used": "CHASTANG",
+    "type": "dam"
+  },
+  "CHASTANG 3": {
+    "class": "waterway",
+    "label": "Barrage du Chastang, Lavastroux, Saint-Martin-la-Méanne, Tulle, Corrèze, Nouvelle-Aquitaine, France métropolitaine, 19320, France",
+    "lat": 45.1515884,
+    "lon": 2.0099407,
+    "needs_review": false,
+    "psr_type": "hydro_run_of_river",
     "query_used": "CHASTANG",
     "type": "dam"
   },
@@ -71,6 +459,106 @@
     "query_used": "CHEYLAS",
     "type": "administrative"
   },
+  "CHEYLAS 1": {
+    "class": "boundary",
+    "label": "Le Cheylas, Grenoble, Isère, Auvergne-Rhône-Alpes, France métropolitaine, 38570, France",
+    "lat": 45.370339,
+    "lon": 5.9927101,
+    "needs_review": false,
+    "psr_type": "hydro_pumped_storage",
+    "query_used": "CHEYLAS",
+    "type": "administrative"
+  },
+  "CHEYLAS 2": {
+    "class": "boundary",
+    "label": "Le Cheylas, Grenoble, Isère, Auvergne-Rhône-Alpes, France métropolitaine, 38570, France",
+    "lat": 45.370339,
+    "lon": 5.9927101,
+    "needs_review": false,
+    "psr_type": "hydro_pumped_storage",
+    "query_used": "CHEYLAS",
+    "type": "administrative"
+  },
+  "CHINON 1": {
+    "class": "boundary",
+    "label": "Chinon, Indre-et-Loire, Centre-Val de Loire, France métropolitaine, 37500, France",
+    "lat": 47.1667182,
+    "lon": 0.2402095,
+    "needs_review": false,
+    "psr_type": "nuclear",
+    "query_used": "CHINON",
+    "type": "administrative"
+  },
+  "CHINON 2": {
+    "class": "boundary",
+    "label": "Chinon, Indre-et-Loire, Centre-Val de Loire, France métropolitaine, 37500, France",
+    "lat": 47.1667182,
+    "lon": 0.2402095,
+    "needs_review": false,
+    "psr_type": "nuclear",
+    "query_used": "CHINON",
+    "type": "administrative"
+  },
+  "CHINON 3": {
+    "class": "boundary",
+    "label": "Chinon, Indre-et-Loire, Centre-Val de Loire, France métropolitaine, 37500, France",
+    "lat": 47.1667182,
+    "lon": 0.2402095,
+    "needs_review": false,
+    "psr_type": "nuclear",
+    "query_used": "CHINON",
+    "type": "administrative"
+  },
+  "CHINON 4": {
+    "class": "boundary",
+    "label": "Chinon, Indre-et-Loire, Centre-Val de Loire, France métropolitaine, 37500, France",
+    "lat": 47.1667182,
+    "lon": 0.2402095,
+    "needs_review": false,
+    "psr_type": "nuclear",
+    "query_used": "CHINON",
+    "type": "administrative"
+  },
+  "CHOOZ 1": {
+    "class": "boundary",
+    "label": "Chooz, Charleville-Mézières, Ardennes, Grand Est, France métropolitaine, 08600, France",
+    "lat": 50.1020081,
+    "lon": 4.8070034,
+    "needs_review": false,
+    "psr_type": "nuclear",
+    "query_used": "CHOOZ",
+    "type": "administrative"
+  },
+  "CHOOZ 2": {
+    "class": "boundary",
+    "label": "Chooz, Charleville-Mézières, Ardennes, Grand Est, France métropolitaine, 08600, France",
+    "lat": 50.1020081,
+    "lon": 4.8070034,
+    "needs_review": false,
+    "psr_type": "nuclear",
+    "query_used": "CHOOZ",
+    "type": "administrative"
+  },
+  "CIVAUX 1": {
+    "class": "boundary",
+    "label": "Civaux, Montmorillon, Vienne, Nouvelle-Aquitaine, France métropolitaine, 86320, France",
+    "lat": 46.4448144,
+    "lon": 0.6646452,
+    "needs_review": false,
+    "psr_type": "nuclear",
+    "query_used": "CIVAUX",
+    "type": "administrative"
+  },
+  "CIVAUX 2": {
+    "class": "boundary",
+    "label": "Civaux, Montmorillon, Vienne, Nouvelle-Aquitaine, France métropolitaine, 86320, France",
+    "lat": 46.4448144,
+    "lon": 0.6646452,
+    "needs_review": false,
+    "psr_type": "nuclear",
+    "query_used": "CIVAUX",
+    "type": "administrative"
+  },
   "COCHE": {
     "class": "place",
     "label": "Coche, Quérion, Pommiers-Moulons, Jonzac, Charente-Maritime, Nouvelle-Aquitaine, France métropolitaine, 17130, France",
@@ -79,6 +567,36 @@
     "needs_review": false,
     "query_used": "COCHE",
     "type": "locality"
+  },
+  "COCHE 5": {
+    "class": "place",
+    "label": "Coche, Quérion, Pommiers-Moulons, Jonzac, Charente-Maritime, Nouvelle-Aquitaine, France métropolitaine, 17130, France",
+    "lat": 45.3130461,
+    "lon": -0.3474426,
+    "needs_review": false,
+    "psr_type": "hydro_pumped_storage",
+    "query_used": "COCHE",
+    "type": "locality"
+  },
+  "COGENERATION NORMANDIE (AMFARD) TRAIN 14": {
+    "class": "railway",
+    "label": "Métro 14, Allée de la Chocolaterie, Petit-Ivry, Ivry-sur-Seine, L'Haÿ-les-Roses, Val-de-Marne, Île-de-France, France métropolitaine, 94200, France",
+    "lat": 48.7788178,
+    "lon": 2.3516746,
+    "needs_review": false,
+    "psr_type": "fossil_gas",
+    "query_used": "14",
+    "type": "subway"
+  },
+  "COGENERATION NORMANDIE (AMFARD) TRAIN 15": {
+    "class": "railway",
+    "label": "Ligne 15 Sud du Grand Paris Express, Ivry Port, Ivry-sur-Seine, L'Haÿ-les-Roses, Val-de-Marne, Île-de-France, France métropolitaine, 94200, France",
+    "lat": 48.7831649,
+    "lon": 2.4135644,
+    "needs_review": false,
+    "psr_type": "fossil_gas",
+    "query_used": "15",
+    "type": "subway"
   },
   "COMBE D'AVRIEUX": {
     "class": "highway",
@@ -89,14 +607,55 @@
     "query_used": "COMBE D'AVRIEUX",
     "type": "residential"
   },
+  "COMBE D'AVRIEUX 1": {
+    "class": "highway",
+    "label": "Rue de la Combe, Avrieux, Saint-Jean-de-Maurienne, Savoie, Auvergne-Rhône-Alpes, France métropolitaine, 73500, France",
+    "lat": 45.2168406,
+    "lon": 6.7219669,
+    "needs_review": false,
+    "psr_type": "hydro_water_reservoir",
+    "query_used": "COMBE D'AVRIEUX",
+    "type": "residential"
+  },
+  "COMBIGOLFE CCG": {
+    "class": "office",
+    "label": "CCG, Rue Pierre-Paul Retali, Sannois, Argenteuil, Val-d'Oise, Île-de-France, France métropolitaine, 95110, France",
+    "lat": 48.9705571,
+    "lon": 2.2626936,
+    "needs_review": false,
+    "psr_type": "fossil_gas",
+    "query_used": "CCG",
+    "type": "consulting"
+  },
   "COMPAGNIE ELECTRIQUE DE BRETAGNE": {
     "class": "landuse",
     "label": "Centrale à cycle combiné gaz de Landivisiau, Le Vern, Landivisiau, Morlaix, Finistère, Bretagne, France métropolitaine, 29400, France",
     "lat": 48.5224152,
     "lon": -4.0716505,
     "needs_review": false,
+    "psr_type": "fossil_gas",
     "query_used": "COMPAGNIE ELECTRIQUE DE BRETAGNE",
     "type": "industrial"
+  },
+  "CORDEMAIS 4": {
+    "class": "boundary",
+    "label": "Cordemais, Nantes, Loire-Atlantique, Pays de la Loire, France métropolitaine, 44360, France",
+    "lat": 47.2909306,
+    "lon": -1.8762761,
+    "needs_review": false,
+    "psr_type": "fossil_hard_coal",
+    "query_used": "CORDEMAIS",
+    "type": "administrative"
+  },
+  "CORDEMAIS 5": {
+    "class": "boundary",
+    "label": "Cordemais, Nantes, Loire-Atlantique, Pays de la Loire, France métropolitaine, 44360, France",
+    "lat": 47.2909306,
+    "lon": -1.8762761,
+    "needs_review": false,
+    "psr_type": "fossil_hard_coal",
+    "query_used": "CORDEMAIS",
+    "type": "administrative"
   },
   "COUESQUE": {
     "class": "waterway",
@@ -107,14 +666,73 @@
     "query_used": "Barrage de Couesques Aveyron (found via web search — unit name is missing the trailing 's')",
     "type": "dam"
   },
+  "CPCU-CogeVitryâGP": {
+    "class": "landuse",
+    "label": "Compagnie Parisienne de Chauffage Urbain, Vitry-sur-Seine, Val-de-Marne, Île-de-France, France métropolitaine, 94400, France",
+    "lat": 48.7888967,
+    "lon": 2.4167763,
+    "needs_review": false,
+    "query_used": "CPCU Vitry (unit name contains a mojibake em-dash — likely 'CPCU-CogeVitry–GP')",
+    "type": "industrial"
+  },
+  "CPCU-StOuen-GP": {
+    "class": "landuse",
+    "label": "Centrale CPCU de Saint-Ouen, Les Docks, Saint-Ouen-sur-Seine, Saint-Denis, Seine-Saint-Denis, Île-de-France, France métropolitaine, 93400, France",
+    "lat": 48.9119054,
+    "lon": 2.3265031,
+    "needs_review": false,
+    "query_used": "CPCU Saint-Ouen",
+    "type": "industrial"
+  },
   "CROIX DE METZ": {
     "class": "place",
     "label": "Croix de Metz, Croix de Metz Régina, Toul, Meurthe-et-Moselle, Grand Est, France métropolitaine, 54200, France",
     "lat": 48.6900453,
     "lon": 5.8983837,
     "needs_review": false,
+    "psr_type": "fossil_gas",
     "query_used": "CROIX DE METZ",
     "type": "suburb"
+  },
+  "CRUAS 1": {
+    "class": "boundary",
+    "label": "Cruas, Privas, Ardèche, Auvergne-Rhône-Alpes, France métropolitaine, 07350, France",
+    "lat": 44.6571316,
+    "lon": 4.7625644,
+    "needs_review": false,
+    "psr_type": "nuclear",
+    "query_used": "CRUAS",
+    "type": "administrative"
+  },
+  "CRUAS 2": {
+    "class": "boundary",
+    "label": "Cruas, Privas, Ardèche, Auvergne-Rhône-Alpes, France métropolitaine, 07350, France",
+    "lat": 44.6571316,
+    "lon": 4.7625644,
+    "needs_review": false,
+    "psr_type": "nuclear",
+    "query_used": "CRUAS",
+    "type": "administrative"
+  },
+  "CRUAS 3": {
+    "class": "boundary",
+    "label": "Cruas, Privas, Ardèche, Auvergne-Rhône-Alpes, France métropolitaine, 07350, France",
+    "lat": 44.6571316,
+    "lon": 4.7625644,
+    "needs_review": false,
+    "psr_type": "nuclear",
+    "query_used": "CRUAS",
+    "type": "administrative"
+  },
+  "CRUAS 4": {
+    "class": "boundary",
+    "label": "Cruas, Privas, Ardèche, Auvergne-Rhône-Alpes, France métropolitaine, 07350, France",
+    "lat": 44.6571316,
+    "lon": 4.7625644,
+    "needs_review": false,
+    "psr_type": "nuclear",
+    "query_used": "CRUAS",
+    "type": "administrative"
   },
   "CURBANS": {
     "class": "boundary",
@@ -125,6 +743,118 @@
     "query_used": "CURBANS",
     "type": "administrative"
   },
+  "CYCOFOS PL1": {
+    "class": "landuse",
+    "label": "Cycofos, Fos-sur-Mer, Istres, Bouches-du-Rhône, Provence-Alpes-Côte d'Azur, France métropolitaine, 13270, France",
+    "lat": 43.4288024,
+    "lon": 4.8858591,
+    "needs_review": false,
+    "psr_type": "fossil_gas",
+    "query_used": "CYCOFOS PL1",
+    "type": "industrial"
+  },
+  "DAMPIERRE 1": {
+    "class": "boundary",
+    "label": "Dampierre-en-Burly, Orléans, Loiret, Centre-Val de Loire, France métropolitaine, 45570, France",
+    "lat": 47.760981,
+    "lon": 2.517088,
+    "needs_review": false,
+    "query_used": "Dampierre-en-Burly (nuclear plant's commune — prior auto-match was a wrong same-name hamlet in Calvados)",
+    "type": "administrative"
+  },
+  "DAMPIERRE 2": {
+    "class": "boundary",
+    "label": "Dampierre-en-Burly, Orléans, Loiret, Centre-Val de Loire, France métropolitaine, 45570, France",
+    "lat": 47.760981,
+    "lon": 2.517088,
+    "needs_review": false,
+    "query_used": "Dampierre-en-Burly (nuclear plant's commune — prior auto-match was a wrong same-name hamlet in Calvados)",
+    "type": "administrative"
+  },
+  "DAMPIERRE 3": {
+    "class": "boundary",
+    "label": "Dampierre-en-Burly, Orléans, Loiret, Centre-Val de Loire, France métropolitaine, 45570, France",
+    "lat": 47.760981,
+    "lon": 2.517088,
+    "needs_review": false,
+    "query_used": "Dampierre-en-Burly (nuclear plant's commune — prior auto-match was a wrong same-name hamlet in Calvados)",
+    "type": "administrative"
+  },
+  "DAMPIERRE 4": {
+    "class": "boundary",
+    "label": "Dampierre-en-Burly, Orléans, Loiret, Centre-Val de Loire, France métropolitaine, 45570, France",
+    "lat": 47.760981,
+    "lon": 2.517088,
+    "needs_review": false,
+    "query_used": "Dampierre-en-Burly (nuclear plant's commune — prior auto-match was a wrong same-name hamlet in Calvados)",
+    "type": "administrative"
+  },
+  "DK6-TG1": {
+    "class": "landuse",
+    "label": "Centrale Thermique DK6, Dunkerque, Nord, Hauts-de-France, France métropolitaine, France",
+    "lat": 51.0476954,
+    "lon": 2.3259455,
+    "needs_review": false,
+    "query_used": "Centrale DK6 Dunkerque",
+    "type": "industrial"
+  },
+  "DK6-TG2": {
+    "class": "landuse",
+    "label": "Centrale Thermique DK6, Dunkerque, Nord, Hauts-de-France, France métropolitaine, France",
+    "lat": 51.0476954,
+    "lon": 2.3259455,
+    "needs_review": false,
+    "query_used": "Centrale DK6 Dunkerque",
+    "type": "industrial"
+  },
+  "DK6-TV1": {
+    "class": "landuse",
+    "label": "Centrale Thermique DK6, Dunkerque, Nord, Hauts-de-France, France métropolitaine, France",
+    "lat": 51.0476954,
+    "lon": 2.3259455,
+    "needs_review": false,
+    "query_used": "Centrale DK6 Dunkerque",
+    "type": "industrial"
+  },
+  "DK6-TV2": {
+    "class": "landuse",
+    "label": "Centrale Thermique DK6, Dunkerque, Nord, Hauts-de-France, France métropolitaine, France",
+    "lat": 51.0476954,
+    "lon": 2.3259455,
+    "needs_review": false,
+    "query_used": "Centrale DK6 Dunkerque",
+    "type": "industrial"
+  },
+  "EMILE HUCHET 6": {
+    "class": "leisure",
+    "label": "Stade Émile Huchet HAC, Rue des Œillets, Cité Émile Huchet, Saint-Avold, Forbach-Boulay-Moselle, Moselle, Grand Est, France métropolitaine, 57500, France",
+    "lat": 49.1313152,
+    "lon": 6.6953109,
+    "needs_review": false,
+    "psr_type": "fossil_hard_coal",
+    "query_used": "EMILE HUCHET",
+    "type": "pitch"
+  },
+  "FECAMP 1": {
+    "class": "boundary",
+    "label": "Fécamp, Le Havre, Seine-Maritime, Normandie, France métropolitaine, 76400, France",
+    "lat": 49.757156,
+    "lon": 0.3763863,
+    "needs_review": false,
+    "psr_type": "wind_offshore",
+    "query_used": "FECAMP",
+    "type": "administrative"
+  },
+  "FECAMP 2": {
+    "class": "boundary",
+    "label": "Fécamp, Le Havre, Seine-Maritime, Normandie, France métropolitaine, 76400, France",
+    "lat": 49.757156,
+    "lon": 0.3763863,
+    "needs_review": false,
+    "psr_type": "wind_offshore",
+    "query_used": "FECAMP",
+    "type": "administrative"
+  },
   "FERME EOLIENNE DE VENT-DES-ILES": {
     "class": null,
     "label": null,
@@ -132,6 +862,36 @@
     "lon": null,
     "needs_review": true,
     "query_used": "manually verified as wrong (auto match was a museum in French Polynesia); further search ('Ferme éolienne Vent des Iles') returned nothing"
+  },
+  "FLAMANVILLE 1": {
+    "class": "boundary",
+    "label": "Flamanville, Rouen, Seine-Maritime, Normandie, France métropolitaine, 76970, France",
+    "lat": 49.6348243,
+    "lon": 0.839636,
+    "needs_review": false,
+    "psr_type": "nuclear",
+    "query_used": "FLAMANVILLE",
+    "type": "administrative"
+  },
+  "FLAMANVILLE 2": {
+    "class": "boundary",
+    "label": "Flamanville, Rouen, Seine-Maritime, Normandie, France métropolitaine, 76970, France",
+    "lat": 49.6348243,
+    "lon": 0.839636,
+    "needs_review": false,
+    "psr_type": "nuclear",
+    "query_used": "FLAMANVILLE",
+    "type": "administrative"
+  },
+  "FLAMANVILLE 3": {
+    "class": "boundary",
+    "label": "Flamanville, Rouen, Seine-Maritime, Normandie, France métropolitaine, 76970, France",
+    "lat": 49.6348243,
+    "lon": 0.839636,
+    "needs_review": false,
+    "psr_type": "nuclear",
+    "query_used": "FLAMANVILLE",
+    "type": "administrative"
   },
   "FR_SAINT-PIERRE": {
     "class": "boundary",
@@ -142,6 +902,36 @@
     "query_used": "FR_SAINT-PIERRE",
     "type": "administrative"
   },
+  "GENNEVILLIERS 1": {
+    "class": "boundary",
+    "label": "Gennevilliers, Nanterre, Hauts-de-Seine, Île-de-France, France métropolitaine, 92230, France",
+    "lat": 48.9254221,
+    "lon": 2.2940122,
+    "needs_review": false,
+    "psr_type": "fossil_gas",
+    "query_used": "GENNEVILLIERS",
+    "type": "administrative"
+  },
+  "GOLFECH 1": {
+    "class": "boundary",
+    "label": "Golfech, Castelsarrasin, Tarn-et-Garonne, Occitanie, France métropolitaine, 82400, France",
+    "lat": 44.1147222,
+    "lon": 0.8519444,
+    "needs_review": false,
+    "psr_type": "nuclear",
+    "query_used": "GOLFECH",
+    "type": "administrative"
+  },
+  "GOLFECH 2": {
+    "class": "boundary",
+    "label": "Golfech, Castelsarrasin, Tarn-et-Garonne, Occitanie, France métropolitaine, 82400, France",
+    "lat": 44.1147222,
+    "lon": 0.8519444,
+    "needs_review": false,
+    "psr_type": "nuclear",
+    "query_used": "GOLFECH",
+    "type": "administrative"
+  },
   "GRAND MAISON": {
     "class": "waterway",
     "label": "Barrage de Grand'Maison, Vaujany, Grenoble, Isère, Auvergne-Rhône-Alpes, France métropolitaine, France",
@@ -150,6 +940,174 @@
     "needs_review": false,
     "query_used": "Barrage de Grand Maison (manually verified — auto match was wrong)",
     "type": "dam"
+  },
+  "GRAND MAISON 1": {
+    "class": "waterway",
+    "label": "Barrage de Grand'Maison, Vaujany, Grenoble, Isère, Auvergne-Rhône-Alpes, France métropolitaine, France",
+    "lat": 45.2057207,
+    "lon": 6.1151773,
+    "needs_review": false,
+    "query_used": "reused GRAND MAISON's manually-verified coords (per-unit variant)",
+    "type": "dam"
+  },
+  "GRAND MAISON 10": {
+    "class": "waterway",
+    "label": "Barrage de Grand'Maison, Vaujany, Grenoble, Isère, Auvergne-Rhône-Alpes, France métropolitaine, France",
+    "lat": 45.2057207,
+    "lon": 6.1151773,
+    "needs_review": false,
+    "query_used": "reused GRAND MAISON's manually-verified coords (per-unit variant)",
+    "type": "dam"
+  },
+  "GRAND MAISON 11": {
+    "class": "waterway",
+    "label": "Barrage de Grand'Maison, Vaujany, Grenoble, Isère, Auvergne-Rhône-Alpes, France métropolitaine, France",
+    "lat": 45.2057207,
+    "lon": 6.1151773,
+    "needs_review": false,
+    "query_used": "reused GRAND MAISON's manually-verified coords (per-unit variant)",
+    "type": "dam"
+  },
+  "GRAND MAISON 12": {
+    "class": "waterway",
+    "label": "Barrage de Grand'Maison, Vaujany, Grenoble, Isère, Auvergne-Rhône-Alpes, France métropolitaine, France",
+    "lat": 45.2057207,
+    "lon": 6.1151773,
+    "needs_review": false,
+    "query_used": "reused GRAND MAISON's manually-verified coords (per-unit variant)",
+    "type": "dam"
+  },
+  "GRAND MAISON 2": {
+    "class": "waterway",
+    "label": "Barrage de Grand'Maison, Vaujany, Grenoble, Isère, Auvergne-Rhône-Alpes, France métropolitaine, France",
+    "lat": 45.2057207,
+    "lon": 6.1151773,
+    "needs_review": false,
+    "query_used": "reused GRAND MAISON's manually-verified coords (per-unit variant)",
+    "type": "dam"
+  },
+  "GRAND MAISON 3": {
+    "class": "waterway",
+    "label": "Barrage de Grand'Maison, Vaujany, Grenoble, Isère, Auvergne-Rhône-Alpes, France métropolitaine, France",
+    "lat": 45.2057207,
+    "lon": 6.1151773,
+    "needs_review": false,
+    "query_used": "reused GRAND MAISON's manually-verified coords (per-unit variant)",
+    "type": "dam"
+  },
+  "GRAND MAISON 4": {
+    "class": "waterway",
+    "label": "Barrage de Grand'Maison, Vaujany, Grenoble, Isère, Auvergne-Rhône-Alpes, France métropolitaine, France",
+    "lat": 45.2057207,
+    "lon": 6.1151773,
+    "needs_review": false,
+    "query_used": "reused GRAND MAISON's manually-verified coords (per-unit variant)",
+    "type": "dam"
+  },
+  "GRAND MAISON 5": {
+    "class": "waterway",
+    "label": "Barrage de Grand'Maison, Vaujany, Grenoble, Isère, Auvergne-Rhône-Alpes, France métropolitaine, France",
+    "lat": 45.2057207,
+    "lon": 6.1151773,
+    "needs_review": false,
+    "query_used": "reused GRAND MAISON's manually-verified coords (per-unit variant)",
+    "type": "dam"
+  },
+  "GRAND MAISON 6": {
+    "class": "waterway",
+    "label": "Barrage de Grand'Maison, Vaujany, Grenoble, Isère, Auvergne-Rhône-Alpes, France métropolitaine, France",
+    "lat": 45.2057207,
+    "lon": 6.1151773,
+    "needs_review": false,
+    "query_used": "reused GRAND MAISON's manually-verified coords (per-unit variant)",
+    "type": "dam"
+  },
+  "GRAND MAISON 7": {
+    "class": "waterway",
+    "label": "Barrage de Grand'Maison, Vaujany, Grenoble, Isère, Auvergne-Rhône-Alpes, France métropolitaine, France",
+    "lat": 45.2057207,
+    "lon": 6.1151773,
+    "needs_review": false,
+    "query_used": "reused GRAND MAISON's manually-verified coords (per-unit variant)",
+    "type": "dam"
+  },
+  "GRAND MAISON 8": {
+    "class": "waterway",
+    "label": "Barrage de Grand'Maison, Vaujany, Grenoble, Isère, Auvergne-Rhône-Alpes, France métropolitaine, France",
+    "lat": 45.2057207,
+    "lon": 6.1151773,
+    "needs_review": false,
+    "query_used": "reused GRAND MAISON's manually-verified coords (per-unit variant)",
+    "type": "dam"
+  },
+  "GRAND MAISON 9": {
+    "class": "waterway",
+    "label": "Barrage de Grand'Maison, Vaujany, Grenoble, Isère, Auvergne-Rhône-Alpes, France métropolitaine, France",
+    "lat": 45.2057207,
+    "lon": 6.1151773,
+    "needs_review": false,
+    "query_used": "reused GRAND MAISON's manually-verified coords (per-unit variant)",
+    "type": "dam"
+  },
+  "GRAVELINES 1": {
+    "class": "boundary",
+    "label": "Gravelines, Dunkerque, Nord, Hauts-de-France, France métropolitaine, 59820, France",
+    "lat": 50.9870697,
+    "lon": 2.1273118,
+    "needs_review": false,
+    "psr_type": "nuclear",
+    "query_used": "GRAVELINES",
+    "type": "administrative"
+  },
+  "GRAVELINES 2": {
+    "class": "boundary",
+    "label": "Gravelines, Dunkerque, Nord, Hauts-de-France, France métropolitaine, 59820, France",
+    "lat": 50.9870697,
+    "lon": 2.1273118,
+    "needs_review": false,
+    "psr_type": "nuclear",
+    "query_used": "GRAVELINES",
+    "type": "administrative"
+  },
+  "GRAVELINES 3": {
+    "class": "boundary",
+    "label": "Gravelines, Dunkerque, Nord, Hauts-de-France, France métropolitaine, 59820, France",
+    "lat": 50.9870697,
+    "lon": 2.1273118,
+    "needs_review": false,
+    "psr_type": "nuclear",
+    "query_used": "GRAVELINES",
+    "type": "administrative"
+  },
+  "GRAVELINES 4": {
+    "class": "boundary",
+    "label": "Gravelines, Dunkerque, Nord, Hauts-de-France, France métropolitaine, 59820, France",
+    "lat": 50.9870697,
+    "lon": 2.1273118,
+    "needs_review": false,
+    "psr_type": "nuclear",
+    "query_used": "GRAVELINES",
+    "type": "administrative"
+  },
+  "GRAVELINES 5": {
+    "class": "boundary",
+    "label": "Gravelines, Dunkerque, Nord, Hauts-de-France, France métropolitaine, 59820, France",
+    "lat": 50.9870697,
+    "lon": 2.1273118,
+    "needs_review": false,
+    "psr_type": "nuclear",
+    "query_used": "GRAVELINES",
+    "type": "administrative"
+  },
+  "GRAVELINES 6": {
+    "class": "boundary",
+    "label": "Gravelines, Dunkerque, Nord, Hauts-de-France, France métropolitaine, 59820, France",
+    "lat": 50.9870697,
+    "lon": 2.1273118,
+    "needs_review": false,
+    "psr_type": "nuclear",
+    "query_used": "GRAVELINES",
+    "type": "administrative"
   },
   "HERMILLON": {
     "class": "boundary",
@@ -169,6 +1127,46 @@
     "query_used": "MALGOVERT",
     "type": "pressurised"
   },
+  "MARTIGUES PONTEAU 5": {
+    "class": "place",
+    "label": "Ponteau, Martigues, Istres, Bouches-du-Rhône, Provence-Alpes-Côte d'Azur, France métropolitaine, 13500, France",
+    "lat": 43.3695906,
+    "lon": 5.0112211,
+    "needs_review": false,
+    "psr_type": "fossil_gas",
+    "query_used": "MARTIGUES PONTEAU",
+    "type": "hamlet"
+  },
+  "MARTIGUES PONTEAU 6": {
+    "class": "place",
+    "label": "Ponteau, Martigues, Istres, Bouches-du-Rhône, Provence-Alpes-Côte d'Azur, France métropolitaine, 13500, France",
+    "lat": 43.3695906,
+    "lon": 5.0112211,
+    "needs_review": false,
+    "psr_type": "fossil_gas",
+    "query_used": "MARTIGUES PONTEAU",
+    "type": "hamlet"
+  },
+  "MONTEREAU 5": {
+    "class": "boundary",
+    "label": "Montereau, Montargis, Loiret, Centre-Val de Loire, France métropolitaine, 45260, France",
+    "lat": 47.8564484,
+    "lon": 2.5717138,
+    "needs_review": false,
+    "psr_type": "fossil_oil",
+    "query_used": "MONTEREAU",
+    "type": "administrative"
+  },
+  "MONTEREAU 6": {
+    "class": "boundary",
+    "label": "Montereau, Montargis, Loiret, Centre-Val de Loire, France métropolitaine, 45260, France",
+    "lat": 47.8564484,
+    "lon": 2.5717138,
+    "needs_review": false,
+    "psr_type": "fossil_oil",
+    "query_used": "MONTEREAU",
+    "type": "administrative"
+  },
   "MONTEYNARD": {
     "class": "boundary",
     "label": "Monteynard, Grenoble, Isère, Auvergne-Rhône-Alpes, France métropolitaine, 38770, France",
@@ -187,6 +1185,46 @@
     "query_used": "MONTEZIC",
     "type": "administrative"
   },
+  "MONTEZIC 1": {
+    "class": "boundary",
+    "label": "Montézic, Rodez, Aveyron, Occitanie, France métropolitaine, 12460, France",
+    "lat": 44.7085893,
+    "lon": 2.6398675,
+    "needs_review": false,
+    "psr_type": "hydro_pumped_storage",
+    "query_used": "MONTEZIC",
+    "type": "administrative"
+  },
+  "MONTEZIC 2": {
+    "class": "boundary",
+    "label": "Montézic, Rodez, Aveyron, Occitanie, France métropolitaine, 12460, France",
+    "lat": 44.7085893,
+    "lon": 2.6398675,
+    "needs_review": false,
+    "psr_type": "hydro_pumped_storage",
+    "query_used": "MONTEZIC",
+    "type": "administrative"
+  },
+  "MONTEZIC 3": {
+    "class": "boundary",
+    "label": "Montézic, Rodez, Aveyron, Occitanie, France métropolitaine, 12460, France",
+    "lat": 44.7085893,
+    "lon": 2.6398675,
+    "needs_review": false,
+    "psr_type": "hydro_pumped_storage",
+    "query_used": "MONTEZIC",
+    "type": "administrative"
+  },
+  "MONTEZIC 4": {
+    "class": "boundary",
+    "label": "Montézic, Rodez, Aveyron, Occitanie, France métropolitaine, 12460, France",
+    "lat": 44.7085893,
+    "lon": 2.6398675,
+    "needs_review": false,
+    "psr_type": "hydro_pumped_storage",
+    "query_used": "MONTEZIC",
+    "type": "administrative"
+  },
   "MONTPEZAT": {
     "class": "boundary",
     "label": "Montpezat, Auch, Gers, Occitanie, France métropolitaine, 32220, France",
@@ -196,6 +1234,26 @@
     "query_used": "MONTPEZAT",
     "type": "administrative"
   },
+  "NOGENT 1": {
+    "class": "boundary",
+    "label": "Nogent, Chaumont, Haute-Marne, Grand Est, France métropolitaine, 52800, France",
+    "lat": 48.0269782,
+    "lon": 5.3416877,
+    "needs_review": false,
+    "psr_type": "nuclear",
+    "query_used": "NOGENT",
+    "type": "administrative"
+  },
+  "NOGENT 2": {
+    "class": "boundary",
+    "label": "Nogent, Chaumont, Haute-Marne, Grand Est, France métropolitaine, 52800, France",
+    "lat": 48.0269782,
+    "lon": 5.3416877,
+    "needs_review": false,
+    "psr_type": "nuclear",
+    "query_used": "NOGENT",
+    "type": "administrative"
+  },
   "ORAISON": {
     "class": "boundary",
     "label": "Oraison, Forcalquier, Alpes-de-Haute-Provence, Provence-Alpes-Côte d'Azur, France métropolitaine, 04700, France",
@@ -203,6 +1261,66 @@
     "lon": 5.919898,
     "needs_review": false,
     "query_used": "ORAISON",
+    "type": "administrative"
+  },
+  "PALUEL 1": {
+    "class": "boundary",
+    "label": "Paluel, Dieppe, Seine-Maritime, Normandie, France métropolitaine, 76450, France",
+    "lat": 49.8324987,
+    "lon": 0.6294445,
+    "needs_review": false,
+    "psr_type": "nuclear",
+    "query_used": "PALUEL",
+    "type": "administrative"
+  },
+  "PALUEL 2": {
+    "class": "boundary",
+    "label": "Paluel, Dieppe, Seine-Maritime, Normandie, France métropolitaine, 76450, France",
+    "lat": 49.8324987,
+    "lon": 0.6294445,
+    "needs_review": false,
+    "psr_type": "nuclear",
+    "query_used": "PALUEL",
+    "type": "administrative"
+  },
+  "PALUEL 3": {
+    "class": "boundary",
+    "label": "Paluel, Dieppe, Seine-Maritime, Normandie, France métropolitaine, 76450, France",
+    "lat": 49.8324987,
+    "lon": 0.6294445,
+    "needs_review": false,
+    "psr_type": "nuclear",
+    "query_used": "PALUEL",
+    "type": "administrative"
+  },
+  "PALUEL 4": {
+    "class": "boundary",
+    "label": "Paluel, Dieppe, Seine-Maritime, Normandie, France métropolitaine, 76450, France",
+    "lat": 49.8324987,
+    "lon": 0.6294445,
+    "needs_review": false,
+    "psr_type": "nuclear",
+    "query_used": "PALUEL",
+    "type": "administrative"
+  },
+  "PENLY 1": {
+    "class": "boundary",
+    "label": "Penly, Petit-Caux, Dieppe, Seine-Maritime, Normandie, France métropolitaine, 76630, France",
+    "lat": 49.9788462,
+    "lon": 1.2316989,
+    "needs_review": false,
+    "psr_type": "nuclear",
+    "query_used": "PENLY",
+    "type": "administrative"
+  },
+  "PENLY 2": {
+    "class": "boundary",
+    "label": "Penly, Petit-Caux, Dieppe, Seine-Maritime, Normandie, France métropolitaine, 76630, France",
+    "lat": 49.9788462,
+    "lon": 1.2316989,
+    "needs_review": false,
+    "psr_type": "nuclear",
+    "query_used": "PENLY",
     "type": "administrative"
   },
   "PIED DE BORNE": {
@@ -220,6 +1338,7 @@
     "lat": 50.2215226,
     "lon": 3.8485702,
     "needs_review": false,
+    "psr_type": "fossil_gas",
     "query_used": "PONT SUR SAMBRE",
     "type": "administrative"
   },
@@ -232,6 +1351,16 @@
     "query_used": "POUGET",
     "type": "hamlet"
   },
+  "POUGET 4": {
+    "class": "place",
+    "label": "Pouget, Marcillat, Riom, Puy-de-Dôme, Auvergne-Rhône-Alpes, France métropolitaine, 63440, France",
+    "lat": 46.0859983,
+    "lon": 3.0274507,
+    "needs_review": false,
+    "psr_type": "hydro_water_reservoir",
+    "query_used": "POUGET",
+    "type": "hamlet"
+  },
   "PRAGNERES": {
     "class": "highway",
     "label": "Pragneres, Route de Gèdre, Pragnères, Gèdre, Gavarnie-Gèdre, Argelès-Gazost, Hautes-Pyrénées, Occitanie, France métropolitaine, 65120, France",
@@ -240,6 +1369,14 @@
     "needs_review": false,
     "query_used": "PRAGNERES",
     "type": "bus_stop"
+  },
+  "PROVENCE 4": {
+    "class": null,
+    "lat": null,
+    "lon": null,
+    "needs_review": true,
+    "query_used": "manually flagged uncertain — prior auto-match was just the PACA region centroid; targeted searches only found an unrelated photovoltaic site in Gardanne, not the actual (thermal/biomass) Provence 4 unit",
+    "type": null
   },
   "RANCE": {
     "class": "waterway",
@@ -268,12 +1405,53 @@
     "query_used": "REVIN",
     "type": "administrative"
   },
+  "REVIN 1": {
+    "class": "boundary",
+    "label": "Revin, Charleville-Mézières, Ardennes, Grand Est, France métropolitaine, 08500, France",
+    "lat": 49.9421221,
+    "lon": 4.6374643,
+    "needs_review": false,
+    "psr_type": "hydro_pumped_storage",
+    "query_used": "REVIN",
+    "type": "administrative"
+  },
+  "REVIN 2": {
+    "class": "boundary",
+    "label": "Revin, Charleville-Mézières, Ardennes, Grand Est, France métropolitaine, 08500, France",
+    "lat": 49.9421221,
+    "lon": 4.6374643,
+    "needs_review": false,
+    "psr_type": "hydro_pumped_storage",
+    "query_used": "REVIN",
+    "type": "administrative"
+  },
+  "REVIN 3": {
+    "class": "boundary",
+    "label": "Revin, Charleville-Mézières, Ardennes, Grand Est, France métropolitaine, 08500, France",
+    "lat": 49.9421221,
+    "lon": 4.6374643,
+    "needs_review": false,
+    "psr_type": "hydro_pumped_storage",
+    "query_used": "REVIN",
+    "type": "administrative"
+  },
+  "REVIN 4": {
+    "class": "boundary",
+    "label": "Revin, Charleville-Mézières, Ardennes, Grand Est, France métropolitaine, 08500, France",
+    "lat": 49.9421221,
+    "lon": 4.6374643,
+    "needs_review": false,
+    "psr_type": "hydro_pumped_storage",
+    "query_used": "REVIN",
+    "type": "administrative"
+  },
   "SAINT AVOLD 7": {
     "class": "boundary",
     "label": "Saint-Avold, Forbach-Boulay-Moselle, Moselle, Grand Est, France métropolitaine, 57500, France",
     "lat": 49.1043397,
     "lon": 6.7071754,
     "needs_review": false,
+    "psr_type": "fossil_gas",
     "query_used": "SAINT AVOLD",
     "type": "administrative"
   },
@@ -283,6 +1461,7 @@
     "lat": 49.1043397,
     "lon": 6.7071754,
     "needs_review": false,
+    "psr_type": "fossil_gas",
     "query_used": "SAINT AVOLD",
     "type": "administrative"
   },
@@ -321,6 +1500,16 @@
     "needs_review": false,
     "query_used": "SAINT PIERRE COGNET",
     "type": "dam"
+  },
+  "SAINT-PIERRE": {
+    "class": "boundary",
+    "label": "Saint-Pierre, Sélestat-Erstein, Bas-Rhin, Collectivité européenne d'Alsace, Grand Est, France métropolitaine, 67140, France",
+    "lat": 48.3832725,
+    "lon": 7.4718731,
+    "needs_review": false,
+    "psr_type": "hydro_run_of_river",
+    "query_used": "SAINT-PIERRE",
+    "type": "administrative"
   },
   "SAINTE CROIX": {
     "class": "waterway",
@@ -367,6 +1556,56 @@
     "query_used": "SISTERON",
     "type": "administrative"
   },
+  "SISTERON 1": {
+    "class": "boundary",
+    "label": "Sisteron, Forcalquier, Alpes-de-Haute-Provence, Provence-Alpes-Côte d'Azur, France métropolitaine, 04200, France",
+    "lat": 44.1963467,
+    "lon": 5.9443791,
+    "needs_review": false,
+    "psr_type": "hydro_water_reservoir",
+    "query_used": "SISTERON",
+    "type": "administrative"
+  },
+  "SISTERON 2": {
+    "class": "boundary",
+    "label": "Sisteron, Forcalquier, Alpes-de-Haute-Provence, Provence-Alpes-Côte d'Azur, France métropolitaine, 04200, France",
+    "lat": 44.1963467,
+    "lon": 5.9443791,
+    "needs_review": false,
+    "psr_type": "hydro_water_reservoir",
+    "query_used": "SISTERON",
+    "type": "administrative"
+  },
+  "SPEM CCG": {
+    "class": "office",
+    "label": "CCG, Rue Pierre-Paul Retali, Sannois, Argenteuil, Val-d'Oise, Île-de-France, France métropolitaine, 95110, France",
+    "lat": 48.9705571,
+    "lon": 2.2626936,
+    "needs_review": false,
+    "psr_type": "fossil_gas",
+    "query_used": "CCG",
+    "type": "consulting"
+  },
+  "ST ALBAN 1": {
+    "class": "boundary",
+    "label": "Saint-Alban, Toulouse, Haute-Garonne, Occitanie, France métropolitaine, 31140, France",
+    "lat": 43.6923207,
+    "lon": 1.4135768,
+    "needs_review": false,
+    "psr_type": "nuclear",
+    "query_used": "ST ALBAN",
+    "type": "administrative"
+  },
+  "ST ALBAN 2": {
+    "class": "boundary",
+    "label": "Saint-Alban, Toulouse, Haute-Garonne, Occitanie, France métropolitaine, 31140, France",
+    "lat": 43.6923207,
+    "lon": 1.4135768,
+    "needs_review": false,
+    "psr_type": "nuclear",
+    "query_used": "ST ALBAN",
+    "type": "administrative"
+  },
   "ST ETIENNE CANTALES": {
     "class": "boundary",
     "label": "Saint-Étienne-Cantalès, Aurillac, Cantal, Auvergne-Rhône-Alpes, France métropolitaine, 15150, France",
@@ -374,6 +1613,26 @@
     "lon": 2.2252598,
     "needs_review": false,
     "query_used": "ST ETIENNE CANTALES",
+    "type": "administrative"
+  },
+  "ST LAURENT 1": {
+    "class": "boundary",
+    "label": "Saint-Laurent, Saint-Gaudens, Haute-Garonne, Occitanie, France métropolitaine, 31230, France",
+    "lat": 43.3253,
+    "lon": 0.79977,
+    "needs_review": false,
+    "psr_type": "nuclear",
+    "query_used": "ST LAURENT",
+    "type": "administrative"
+  },
+  "ST LAURENT 2": {
+    "class": "boundary",
+    "label": "Saint-Laurent, Saint-Gaudens, Haute-Garonne, Occitanie, France métropolitaine, 31230, France",
+    "lat": 43.3253,
+    "lon": 0.79977,
+    "needs_review": false,
+    "psr_type": "nuclear",
+    "query_used": "ST LAURENT",
     "type": "administrative"
   },
   "SUPER BISSORTE": {
@@ -385,12 +1644,152 @@
     "query_used": "SUPER BISSORTE",
     "type": "cable_car"
   },
+  "SUPER BISSORTE 1": {
+    "class": "aerialway",
+    "label": "Super-Bissorte, Sentier de Bissorte, Bissorte, Orelle, Saint-Jean-de-Maurienne, Savoie, Auvergne-Rhône-Alpes, France métropolitaine, 73140, France",
+    "lat": 45.1911276,
+    "lon": 6.5770298,
+    "needs_review": false,
+    "psr_type": "hydro_pumped_storage",
+    "query_used": "SUPER BISSORTE",
+    "type": "cable_car"
+  },
+  "SUPER BISSORTE 2": {
+    "class": "aerialway",
+    "label": "Super-Bissorte, Sentier de Bissorte, Bissorte, Orelle, Saint-Jean-de-Maurienne, Savoie, Auvergne-Rhône-Alpes, France métropolitaine, 73140, France",
+    "lat": 45.1911276,
+    "lon": 6.5770298,
+    "needs_review": false,
+    "psr_type": "hydro_pumped_storage",
+    "query_used": "SUPER BISSORTE",
+    "type": "cable_car"
+  },
+  "SUPER BISSORTE 3": {
+    "class": "aerialway",
+    "label": "Super-Bissorte, Sentier de Bissorte, Bissorte, Orelle, Saint-Jean-de-Maurienne, Savoie, Auvergne-Rhône-Alpes, France métropolitaine, 73140, France",
+    "lat": 45.1911276,
+    "lon": 6.5770298,
+    "needs_review": false,
+    "psr_type": "hydro_pumped_storage",
+    "query_used": "SUPER BISSORTE",
+    "type": "cable_car"
+  },
+  "SUPER BISSORTE 4": {
+    "class": "aerialway",
+    "label": "Super-Bissorte, Sentier de Bissorte, Bissorte, Orelle, Saint-Jean-de-Maurienne, Savoie, Auvergne-Rhône-Alpes, France métropolitaine, 73140, France",
+    "lat": 45.1911276,
+    "lon": 6.5770298,
+    "needs_review": false,
+    "psr_type": "hydro_pumped_storage",
+    "query_used": "SUPER BISSORTE",
+    "type": "cable_car"
+  },
+  "SUPER BISSORTE 5": {
+    "class": "aerialway",
+    "label": "Super-Bissorte, Sentier de Bissorte, Bissorte, Orelle, Saint-Jean-de-Maurienne, Savoie, Auvergne-Rhône-Alpes, France métropolitaine, 73140, France",
+    "lat": 45.1911276,
+    "lon": 6.5770298,
+    "needs_review": false,
+    "psr_type": "hydro_pumped_storage",
+    "query_used": "SUPER BISSORTE",
+    "type": "cable_car"
+  },
+  "TRICASTIN 1": {
+    "class": "boundary",
+    "label": "Saint-Paul-Trois-Châteaux, Nyons, Drôme, Auvergne-Rhône-Alpes, France métropolitaine, 26130, France",
+    "lat": 44.3475554,
+    "lon": 4.7707325,
+    "needs_review": false,
+    "psr_type": "nuclear",
+    "query_used": "TRICASTIN",
+    "type": "administrative"
+  },
+  "TRICASTIN 2": {
+    "class": "boundary",
+    "label": "Saint-Paul-Trois-Châteaux, Nyons, Drôme, Auvergne-Rhône-Alpes, France métropolitaine, 26130, France",
+    "lat": 44.3475554,
+    "lon": 4.7707325,
+    "needs_review": false,
+    "psr_type": "nuclear",
+    "query_used": "TRICASTIN",
+    "type": "administrative"
+  },
+  "TRICASTIN 3": {
+    "class": "boundary",
+    "label": "Saint-Paul-Trois-Châteaux, Nyons, Drôme, Auvergne-Rhône-Alpes, France métropolitaine, 26130, France",
+    "lat": 44.3475554,
+    "lon": 4.7707325,
+    "needs_review": false,
+    "psr_type": "nuclear",
+    "query_used": "TRICASTIN",
+    "type": "administrative"
+  },
+  "TRICASTIN 4": {
+    "class": "boundary",
+    "label": "Saint-Paul-Trois-Châteaux, Nyons, Drôme, Auvergne-Rhône-Alpes, France métropolitaine, 26130, France",
+    "lat": 44.3475554,
+    "lon": 4.7707325,
+    "needs_review": false,
+    "psr_type": "nuclear",
+    "query_used": "TRICASTIN",
+    "type": "administrative"
+  },
+  "VAIRES 1": {
+    "class": "boundary",
+    "label": "Vaires-sur-Marne, Torcy, Seine-et-Marne, Île-de-France, France métropolitaine, 77360, France",
+    "lat": 48.8733776,
+    "lon": 2.6396951,
+    "needs_review": false,
+    "psr_type": "fossil_oil",
+    "query_used": "VAIRES",
+    "type": "administrative"
+  },
+  "VAIRES 2": {
+    "class": "boundary",
+    "label": "Vaires-sur-Marne, Torcy, Seine-et-Marne, Île-de-France, France métropolitaine, 77360, France",
+    "lat": 48.8733776,
+    "lon": 2.6396951,
+    "needs_review": false,
+    "psr_type": "fossil_oil",
+    "query_used": "VAIRES",
+    "type": "administrative"
+  },
+  "VAIRES 3": {
+    "class": "boundary",
+    "label": "Vaires-sur-Marne, Torcy, Seine-et-Marne, Île-de-France, France métropolitaine, 77360, France",
+    "lat": 48.8733776,
+    "lon": 2.6396951,
+    "needs_review": false,
+    "psr_type": "fossil_oil",
+    "query_used": "VAIRES",
+    "type": "administrative"
+  },
   "VILLARODIN": {
     "class": "place",
     "label": "Villarodin, La Norma, Villarodin-Bourget, Saint-Jean-de-Maurienne, Savoie, Auvergne-Rhône-Alpes, France métropolitaine, 73500, France",
     "lat": 45.2082077,
     "lon": 6.7112786,
     "needs_review": false,
+    "query_used": "VILLARODIN",
+    "type": "hamlet"
+  },
+  "VILLARODIN 1": {
+    "class": "place",
+    "label": "Villarodin, La Norma, Villarodin-Bourget, Saint-Jean-de-Maurienne, Savoie, Auvergne-Rhône-Alpes, France métropolitaine, 73500, France",
+    "lat": 45.2082077,
+    "lon": 6.7112786,
+    "needs_review": false,
+    "psr_type": "hydro_water_reservoir",
+    "query_used": "VILLARODIN",
+    "type": "hamlet"
+  },
+  "VILLARODIN 2": {
+    "class": "place",
+    "label": "Villarodin, La Norma, Villarodin-Bourget, Saint-Jean-de-Maurienne, Savoie, Auvergne-Rhône-Alpes, France métropolitaine, 73500, France",
+    "lat": 45.2082077,
+    "lon": 6.7112786,
+    "needs_review": false,
+    "psr_type": "hydro_water_reservoir",
     "query_used": "VILLARODIN",
     "type": "hamlet"
   },

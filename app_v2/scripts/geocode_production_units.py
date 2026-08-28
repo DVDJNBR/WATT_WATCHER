@@ -1,13 +1,24 @@
 """
-Geocode production units seen in ENTSO-E generation-outage data — FT/GEODATA.
+Geocode France's large production units (ENTSO-E's >100MW registry) — FT/GEODATA.
 
 Standalone, on-demand script — deliberately NOT an Azure Function / pipeline
 stage. Physical plant locations don't change on a schedule; this only needs
-to run when a genuinely new unit name shows up in the outages feed that
-isn't in the local cache yet.
+to run when a genuinely new unit name shows up in the registry that isn't
+in the local cache yet.
 
-Approach: pull real unit names from ENTSO-E (documentType A77 — see
-functions/shared/entsoe_client.py), then resolve each one through OSM's
+Approach: pull the real unit roster from ENTSO-E's A73 "Actual generation
+per generation unit" (see functions/shared/entsoe_client.py) rather than
+the A77 outages feed — A77 only ever names units that have broken down at
+least once, which would leave a "grey out the unavailable ones" map with
+pins for failures and nothing for the healthy majority. A73 lists every
+large unit that generated, regardless of outage status, so it's the stable
+master list; A77 stays a status layer applied on top of it elsewhere.
+
+Each unit's fuel/technology (psr_type: nuclear, hydro_water_reservoir,
+wind_offshore, ...) is kept in the cache too, for a future map to color or
+filter by.
+
+Then each unit name is resolved through OSM's
 Nominatim search (nominatim.openstreetmap.org) — chosen over France's
 official BAN address API (api-adresse.data.gouv.fr) after a real
 side-by-side check on ambiguous names ("Rance", "Revin", "Hermillon",
@@ -35,7 +46,7 @@ gradually, across sessions, without a re-run wiping out that work.
 
 Usage:
     uv run python scripts/geocode_production_units.py
-    uv run python scripts/geocode_production_units.py --days-back 180 --days-forward 180
+    uv run python scripts/geocode_production_units.py --days-back 7
 """
 
 import argparse
@@ -164,8 +175,20 @@ def geocode_unit(unit_name: str) -> dict:
     return {"lat": None, "lon": None, "label": None, "needs_review": True}
 
 
-def fetch_known_unit_names(days_back: int, days_forward: int) -> set[str]:
-    """Real unit names currently seen in the ENTSO-E outages feed."""
+def fetch_known_units(days_back: int) -> dict[str, str]:
+    """
+    Real unit names from ENTSO-E's A73 generation-unit registry — every large
+    (>100MW) unit that generated in the window, independent of outage status.
+
+    Deliberately not the A77 outages feed: that only ever names units that
+    have *broken down* at least once, which would make a "grey out the
+    unavailable ones" map show pins only for failures and nothing for the
+    healthy majority. This is the stable master list; A77 stays the status
+    layer applied on top of it elsewhere, not the source of names.
+
+    Returns {unit_name: psr_type} — psr_type kept for a future map so units
+    can be colored/filtered by fuel/technology.
+    """
     from shared.entsoe_client import EntsoeClient
 
     token = os.environ.get("ENTSOE_API_TOKEN", "")
@@ -174,31 +197,39 @@ def fetch_known_unit_names(days_back: int, days_forward: int) -> set[str]:
 
     client = EntsoeClient(api_token=token)
     now = datetime.now(timezone.utc)
-    records = client.fetch_unavailability_of_production_units(
-        now - timedelta(days=days_back), now + timedelta(days=days_forward),
-    )
-    return {r["unit_name"] for r in records}
+    records = client.fetch_generation_unit_registry(now - timedelta(days=days_back), now)
+    return {r["unit_name"]: r["psr_type"] for r in records}
 
 
 def main():
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--days-back", type=int, default=90)
-    parser.add_argument("--days-forward", type=int, default=90)
+    parser.add_argument(
+        "--days-back", type=int, default=3,
+        help="Units report actual generation daily regardless of outage status, "
+             "so a small window already captures the full current roster.",
+    )
     args = parser.parse_args()
 
     cache = _load_cache()
-    unit_names = fetch_known_unit_names(args.days_back, args.days_forward)
-    new_names = sorted(n for n in unit_names if n not in cache)
+    units = fetch_known_units(args.days_back)
+    new_names = sorted(n for n in units if n not in cache)
 
     logger.info("%d unit names known, %d already cached, %d new to geocode",
-                len(unit_names), len(unit_names) - len(new_names), len(new_names))
+                len(units), len(units) - len(new_names), len(new_names))
 
     for name in new_names:
         result = geocode_unit(name)
+        result["psr_type"] = units[name]
         cache[name] = result
         flag = "NEEDS REVIEW" if result["needs_review"] else "ok"
         logger.info("  [%s] %-40s -> %s", flag, name, result.get("label"))
+
+    # Backfill psr_type on pre-existing entries that predate this field
+    # (from the earlier outages-only run) without touching anything else.
+    for name, psr_type in units.items():
+        if name in cache and "psr_type" not in cache[name]:
+            cache[name]["psr_type"] = psr_type
 
     _save_cache(cache)
 

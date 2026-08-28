@@ -404,3 +404,105 @@ class TestOutagesPagination:
                 client.fetch_unavailability_of_production_units(
                     datetime(2026, 1, 1, tzinfo=timezone.utc), datetime(2026, 1, 2, tzinfo=timezone.utc),
                 )
+
+
+GENERATION_NS = "urn:iec62325.351:tc57wg16:451-6:generationloaddocument:3:0"
+
+
+def _generation_timeseries(resource_mrid, unit_mrid, unit_name, psr_type):
+    return f"""
+  <TimeSeries>
+    <mRID>1</mRID>
+    <businessType>A01</businessType>
+    <registeredResource.mRID codingScheme="A01">{resource_mrid}</registeredResource.mRID>
+    <MktPSRType>
+      <psrType>{psr_type}</psrType>
+      <PowerSystemResources>
+        <mRID codingScheme="A01">{unit_mrid}</mRID>
+        <name>{unit_name}</name>
+      </PowerSystemResources>
+    </MktPSRType>
+    <Period>
+      <timeInterval><start>2026-01-01T00:00Z</start><end>2026-01-01T01:00Z</end></timeInterval>
+      <resolution>PT60M</resolution>
+      <Point><position>1</position><quantity>123.4</quantity></Point>
+    </Period>
+  </TimeSeries>"""
+
+
+def _generation_document(*timeseries_xml: str) -> str:
+    return f"""<?xml version="1.0" encoding="utf-8"?>
+<GL_MarketDocument xmlns="{GENERATION_NS}">
+  <mRID>test-generation</mRID>
+  <type>A73</type>
+  {''.join(timeseries_xml)}
+</GL_MarketDocument>"""
+
+
+class TestFetchGenerationUnitRegistry:
+    """fetch_generation_unit_registry — A73, the outage-independent master
+    list of large units, used to seed the geocoding script instead of A77
+    (which only ever names units that have already broken down)."""
+
+    def test_parses_unit_name_and_psr_type(self):
+        client = EntsoeClient(api_token="t")
+        xml = _generation_document(
+            _generation_timeseries("17W100P100P0318E", "17W000000918390N", "BAYET MORANDES (LES)", "B04"),
+        )
+        mock_resp = MagicMock(status_code=200, text=xml)
+        with patch.object(client.session, "get", return_value=mock_resp):
+            units = client.fetch_generation_unit_registry(
+                datetime(2026, 1, 1, tzinfo=timezone.utc), datetime(2026, 1, 2, tzinfo=timezone.utc),
+            )
+        assert units == [{
+            "unit_mrid": "17W000000918390N",
+            "unit_name": "BAYET MORANDES (LES)",
+            "psr_type": "fossil_gas",
+        }]
+
+    def test_deduplicates_by_unit_mrid(self):
+        """The same unit reports one TimeSeries per Period across a multi-day
+        window — must collapse to one roster entry, not one per report."""
+        client = EntsoeClient(api_token="t")
+        xml = _generation_document(
+            _generation_timeseries("R1", "U1", "SITE A", "B14"),
+            _generation_timeseries("R1", "U1", "SITE A", "B14"),
+        )
+        mock_resp = MagicMock(status_code=200, text=xml)
+        with patch.object(client.session, "get", return_value=mock_resp):
+            units = client.fetch_generation_unit_registry(
+                datetime(2026, 1, 1, tzinfo=timezone.utc), datetime(2026, 1, 2, tzinfo=timezone.utc),
+            )
+        assert len(units) == 1
+
+    def test_unknown_psr_type_falls_back_to_raw_code(self):
+        client = EntsoeClient(api_token="t")
+        xml = _generation_document(
+            _generation_timeseries("R1", "U1", "SITE A", "B99"),
+        )
+        mock_resp = MagicMock(status_code=200, text=xml)
+        with patch.object(client.session, "get", return_value=mock_resp):
+            units = client.fetch_generation_unit_registry(
+                datetime(2026, 1, 1, tzinfo=timezone.utc), datetime(2026, 1, 2, tzinfo=timezone.utc),
+            )
+        assert units[0]["psr_type"] == "B99"
+
+    def test_acknowledgement_returns_empty_not_error(self):
+        client = EntsoeClient(api_token="t")
+        xml = f"""<?xml version="1.0"?>
+<Acknowledgement_MarketDocument xmlns="{GENERATION_NS}">
+  <Reason><code>999</code><text>No matching data found</text></Reason>
+</Acknowledgement_MarketDocument>"""
+        mock_resp = MagicMock(status_code=200, text=xml)
+        with patch.object(client.session, "get", return_value=mock_resp):
+            units = client.fetch_generation_unit_registry(
+                datetime(2026, 1, 1, tzinfo=timezone.utc), datetime(2026, 1, 2, tzinfo=timezone.utc),
+            )
+        assert units == []
+
+    def test_missing_token_raises(self):
+        client = EntsoeClient(api_token=None)
+        with pytest.raises(EntsoeClientError, match="not configured"):
+            client.fetch_generation_unit_registry(
+                datetime(2026, 1, 1, tzinfo=timezone.utc), datetime(2026, 1, 2, tzinfo=timezone.utc),
+            )
