@@ -95,7 +95,7 @@ const tooltipStyle = {
 function CustomLegend() {
   return (
     <div style={{ display: 'flex', gap: 16, justifyContent: 'center', fontSize: '0.8rem', paddingTop: 8 }}>
-      <span style={{ color: '#4f8ef7' }}>⎯ Production</span>
+      <span style={{ color: '#2dd4bf' }}>⎯ Production</span>
       <span style={{ color: '#f59e0b' }}>⎯ Consommation</span>
       <span style={{ color: '#ef4444', opacity: 0.7 }}>▪ Excédent export</span>
     </div>
@@ -122,7 +122,13 @@ export function ProdConsChart({ data = [], region, loading = false }) {
       <section className="glass-card chart-card" data-testid="prod-cons-chart-empty">
         <h2 className="chart-title">{title}</h2>
         <div className="empty-state">
-          <span className="empty-state__icon" aria-hidden="true">📊</span>
+          <span className="empty-state__icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="5" y1="19" x2="5" y2="10" />
+              <line x1="12" y1="19" x2="12" y2="5" />
+              <line x1="19" y1="19" x2="19" y2="14" />
+            </svg>
+          </span>
           <p className="empty-state__title">Aucune donnée disponible</p>
           <p className="empty-state__hint">Rafraîchissez le pipeline ou élargissez la plage de dates.</p>
         </div>
@@ -187,7 +193,7 @@ export function ProdConsChart({ data = [], region, loading = false }) {
           <Line
             type="monotone"
             dataKey="prod"
-            stroke="#4f8ef7"
+            stroke="#2dd4bf"
             strokeWidth={2.5}
             dot={false}
             name="Production"

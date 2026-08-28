@@ -54,7 +54,11 @@ export function MeteoChart({ data = [], region, loading = false }) {
       <section className="glass-card chart-card" data-testid="meteo-chart-empty">
         <h2 className="chart-title">Météo — {region || 'France'}</h2>
         <div className="empty-state">
-          <span className="empty-state__icon" aria-hidden="true">🌡️</span>
+          <span className="empty-state__icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 14.5V5a2 2 0 1 0-4 0v9.5a4 4 0 1 0 4 0Z" />
+            </svg>
+          </span>
           <p className="empty-state__title">Pas encore de données météo</p>
           <p className="empty-state__hint">Lancez le pipeline pour ingérer les données Open-Meteo.</p>
         </div>

@@ -85,7 +85,11 @@ export function HistoryChart({ data, region, loading = false }) {
       <section className="glass-card chart-card chart-empty" data-testid="history-chart-empty">
         <h2 className="chart-title">Historique de production — {region}</h2>
         <div className="empty-state">
-          <span className="empty-state__icon" aria-hidden="true">📈</span>
+          <span className="empty-state__icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="4,17 9,10 13,13 20,5" />
+            </svg>
+          </span>
           <p className="empty-state__title">Aucune donnée pour cette région</p>
           <p className="empty-state__hint">
             Le pipeline se lance toutes les 15 min.<br />
@@ -115,10 +119,10 @@ export function HistoryChart({ data, region, loading = false }) {
           </defs>
 
           <CartesianGrid strokeDasharray="3 3" stroke="#888" strokeOpacity={0.2} />
-          <XAxis dataKey="timestamp" tick={{ fill: '#8b9ab5', fontSize: 10 }} interval="preserveStartEnd" />
-          <YAxis tick={{ fill: '#8b9ab5', fontSize: 11 }} unit=" MW" width={70} />
+          <XAxis dataKey="timestamp" tick={{ fill: '#9a9a9e', fontSize: 10 }} interval="preserveStartEnd" />
+          <YAxis tick={{ fill: '#9a9a9e', fontSize: 11 }} unit=" MW" width={70} />
           <Tooltip {...tooltipStyle} />
-          <Legend formatter={name => name === 'total' ? '⚡ Production totale' : (SOURCE_LABELS[name] || name)} />
+          <Legend formatter={name => name === 'total' ? 'Production totale' : (SOURCE_LABELS[name] || name)} />
 
           {/* Stacked areas per source */}
           {sources.map(src => (
@@ -137,7 +141,7 @@ export function HistoryChart({ data, region, loading = false }) {
           <Line
             type="monotone"
             dataKey="total"
-            stroke="#4f8ef7"
+            stroke="#2dd4bf"
             strokeWidth={2.5}
             dot={false}
             name="total"
