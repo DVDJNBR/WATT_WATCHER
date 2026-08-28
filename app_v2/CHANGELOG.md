@@ -1,3 +1,9 @@
+## [1.26.1](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.26.0...v1.26.1) (2026-08-28)
+
+### Bug Fixes
+
+* **entsoe:** paginate outage requests past the 200-item API cap ([e0dc30c](https://github.com/DVDJNBR/WATT_WATCHER/commit/e0dc30c5f6f1ee13441084e85e1b814d8c088cd1))
+
 ## [1.26.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.25.0...v1.26.0) (2026-08-28)
 
 ### Features
