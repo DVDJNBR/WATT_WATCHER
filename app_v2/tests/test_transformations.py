@@ -221,8 +221,8 @@ class TestMaintenanceSilver:
 
 class TestCleanMaintenanceDf:
     """clean_maintenance_df — the pure in-memory cleaning step, called directly
-    on the live scraper's output (function_app.py Stage 6), independent of
-    the file-based transform_maintenance_to_silver wrapper above."""
+    on ENTSO-E outage records (shared/stages/outages_stage.py), independent
+    of the file-based transform_maintenance_to_silver wrapper above."""
 
     def test_dedup_on_event_id(self):
         df = pd.DataFrame([
