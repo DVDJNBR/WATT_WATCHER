@@ -27,12 +27,13 @@
     "type": "reservoir"
   },
   "BAYET MORANDES (LES)": {
-    "class": null,
-    "label": null,
-    "lat": null,
-    "lon": null,
-    "needs_review": true,
-    "query_used": "manually verified as wrong (auto match was an unrelated river in Hérault); further searches ('Bayet Morandes Allier') returned nothing"
+    "class": "landuse",
+    "label": "Centrale à cycle combiné gaz de Bayet (3CB), Bayet, Vichy, Allier, Auvergne-Rhône-Alpes, France métropolitaine, 03500, France",
+    "lat": 46.2713809,
+    "lon": 3.3026024,
+    "needs_review": false,
+    "query_used": "Centrale Bayet Allier (found via web search: \"Morandes\" is the site/lieu-dit name for this gas plant, not a separate location)",
+    "type": "industrial"
   },
   "BESS_AFD7_BARBAN_SAUCATS": {
     "class": "boundary",
@@ -98,10 +99,13 @@
     "type": "industrial"
   },
   "COUESQUE": {
-    "label": null,
-    "lat": null,
-    "lon": null,
-    "needs_review": true
+    "class": "waterway",
+    "label": "Barrage de Couesques, Campouriez, Rodez, Aveyron, Occitanie, France métropolitaine, France",
+    "lat": 44.6957253,
+    "lon": 2.585906,
+    "needs_review": false,
+    "query_used": "Barrage de Couesques Aveyron (found via web search — unit name is missing the trailing 's')",
+    "type": "dam"
   },
   "CROIX DE METZ": {
     "class": "place",
@@ -301,13 +305,13 @@
     "type": "administrative"
   },
   "SAINT GUILLERME": {
-    "class": "landuse",
-    "label": "Zone artisanale Mont Guillerme, Saint-Oblas, Oytier-Saint-Oblas, Vienne, Isère, Auvergne-Rhône-Alpes, France métropolitaine, 38780, France",
-    "lat": 45.5758499,
-    "lon": 5.0399624,
-    "needs_review": true,
-    "query_used": "SAINT GUILLERME (auto match is an industrial zone name coincidence, not cross-checked as the real plant)",
-    "type": "industrial"
+    "class": "waterway",
+    "label": "Barrage du Chambon, Le Chambon, Mont-de-Lans, Les Deux Alpes, Grenoble, Isère, Auvergne-Rhône-Alpes, France métropolitaine, 38860, France",
+    "lat": 45.0460365,
+    "lon": 6.137554,
+    "needs_review": false,
+    "query_used": "Barrage du Chambon Mizoën Isère (found via web search: Saint-Guillerme II power station sits at the Chambon dam, Romanche valley)",
+    "type": "dam"
   },
   "SAINT PIERRE COGNET": {
     "class": "waterway",
@@ -337,12 +341,13 @@
     "type": "dam"
   },
   "SAUSSAZ": {
-    "class": null,
-    "label": null,
-    "lat": null,
-    "lon": null,
-    "needs_review": true,
-    "query_used": "manually flagged uncertain (auto match was a mountain peak in Hautes-Alpes, likely not the actual hydro plant); further search ('Barrage de Saussaz Maurienne') returned nothing"
+    "class": "building",
+    "label": "Centrale thermique de la Saussaz, Rue du 12 Décembre 1917, Sainte-Anne, La Saussaz, Saint-Michel-de-Maurienne, Saint-Jean-de-Maurienne, Savoie, Auvergne-Rhône-Alpes, France métropolitaine, 73140, France",
+    "lat": 45.2109086,
+    "lon": 6.4860551,
+    "needs_review": false,
+    "query_used": "Centrale Saussaz Saint-Jean-de-Maurienne (found via web search: Saussaz II, on the Arc river)",
+    "type": "yes"
   },
   "SERRE PONCON": {
     "class": "tourism",
