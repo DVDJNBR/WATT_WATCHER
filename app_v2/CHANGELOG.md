@@ -1,3 +1,9 @@
+## [1.25.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.24.0...v1.25.0) (2026-08-28)
+
+### Features
+
+* **app_v2:** animated per-source Pipeline diagram (Phase B) ([3bd1d3d](https://github.com/DVDJNBR/WATT_WATCHER/commit/3bd1d3d0f6fc618ad87cd050fa361b93d3df8278))
+
 ## [1.24.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.23.0...v1.24.0) (2026-08-28)
 
 ### Features
