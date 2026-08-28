@@ -1,3 +1,9 @@
+## [1.26.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.25.0...v1.26.0) (2026-08-28)
+
+### Features
+
+* **app_v2:** frequency-based pipeline (15min/daily/weekly) + real outages via ENTSO-E ([347d1a5](https://github.com/DVDJNBR/WATT_WATCHER/commit/347d1a58d95bf34f4da7ab9aa781e18dd33fe1d4))
+
 ## [1.25.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.24.0...v1.25.0) (2026-08-28)
 
 ### Features
