@@ -1173,24 +1173,34 @@ input[type="date"] {
 /* ── Pipeline diagram (source-by-source animated flow) ────────────────────── */
 .pipeline-diagram { margin-top: 4px; }
 
-.source-toggle-row {
+.pipeline-diagram__body {
   display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+  align-items: flex-start;
+  gap: 24px;
   margin-top: 16px;
+}
+
+.pipeline-diagram__main { flex: 1; min-width: 0; }
+
+.source-toggle-col {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 0 0 200px;
 }
 
 .source-toggle {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 7px 14px;
+  padding: 9px 14px;
   border: 1px solid var(--color-border);
   background: var(--color-surface-2);
   color: var(--color-text-muted);
   font-size: 0.82rem;
   font-weight: 500;
   font-family: inherit;
+  text-align: left;
   cursor: pointer;
   transition: border-color var(--transition), color var(--transition), background var(--transition);
 }
@@ -1396,6 +1406,8 @@ input[type="date"] {
 }
 
 @media (max-width: 1024px) {
+  .pipeline-diagram__body { flex-direction: column; }
+  .source-toggle-col { flex-direction: row; flex-wrap: wrap; flex-basis: auto; width: 100%; }
   .pipeline-diagram__track,
   .data-lake-group__stages {
     flex-direction: column;

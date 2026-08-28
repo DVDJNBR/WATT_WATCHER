@@ -132,41 +132,46 @@ export function PipelineDiagram() {
 
   return (
     <div className="pipeline-diagram">
-      <div className="source-toggle-row" role="tablist" aria-label="Choisir une source">
-        {SOURCES.map(s => (
-          <SourceToggle key={s.id} source={s} active={s.id === selectedId} onSelect={setSelectedId} />
-        ))}
-      </div>
-      {source.note && <p className="pipeline-diagram__source-note">{source.note}</p>}
-
-      <div className="pipeline-diagram__track">
-        <div className="data-lake-group">
-          <span className="data-lake-group__label">Data lake — ADLS Gen2</span>
-          <div className="data-lake-group__stages">
-            <StageNode stage={STAGES[0]} index={0} visited={0 < source.visitedCount} current={stageIndex === 0} source={source} />
-            <Connector traveled={stageIndex >= 1} source={source} cableKey="cleaning" />
-            <StageNode stage={STAGES[1]} index={1} visited={1 < source.visitedCount} current={stageIndex === 1} source={source} />
-          </div>
+      <div className="pipeline-diagram__body">
+        <div className="source-toggle-col" role="tablist" aria-label="Choisir une source">
+          {SOURCES.map(s => (
+            <SourceToggle key={s.id} source={s} active={s.id === selectedId} onSelect={setSelectedId} />
+          ))}
         </div>
 
-        <Connector traveled={stageIndex >= 2} source={source} cableKey="aggregation" />
-        <StageNode stage={STAGES[2]} index={2} visited={2 < source.visitedCount} current={stageIndex === 2} source={source} />
-        <Connector traveled={stageIndex >= 3 && 3 < source.visitedCount} source={source} />
-        <StageNode stage={STAGES[3]} index={3} visited={3 < source.visitedCount} current={stageIndex === 3} source={source} />
-        <Connector traveled={stageIndex >= 4 && 4 < source.visitedCount} source={source} />
-        <StageNode
-          stage={STAGES[4]}
-          index={4}
-          visited={4 < source.visitedCount}
-          current={stageIndex === 4}
-          source={source}
-          onDashboardClick={() => navigate('/')}
-        />
-      </div>
+        <div className="pipeline-diagram__main">
+          {source.note && <p className="pipeline-diagram__source-note">{source.note}</p>}
 
-      <div className="preview-panel">
-        <p className="preview-panel__stage-label">{STAGES[stageIndex].label}</p>
-        <PreviewPanel source={source} stageKind={currentKind} />
+          <div className="pipeline-diagram__track">
+            <div className="data-lake-group">
+              <span className="data-lake-group__label">Data lake — ADLS Gen2</span>
+              <div className="data-lake-group__stages">
+                <StageNode stage={STAGES[0]} index={0} visited={0 < source.visitedCount} current={stageIndex === 0} source={source} />
+                <Connector traveled={stageIndex >= 1} source={source} cableKey="cleaning" />
+                <StageNode stage={STAGES[1]} index={1} visited={1 < source.visitedCount} current={stageIndex === 1} source={source} />
+              </div>
+            </div>
+
+            <Connector traveled={stageIndex >= 2} source={source} cableKey="aggregation" />
+            <StageNode stage={STAGES[2]} index={2} visited={2 < source.visitedCount} current={stageIndex === 2} source={source} />
+            <Connector traveled={stageIndex >= 3 && 3 < source.visitedCount} source={source} />
+            <StageNode stage={STAGES[3]} index={3} visited={3 < source.visitedCount} current={stageIndex === 3} source={source} />
+            <Connector traveled={stageIndex >= 4 && 4 < source.visitedCount} source={source} />
+            <StageNode
+              stage={STAGES[4]}
+              index={4}
+              visited={4 < source.visitedCount}
+              current={stageIndex === 4}
+              source={source}
+              onDashboardClick={() => navigate('/')}
+            />
+          </div>
+
+          <div className="preview-panel">
+            <p className="preview-panel__stage-label">{STAGES[stageIndex].label}</p>
+            <PreviewPanel source={source} stageKind={currentKind} />
+          </div>
+        </div>
       </div>
     </div>
   )
