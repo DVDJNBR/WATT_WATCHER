@@ -66,3 +66,16 @@ class TestBronzeStorageLocal:
         stored = json.loads(Path(path).read_text(encoding="utf-8"))
         assert stored["job_id"] == "abc"
         assert stored["status"] == "failure"
+
+    def test_write_text_creates_file_with_extension(self, local_storage):
+        """write_text is used for non-JSON raw payloads (e.g. ODRE's CSV)."""
+        ts = datetime(2026, 1, 5, 8, 0, 0, tzinfo=timezone.utc)
+        path = local_storage.write_text("a;b;c\n1;2;3\n", source="capacity", extension="csv", timestamp=ts)
+        assert Path(path).exists()
+        assert path.endswith(".csv")
+        assert "capacity/2026/01/05/" in path
+
+    def test_write_text_content_matches(self, local_storage):
+        content = "region;filiere;puissance\n11;eolien;100\n"
+        path = local_storage.write_text(content, source="capacity", extension="csv")
+        assert Path(path).read_text(encoding="utf-8") == content

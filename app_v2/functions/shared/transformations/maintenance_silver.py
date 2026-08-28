@@ -17,6 +17,31 @@ import pandas as pd
 logger = logging.getLogger(__name__)
 
 
+def clean_maintenance_df(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Pure cleaning step: normalize dates, strip description text, dedup on event_id.
+
+    Used both by the file-based `transform_maintenance_to_silver` (offline/backfill)
+    and directly on in-memory scraper output (live 15-min pipeline).
+    """
+    df = df.copy()
+
+    # Parse dates
+    for date_col in ["start_date", "end_date"]:
+        if date_col in df.columns:
+            df[date_col] = pd.to_datetime(df[date_col], utc=True, errors="coerce")
+
+    # Clean description text (strip extra whitespace)
+    if "description" in df.columns:
+        df["description"] = df["description"].str.strip().str.replace(r"\s+", " ", regex=True)
+
+    # Dedup on event_id
+    if "event_id" in df.columns:
+        df = df.drop_duplicates(subset=["event_id"], keep="last")
+
+    return df
+
+
 def transform_maintenance_to_silver(
     bronze_path: str | Path,
     output_dir: str | Path,
@@ -40,21 +65,8 @@ def transform_maintenance_to_silver(
     if not records:
         return {"status": "empty", "rows": 0}
 
-    df = pd.DataFrame(records)
-
-    # Parse dates
-    for date_col in ["start_date", "end_date"]:
-        if date_col in df.columns:
-            df[date_col] = pd.to_datetime(df[date_col], utc=True, errors="coerce")
-
-    # Clean description text (strip extra whitespace)
-    if "description" in df.columns:
-        df["description"] = df["description"].str.strip().str.replace(r"\s+", " ", regex=True)
-
-    # Dedup on event_id
-    before = len(df)
-    if "event_id" in df.columns:
-        df = df.drop_duplicates(subset=["event_id"], keep="last")
+    before = len(records)
+    df = clean_maintenance_df(pd.DataFrame(records))
 
     # Write partitioned by start_date year/month
     files = 0

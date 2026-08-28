@@ -22,6 +22,7 @@ except ImportError:
 
 from shared.rte_client import RTEClient, RTEClientError
 from shared.bronze_storage import BronzeStorage
+from shared.silver_storage import SilverStorage
 from shared.maintenance_scraper import MaintenanceScraper
 from shared.audit_logger import AuditLogger
 
@@ -85,52 +86,6 @@ if AZURE_FUNCTIONS_AVAILABLE:
         job_id = str(uuid.uuid4())
         logger.info("Starting pipeline job: %s", job_id)
         run_full_pipeline(job_id=job_id, minutes=240)
-
-    # ── Maintenance scraping timer ───────────────────────────────────────────
-
-    @app.timer_trigger(
-        schedule="0 0 6 * * *",  # every day at 06:00 UTC
-        arg_name="timer",
-        run_on_startup=False,
-    )
-    def maintenance_scraping_timer(timer: func.TimerRequest) -> None:
-        """Daily scraping of grid maintenance events → Bronze layer."""
-        job_id = str(uuid.uuid4())
-        logger.info("[%s] Maintenance scraping starting", job_id)
-        storage_account = os.environ.get("STORAGE_ACCOUNT_NAME")
-        bronze = BronzeStorage(storage_account_name=storage_account)
-        scraper = MaintenanceScraper(
-            base_url=os.environ.get("MAINTENANCE_SCRAPING_URL")
-        )
-        try:
-            records = scraper.scrape_from_url()
-            path = bronze.write_json(records, source="maintenance")
-            logger.info("[%s] Scraped %d maintenance events → %s", job_id, len(records), path)
-        except Exception as exc:
-            logger.error("[%s] Maintenance scraping failed: %s", job_id, exc, exc_info=True)
-
-    # ── Price retention timer ────────────────────────────────────────────────
-
-    @app.timer_trigger(
-        schedule="0 15 2 * * *",  # every day at 02:15 UTC
-        arg_name="timer",
-        run_on_startup=False,
-    )
-    def price_retention_timer(timer: func.TimerRequest) -> None:
-        """Daily purge of FACT_MARKET_PRICE rows older than PRICE_RETENTION_DAYS."""
-        job_id = str(uuid.uuid4())
-        logger.info("[%s] Price retention starting", job_id)
-        conn = None
-        try:
-            from shared.price_retention import purge_old_prices
-            conn = _get_db_connection()
-            deleted = purge_old_prices(conn)
-            logger.info("[%s] Price retention: purged %d rows", job_id, deleted)
-        except Exception as exc:
-            logger.error("[%s] Price retention failed: %s", job_id, exc, exc_info=True)
-        finally:
-            if conn:
-                conn.close()
 
     # ── SQL reference snapshot timer ─────────────────────────────────────────
 
@@ -250,6 +205,10 @@ def run_full_pipeline(
     job_id = job_id or str(uuid.uuid4())
     results: dict = {"job_id": job_id, "stages": {}}
 
+    storage_account_pipeline = os.environ.get("STORAGE_ACCOUNT_NAME") if not local_mode else None
+    bronze_all = BronzeStorage(storage_account_name=storage_account_pipeline, local_mode=local_mode)
+    silver_all = SilverStorage(storage_account_name=storage_account_pipeline, local_mode=local_mode)
+
     # ── Stage 1: Bronze ingestion ────────────────────────────────────────────
     logger.info("[%s] Stage 1: Bronze ingestion (minutes=%d, backfill_days=%d)",
                 job_id, minutes, backfill_days)
@@ -305,6 +264,16 @@ def run_full_pipeline(
                 res = transform_rte_to_silver(tmp_bronze, tmp_silver)
                 results["stages"]["silver"] = res
                 results["stages"]["silver"]["_tmp_silver_dir"] = str(tmp_silver)
+
+                # transform_rte_to_silver writes under tmp_silver/silver/rte/production/...
+                # (it prefixes its own "silver/rte/production" inside the output_dir we gave
+                # it) — point upload_directory at that inner folder so the real ADLS "silver"
+                # container ends up with a clean rte/production/year=.../ layout, not a
+                # doubled silver/silver/... nesting.
+                rte_silver_local = tmp_silver / "silver" / "rte" / "production"
+                if rte_silver_local.exists():
+                    uploaded = silver_all.upload_directory(rte_silver_local, prefix="rte/production")
+                    results["stages"]["silver"]["files_persisted_to_adls"] = uploaded
             else:
                 results["stages"]["silver"] = {"status": "skipped", "reason": "no bronze_path"}
 
@@ -358,11 +327,21 @@ def run_full_pipeline(
         from shared.gold.dim_loader import DimLoader as _DimLoader
 
         meteo_records = fetch_meteo_all_regions(past_days=3)
+        if meteo_records:
+            bronze_all.write_json(meteo_records, source="meteo", sub_path="regional")
         df_meteo = transform_meteo_to_silver(meteo_records)
 
         if df_meteo.empty:
             results["stages"]["meteo"] = {"status": "empty", "rows": 0}
         else:
+            df_meteo_part = df_meteo.copy()
+            df_meteo_part["year"] = df_meteo_part["timestamp"].dt.year
+            df_meteo_part["month"] = df_meteo_part["timestamp"].dt.month
+            silver_all.write_parquet(
+                df_meteo_part, source="meteo", sub_path="regional",
+                partition_cols=["year", "month"],
+            )
+
             conn_m = _get_db_connection()
             try:
                 dim_m = _DimLoader(conn_m)
@@ -435,14 +414,20 @@ def run_full_pipeline(
     # ── Stage 5: Capacité installée (ODRE) — non-fatal ────────────────────────
     logger.info("[%s] Stage 5: Capacity ingestion (ODRE)", job_id)
     try:
-        from shared.odre_capacity_client import fetch_capacity
+        from shared.odre_capacity_client import fetch_raw_csv, parse_capacity_csv
+        from shared.transformations.capacity_silver import records_to_silver_df
         from shared.gold.dim_loader import DimLoader as _DimLoader2
 
-        capacity_records = fetch_capacity()
+        capacity_csv = fetch_raw_csv()
+        bronze_all.write_text(capacity_csv, source="capacity", extension="csv")
+        capacity_records = parse_capacity_csv(capacity_csv)
 
         if not capacity_records:
             results["stages"]["capacity"] = {"status": "empty", "rows": 0}
         else:
+            df_capacity = records_to_silver_df(capacity_records)
+            silver_all.write_parquet(df_capacity, source="capacity")
+
             conn_c = _get_db_connection()
             try:
                 dim_c = _DimLoader2(conn_c)
@@ -520,7 +505,9 @@ def run_full_pipeline(
     # ── Stage 6: Maintenance (scraper) — non-fatal ─────────────────────────────
     logger.info("[%s] Stage 6: Maintenance ingestion", job_id)
     try:
+        import pandas as _pd_mn
         from shared.gold.dim_loader import DimLoader as _DimLoader3
+        from shared.transformations.maintenance_silver import clean_maintenance_df
         from datetime import datetime as _datetime, timezone as _tz
 
         maintenance_url = os.environ.get("MAINTENANCE_SCRAPING_URL", "")
@@ -533,9 +520,24 @@ def run_full_pipeline(
             except Exception as scrape_exc:
                 logger.warning("[%s] Maintenance scraping failed (non-fatal): %s", job_id, scrape_exc)
 
-        if not maintenance_events:
+        if maintenance_events:
+            bronze_all.write_json(maintenance_events, source="maintenance")
+
+        df_maintenance = clean_maintenance_df(_pd_mn.DataFrame(maintenance_events))
+
+        if df_maintenance.empty:
             results["stages"]["maintenance"] = {"status": "empty", "rows": 0}
         else:
+            if "start_date" in df_maintenance.columns:
+                df_mn_part = df_maintenance.copy()
+                df_mn_part["year"] = df_mn_part["start_date"].dt.year
+                df_mn_part["month"] = df_mn_part["start_date"].dt.month
+                silver_all.write_parquet(
+                    df_mn_part, source="maintenance", partition_cols=["year", "month"],
+                )
+            else:
+                silver_all.write_parquet(df_maintenance, source="maintenance")
+
             conn_mn = _get_db_connection()
             try:
                 dim_mn = _DimLoader3(conn_mn)
@@ -546,10 +548,13 @@ def run_full_pipeline(
                 tbl_mnt = "FACT_MAINTENANCE" if is_sqlite_mn else "fact_maintenance"
                 now_str = _datetime.now(_tz.utc).isoformat()
 
+                def _iso(val):
+                    return val.isoformat() if _pd_mn.notna(val) else None
+
                 cursor_mn = conn_mn.cursor()
                 rows_loaded_mn = 0
-                for evt in maintenance_events:
-                    event_id = evt.get("event_id", "").strip()
+                for evt in df_maintenance.to_dict("records"):
+                    event_id = str(evt.get("event_id", "")).strip()
                     if not event_id:
                         continue
                     if is_sqlite_mn:
@@ -569,8 +574,8 @@ def run_full_pipeline(
                                 event_id,
                                 evt.get("unit_name"),
                                 evt.get("event_type"),
-                                evt.get("start_date"),
-                                evt.get("end_date"),
+                                _iso(evt.get("start_date")),
+                                _iso(evt.get("end_date")),
                                 evt.get("unavailable_mw"),
                                 now_str,
                             ),
@@ -592,8 +597,8 @@ def run_full_pipeline(
                                 event_id,
                                 evt.get("unit_name"),
                                 evt.get("event_type"),
-                                evt.get("start_date"),
-                                evt.get("end_date"),
+                                _iso(evt.get("start_date")),
+                                _iso(evt.get("end_date")),
                                 evt.get("unavailable_mw"),
                                 now_str,
                             ),
@@ -628,11 +633,27 @@ def run_full_pipeline(
             period_start_p = now_p - _td_p(hours=26)
             price_client = EntsoeClient(api_token=entsoe_token)
             price_records = price_client.fetch_day_ahead_prices(period_start_p, now_p)
+            if price_records:
+                bronze_all.write_json(
+                    [
+                        {"timestamp": r["timestamp"].isoformat(), "price_eur_mwh": r["price_eur_mwh"]}
+                        for r in price_records
+                    ],
+                    source="price",
+                )
             df_price = transform_price_to_silver(price_records)
 
             if df_price.empty:
                 results["stages"]["price"] = {"status": "empty", "rows": 0}
             else:
+                df_price_part = df_price.copy()
+                df_price_part["year"] = df_price_part["timestamp"].dt.year
+                df_price_part["month"] = df_price_part["timestamp"].dt.month
+                silver_all.write_parquet(
+                    df_price_part, source="price", sub_path="market",
+                    partition_cols=["year", "month"],
+                )
+
                 conn_p = _get_db_connection()
                 try:
                     dim_p = _DimLoader4(conn_p)

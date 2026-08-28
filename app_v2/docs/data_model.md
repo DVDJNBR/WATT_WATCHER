@@ -29,8 +29,14 @@ dim_region ──────< fact_maintenance
 | `fact_energy_flow` | region × time × source | RTE eco2mix-regional-tr | every 15 min |
 | `fact_meteo` | region × time | Open-Meteo (ERA5) | every 15 min |
 | `fact_capacity` | region × source × year | RTE reference data | low-frequency |
-| `fact_maintenance` | 1 row / outage event | RTE maintenance scraping | daily |
-| `fact_market_price` | 1 row / time (national, no region split) | ENTSO-E Transparency (A44) | every 15 min, purged daily beyond `PRICE_RETENTION_DAYS` |
+| `fact_maintenance` | 1 row / outage event | RTE maintenance scraping | every 15 min |
+| `fact_market_price` | 1 row / time (national, no region split) | ENTSO-E Transparency (A44) | every 15 min, no purge — full history kept like every other fact table |
+
+Every source above genuinely goes through Bronze (raw JSON/CSV, ADLS)
+→ Silver (cleaned Parquet, ADLS, Hive-partitioned) → Gold — this table only
+covers the Gold layer. Bronze/Silver blobs are auto-purged by ADLS lifecycle
+policies (`retention_bronze_days`/`retention_silver_days` in Terraform, not
+by application code); Gold rows are never purged for any table.
 
 ## Why `fact_market_price` has no `id_region`
 
