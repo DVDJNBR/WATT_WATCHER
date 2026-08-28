@@ -1,3 +1,9 @@
+## [1.26.2](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.26.1...v1.26.2) (2026-08-28)
+
+### Bug Fixes
+
+* **geodata:** resolve 4 more production units via web search ([10a803d](https://github.com/DVDJNBR/WATT_WATCHER/commit/10a803deb4c8ed46332a7708eb204e90b420120c))
+
 ## [1.26.1](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.26.0...v1.26.1) (2026-08-28)
 
 ### Bug Fixes
