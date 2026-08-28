@@ -21,6 +21,28 @@ from shared.transformations.data_quality import (
 logger = logging.getLogger(__name__)
 
 
+def records_to_silver_df(records: list[dict]) -> pd.DataFrame:
+    """
+    Build the Silver DataFrame for the live ODRE capacity path.
+
+    `odre_capacity_client.fetch_capacity()` already parses, converts units
+    (kW → MW), aggregates by (region, source) and drops zero/invalid rows —
+    the records it returns are already clean. This just gives that already-clean
+    data a typed DataFrame shape for Silver persistence, without duplicating
+    `_parse_capacity_csv`'s column-detection logic (which targets ODRE's raw
+    export columns, not the legacy/differently-shaped schema `transform_capacity_to_silver`
+    below was built for).
+    """
+    if not records:
+        return pd.DataFrame()
+    df = pd.DataFrame(records)
+    if "puissance_installee_mw" in df.columns:
+        df["puissance_installee_mw"] = pd.to_numeric(df["puissance_installee_mw"], errors="coerce")
+    if "annee" in df.columns:
+        df["annee"] = pd.to_numeric(df["annee"], errors="coerce").astype("Int64")
+    return df
+
+
 def transform_capacity_to_silver(
     bronze_path: str | Path,
     output_dir: str | Path,

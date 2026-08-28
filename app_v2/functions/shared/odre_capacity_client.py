@@ -68,18 +68,22 @@ def _find_col(df: pd.DataFrame, candidates: list[str]) -> str | None:
     return None
 
 
-def fetch_capacity() -> list[dict]:
+def fetch_raw_csv() -> str:
+    """Download the raw ODRE capacity CSV, unparsed (for Bronze archival)."""
+    resp = requests.get(ODRE_URL, timeout=60)
+    resp.raise_for_status()
+    return resp.content.decode("utf-8")
+
+
+def parse_capacity_csv(csv_text: str) -> list[dict]:
     """
-    Download and parse installed capacity from ODRE.
+    Parse raw ODRE capacity CSV text into aggregated capacity records.
 
     Returns:
         List of dicts with keys:
             region_code, region_name, source_name, puissance_installee_mw, annee
     """
-    resp = requests.get(ODRE_URL, timeout=60)
-    resp.raise_for_status()
-
-    df = pd.read_csv(io.BytesIO(resp.content), sep=";", low_memory=False, encoding="utf-8")
+    df = pd.read_csv(io.StringIO(csv_text), sep=";", low_memory=False)
 
     # Normalize column names: lowercase, spaces→_, special chars stripped
     df.columns = [
@@ -154,3 +158,14 @@ def fetch_capacity() -> list[dict]:
 
     logger.info("Aggregated to %d capacity records from ODRE (%d raw rows)", len(records), len(df))
     return records
+
+
+def fetch_capacity() -> list[dict]:
+    """
+    Download and parse installed capacity from ODRE.
+
+    Returns:
+        List of dicts with keys:
+            region_code, region_name, source_name, puissance_installee_mw, annee
+    """
+    return parse_capacity_csv(fetch_raw_csv())

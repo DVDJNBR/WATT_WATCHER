@@ -76,6 +76,40 @@ class BronzeStorage:
         else:
             return self._write_adls(full_path, content)
 
+    def write_text(
+        self,
+        content: str,
+        source: str,
+        sub_path: str = "",
+        extension: str = "txt",
+        timestamp: datetime | None = None,
+    ) -> str:
+        """
+        Write a raw non-JSON payload (e.g. CSV) to Bronze layer.
+
+        Args:
+            content: Raw payload as text, written byte-for-byte as received.
+            source: Data source identifier (e.g. 'capacity').
+            sub_path: Sub-directory under source.
+            extension: File extension without the leading dot (e.g. 'csv').
+            timestamp: Timestamp for the file name. Defaults to now.
+
+        Returns:
+            Full path of the written file.
+        """
+        ts = timestamp or datetime.now(timezone.utc)
+        ts_str = ts.strftime("%Y%m%dT%H%M%SZ")
+        date_path = ts.strftime("%Y/%m/%d")
+
+        filename = f"{source}_{ts_str}.{extension}"
+        parts = [source, sub_path, date_path, filename] if sub_path else [source, date_path, filename]
+        full_path = "/".join(parts)
+
+        if self.local_mode:
+            return self._write_local(full_path, content)
+        else:
+            return self._write_adls(full_path, content)
+
     def write_audit(
         self,
         audit_entry: dict,

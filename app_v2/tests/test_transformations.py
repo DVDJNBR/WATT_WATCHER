@@ -12,8 +12,14 @@ from functions.shared.transformations.data_quality import (
     apply_quality_rules,
 )
 from functions.shared.transformations.rte_silver import transform_rte_to_silver
-from functions.shared.transformations.capacity_silver import transform_capacity_to_silver
-from functions.shared.transformations.maintenance_silver import transform_maintenance_to_silver
+from functions.shared.transformations.capacity_silver import (
+    transform_capacity_to_silver,
+    records_to_silver_df,
+)
+from functions.shared.transformations.maintenance_silver import (
+    transform_maintenance_to_silver,
+    clean_maintenance_df,
+)
 from functions.shared.transformations.era5_silver import transform_era5_to_silver
 
 
@@ -160,6 +166,26 @@ class TestCapacitySilver:
         assert len(parquets) == 1
 
 
+class TestRecordsToSilverDf:
+    """records_to_silver_df — the live ODRE path's Silver step (in-memory,
+    used on fetch_capacity()'s already-aggregated output, not the legacy
+    file-based transform_capacity_to_silver above)."""
+
+    def test_empty_records(self):
+        df = records_to_silver_df([])
+        assert df.empty
+
+    def test_typed_columns(self):
+        records = [
+            {"region_code": "11", "region_name": "Île-de-France",
+             "source_name": "eolien", "puissance_installee_mw": "123.45", "annee": "2026"},
+        ]
+        df = records_to_silver_df(records)
+        assert len(df) == 1
+        assert df.iloc[0]["puissance_installee_mw"] == 123.45
+        assert df.iloc[0]["annee"] == 2026
+
+
 # ─── Maintenance Silver Tests ───────────────────────────────────────────────
 
 class TestMaintenanceSilver:
@@ -191,6 +217,40 @@ class TestMaintenanceSilver:
         df = pd.read_parquet(parquets[0])
         for desc in df["description"].tolist():
             assert "  " not in desc  # No double spaces
+
+
+class TestCleanMaintenanceDf:
+    """clean_maintenance_df — the pure in-memory cleaning step, called directly
+    on the live scraper's output (function_app.py Stage 6), independent of
+    the file-based transform_maintenance_to_silver wrapper above."""
+
+    def test_dedup_on_event_id(self):
+        df = pd.DataFrame([
+            {"event_id": "EVT-001", "start_date": "2026-03-01T06:00:00Z",
+             "end_date": "2026-04-15T18:00:00Z", "description": "Visite  décennale"},
+            {"event_id": "EVT-001", "start_date": "2026-03-01T06:00:00Z",
+             "end_date": "2026-04-15T18:00:00Z", "description": "Visite  décennale"},
+        ])
+        cleaned = clean_maintenance_df(df)
+        assert len(cleaned) == 1
+
+    def test_dates_parsed_to_datetime(self):
+        df = pd.DataFrame([
+            {"event_id": "EVT-002", "start_date": "2026-02-20T14:30:00Z", "end_date": "2026-02-28T23:59:00Z"},
+        ])
+        cleaned = clean_maintenance_df(df)
+        assert pd.api.types.is_datetime64_any_dtype(cleaned["start_date"])
+
+    def test_description_whitespace_stripped(self):
+        df = pd.DataFrame([
+            {"event_id": "EVT-003", "description": "Arrêt   pompe  "},
+        ])
+        cleaned = clean_maintenance_df(df)
+        assert cleaned.iloc[0]["description"] == "Arrêt pompe"
+
+    def test_empty_input(self):
+        cleaned = clean_maintenance_df(pd.DataFrame([]))
+        assert cleaned.empty
 
 
 # ─── ERA5 Silver Tests ──────────────────────────────────────────────────────

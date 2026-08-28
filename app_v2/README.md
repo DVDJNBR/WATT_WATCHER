@@ -86,13 +86,12 @@ Also requires the `AZURE_CREDENTIALS` GitHub secret (service principal) for the 
 Push to `main` → GitHub Actions runs tests → deploys the Functions pipeline.
 
 **Timer triggers:**
-- `*/15 * * * *` — RTE ingestion → Bronze
-- `0 6 * * *` — Grid maintenance scraping → Bronze
-- `0 1 * * *` — SQL reference snapshot → Bronze
-- `0 2:15 * * *` — Price retention: purge `FACT_MARKET_PRICE` beyond `PRICE_RETENTION_DAYS` (default 7)
-- Full pipeline (Bronze → Silver → Gold, incl. Météo/ODRE/maintenance/prix marché) runs as part of the RTE ingestion job
+- `*/15 * * * *` — full pipeline (Bronze → Silver → Gold) for all sources: RTE eCO2mix, Open-Meteo, ODRE capacity, grid maintenance, and ENTSO-E day-ahead prices. Every source writes raw Bronze and cleaned Silver Parquet before loading Gold.
+- `0 1 * * *` — SQL reference snapshot (`DIM_REGION`/`DIM_SOURCE`) → Bronze
 
-**Day-ahead market prices (ENTSO-E):** optional — set `ENTSOE_API_TOKEN` (see `.cloud/terraform.tfvars.example`) to enable. Ingestion is non-fatal and silently skipped if unset. See `docs/entsoe_price_integration_report.md` for the full write-up (schema, retention, how the 40% surplus threshold on the dashboard was calibrated against real prices).
+Bronze/Silver blobs are auto-purged by ADLS lifecycle policies (`retention_bronze_days`/`retention_silver_days` in Terraform, default 180/90 days) — no purge job needed in code. Gold tables are never purged.
+
+**Day-ahead market prices (ENTSO-E):** optional — set `ENTSOE_API_TOKEN` (see `.cloud/terraform.tfvars.example`) to enable. Ingestion is non-fatal and silently skipped if unset. See `docs/entsoe_price_integration_report.md` for the full write-up (schema, how the 40% surplus threshold on the dashboard was calibrated against real prices).
 
 ### Destroy & recreate
 

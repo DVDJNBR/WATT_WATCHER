@@ -11,7 +11,6 @@ supabase_connection_string = "postgresql://postgres:CHANGE_ME@db.xxxxx.supabase.
 retention_bronze_days = 180   # 6 months
 retention_silver_days = 90    # 3 months
 retention_audit_days  = 365   # 12 months
-price_retention_days  = 7     # 1 week — FACT_MARKET_PRICE only, purged daily
 
 # ENTSO-E Transparency Platform token — day-ahead market price ingestion.
 # Optional: leave empty ("") to skip price ingestion entirely (non-fatal).

@@ -39,8 +39,3 @@ variable "entsoe_api_token" {
   default     = ""
 }
 
-variable "price_retention_days" {
-  description = "FACT_MARKET_PRICE retention in days (purged daily by price_retention_timer)"
-  type        = number
-  default     = 7
-}
