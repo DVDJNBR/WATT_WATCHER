@@ -1,0 +1,401 @@
+{
+  "AIGLE": {
+    "class": "waterway",
+    "label": "Barrage de l'Aigle, Le Breuil, Soursac, Ussel, Corrèze, Nouvelle-Aquitaine, France métropolitaine, France",
+    "lat": 45.24343,
+    "lon": 2.2246104,
+    "needs_review": false,
+    "query_used": "Barrage de l'Aigle Corrèze (manually verified — auto match was wrong)",
+    "type": "dam"
+  },
+  "BANC DE GUERANDE": {
+    "class": "boundary",
+    "label": "Guérande, Saint-Nazaire, Loire-Atlantique, Pays de la Loire, France métropolitaine, 44350, France",
+    "lat": 47.3278442,
+    "lon": -2.4293843,
+    "needs_review": false,
+    "query_used": "GUERANDE",
+    "type": "administrative"
+  },
+  "BATHIE": {
+    "class": "water",
+    "label": "Bassin compensateur de La Bathie, Biorges, La Bâthie, Albertville, Savoie, Auvergne-Rhône-Alpes, France métropolitaine, 73540, France",
+    "lat": 45.6456361,
+    "lon": 6.4397826,
+    "needs_review": false,
+    "query_used": "BATHIE",
+    "type": "reservoir"
+  },
+  "BAYET MORANDES (LES)": {
+    "class": null,
+    "label": null,
+    "lat": null,
+    "lon": null,
+    "needs_review": true,
+    "query_used": "manually verified as wrong (auto match was an unrelated river in Hérault); further searches ('Bayet Morandes Allier') returned nothing"
+  },
+  "BESS_AFD7_BARBAN_SAUCATS": {
+    "class": "boundary",
+    "label": "Saucats, Bordeaux, Gironde, Nouvelle-Aquitaine, France métropolitaine, 33650, France",
+    "lat": 44.652798,
+    "lon": -0.5958896,
+    "needs_review": false,
+    "query_used": "SAUCATS",
+    "type": "administrative"
+  },
+  "BROMMAT": {
+    "class": "boundary",
+    "label": "Brommat, Rodez, Aveyron, Occitanie, France métropolitaine, 12600, France",
+    "lat": 44.8288,
+    "lon": 2.68482,
+    "needs_review": false,
+    "query_used": "BROMMAT",
+    "type": "administrative"
+  },
+  "CHASTANG": {
+    "class": "waterway",
+    "label": "Barrage du Chastang, Lavastroux, Saint-Martin-la-Méanne, Tulle, Corrèze, Nouvelle-Aquitaine, France métropolitaine, 19320, France",
+    "lat": 45.1515884,
+    "lon": 2.0099407,
+    "needs_review": false,
+    "query_used": "CHASTANG",
+    "type": "dam"
+  },
+  "CHEYLAS": {
+    "class": "boundary",
+    "label": "Le Cheylas, Grenoble, Isère, Auvergne-Rhône-Alpes, France métropolitaine, 38570, France",
+    "lat": 45.370339,
+    "lon": 5.9927101,
+    "needs_review": false,
+    "query_used": "CHEYLAS",
+    "type": "administrative"
+  },
+  "COCHE": {
+    "class": "place",
+    "label": "Coche, Quérion, Pommiers-Moulons, Jonzac, Charente-Maritime, Nouvelle-Aquitaine, France métropolitaine, 17130, France",
+    "lat": 45.3130461,
+    "lon": -0.3474426,
+    "needs_review": false,
+    "query_used": "COCHE",
+    "type": "locality"
+  },
+  "COMBE D'AVRIEUX": {
+    "class": "highway",
+    "label": "Rue de la Combe, Avrieux, Saint-Jean-de-Maurienne, Savoie, Auvergne-Rhône-Alpes, France métropolitaine, 73500, France",
+    "lat": 45.2168406,
+    "lon": 6.7219669,
+    "needs_review": false,
+    "query_used": "COMBE D'AVRIEUX",
+    "type": "residential"
+  },
+  "COMPAGNIE ELECTRIQUE DE BRETAGNE": {
+    "class": "landuse",
+    "label": "Centrale à cycle combiné gaz de Landivisiau, Le Vern, Landivisiau, Morlaix, Finistère, Bretagne, France métropolitaine, 29400, France",
+    "lat": 48.5224152,
+    "lon": -4.0716505,
+    "needs_review": false,
+    "query_used": "COMPAGNIE ELECTRIQUE DE BRETAGNE",
+    "type": "industrial"
+  },
+  "COUESQUE": {
+    "label": null,
+    "lat": null,
+    "lon": null,
+    "needs_review": true
+  },
+  "CROIX DE METZ": {
+    "class": "place",
+    "label": "Croix de Metz, Croix de Metz Régina, Toul, Meurthe-et-Moselle, Grand Est, France métropolitaine, 54200, France",
+    "lat": 48.6900453,
+    "lon": 5.8983837,
+    "needs_review": false,
+    "query_used": "CROIX DE METZ",
+    "type": "suburb"
+  },
+  "CURBANS": {
+    "class": "boundary",
+    "label": "Curbans, Forcalquier, Alpes-de-Haute-Provence, Provence-Alpes-Côte d'Azur, France métropolitaine, 05110, France",
+    "lat": 44.4290565,
+    "lon": 6.0387166,
+    "needs_review": false,
+    "query_used": "CURBANS",
+    "type": "administrative"
+  },
+  "FERME EOLIENNE DE VENT-DES-ILES": {
+    "class": null,
+    "label": null,
+    "lat": null,
+    "lon": null,
+    "needs_review": true,
+    "query_used": "manually verified as wrong (auto match was a museum in French Polynesia); further search ('Ferme éolienne Vent des Iles') returned nothing"
+  },
+  "FR_SAINT-PIERRE": {
+    "class": "boundary",
+    "label": "Saint-Pierre, Sélestat-Erstein, Bas-Rhin, Collectivité européenne d'Alsace, Grand Est, France métropolitaine, 67140, France",
+    "lat": 48.3832725,
+    "lon": 7.4718731,
+    "needs_review": false,
+    "query_used": "FR_SAINT-PIERRE",
+    "type": "administrative"
+  },
+  "GRAND MAISON": {
+    "class": "waterway",
+    "label": "Barrage de Grand'Maison, Vaujany, Grenoble, Isère, Auvergne-Rhône-Alpes, France métropolitaine, France",
+    "lat": 45.2057207,
+    "lon": 6.1151773,
+    "needs_review": false,
+    "query_used": "Barrage de Grand Maison (manually verified — auto match was wrong)",
+    "type": "dam"
+  },
+  "HERMILLON": {
+    "class": "boundary",
+    "label": "Hermillon, La Tour-en-Maurienne, Saint-Jean-de-Maurienne, Savoie, Auvergne-Rhône-Alpes, France métropolitaine, 73300, France",
+    "lat": 45.299115,
+    "lon": 6.3624976,
+    "needs_review": false,
+    "query_used": "HERMILLON",
+    "type": "administrative"
+  },
+  "MALGOVERT": {
+    "class": "waterway",
+    "label": "Galerie d'amenée EDF de Malgovert, Villaroger, Albertville, Savoie, Auvergne-Rhône-Alpes, France métropolitaine, 73640, France",
+    "lat": 45.5757938,
+    "lon": 6.8686494,
+    "needs_review": false,
+    "query_used": "MALGOVERT",
+    "type": "pressurised"
+  },
+  "MONTEYNARD": {
+    "class": "boundary",
+    "label": "Monteynard, Grenoble, Isère, Auvergne-Rhône-Alpes, France métropolitaine, 38770, France",
+    "lat": 44.9656674,
+    "lon": 5.7017388,
+    "needs_review": false,
+    "query_used": "MONTEYNARD",
+    "type": "administrative"
+  },
+  "MONTEZIC": {
+    "class": "boundary",
+    "label": "Montézic, Rodez, Aveyron, Occitanie, France métropolitaine, 12460, France",
+    "lat": 44.7085893,
+    "lon": 2.6398675,
+    "needs_review": false,
+    "query_used": "MONTEZIC",
+    "type": "administrative"
+  },
+  "MONTPEZAT": {
+    "class": "boundary",
+    "label": "Montpezat, Auch, Gers, Occitanie, France métropolitaine, 32220, France",
+    "lat": 43.3955556,
+    "lon": 0.9686111,
+    "needs_review": false,
+    "query_used": "MONTPEZAT",
+    "type": "administrative"
+  },
+  "ORAISON": {
+    "class": "boundary",
+    "label": "Oraison, Forcalquier, Alpes-de-Haute-Provence, Provence-Alpes-Côte d'Azur, France métropolitaine, 04700, France",
+    "lat": 43.9166157,
+    "lon": 5.919898,
+    "needs_review": false,
+    "query_used": "ORAISON",
+    "type": "administrative"
+  },
+  "PIED DE BORNE": {
+    "class": "boundary",
+    "label": "Pied-de-Borne, Mende, Lozère, Occitanie, France métropolitaine, 48800, France",
+    "lat": 44.4754249,
+    "lon": 3.9846803,
+    "needs_review": false,
+    "query_used": "PIED DE BORNE",
+    "type": "administrative"
+  },
+  "PONT SUR SAMBRE": {
+    "class": "boundary",
+    "label": "Pont-sur-Sambre, Avesnes-sur-Helpe, Nord, Hauts-de-France, France métropolitaine, 59138, France",
+    "lat": 50.2215226,
+    "lon": 3.8485702,
+    "needs_review": false,
+    "query_used": "PONT SUR SAMBRE",
+    "type": "administrative"
+  },
+  "POUGET": {
+    "class": "place",
+    "label": "Pouget, Marcillat, Riom, Puy-de-Dôme, Auvergne-Rhône-Alpes, France métropolitaine, 63440, France",
+    "lat": 46.0859983,
+    "lon": 3.0274507,
+    "needs_review": false,
+    "query_used": "POUGET",
+    "type": "hamlet"
+  },
+  "PRAGNERES": {
+    "class": "highway",
+    "label": "Pragneres, Route de Gèdre, Pragnères, Gèdre, Gavarnie-Gèdre, Argelès-Gazost, Hautes-Pyrénées, Occitanie, France métropolitaine, 65120, France",
+    "lat": 42.8185508,
+    "lon": 0.0100851,
+    "needs_review": false,
+    "query_used": "PRAGNERES",
+    "type": "bus_stop"
+  },
+  "RANCE": {
+    "class": "waterway",
+    "label": "Barrage de la Rance, Le Rosais, Saint-Malo, Ille-et-Vilaine, Bretagne, France métropolitaine, France",
+    "lat": 48.6179442,
+    "lon": -2.0246392,
+    "needs_review": false,
+    "query_used": "Barrage de la Rance (manually verified — auto match was wrong)",
+    "type": "dam"
+  },
+  "RANDENS": {
+    "class": "boundary",
+    "label": "Randens, Val-d'Arc, Saint-Jean-de-Maurienne, Savoie, Auvergne-Rhône-Alpes, France métropolitaine, 73220, France",
+    "lat": 45.542021,
+    "lon": 6.3303909,
+    "needs_review": false,
+    "query_used": "RANDENS",
+    "type": "administrative"
+  },
+  "REVIN": {
+    "class": "boundary",
+    "label": "Revin, Charleville-Mézières, Ardennes, Grand Est, France métropolitaine, 08500, France",
+    "lat": 49.9421221,
+    "lon": 4.6374643,
+    "needs_review": false,
+    "query_used": "REVIN",
+    "type": "administrative"
+  },
+  "SAINT AVOLD 7": {
+    "class": "boundary",
+    "label": "Saint-Avold, Forbach-Boulay-Moselle, Moselle, Grand Est, France métropolitaine, 57500, France",
+    "lat": 49.1043397,
+    "lon": 6.7071754,
+    "needs_review": false,
+    "query_used": "SAINT AVOLD",
+    "type": "administrative"
+  },
+  "SAINT AVOLD 8": {
+    "class": "boundary",
+    "label": "Saint-Avold, Forbach-Boulay-Moselle, Moselle, Grand Est, France métropolitaine, 57500, France",
+    "lat": 49.1043397,
+    "lon": 6.7071754,
+    "needs_review": false,
+    "query_used": "SAINT AVOLD",
+    "type": "administrative"
+  },
+  "SAINT CHAMAS": {
+    "class": "boundary",
+    "label": "Saint-Chamas, Istres, Bouches-du-Rhône, Provence-Alpes-Côte d'Azur, France métropolitaine, 13250, France",
+    "lat": 43.5497879,
+    "lon": 5.0341639,
+    "needs_review": false,
+    "query_used": "SAINT CHAMAS",
+    "type": "administrative"
+  },
+  "SAINT ESTEVE": {
+    "class": "boundary",
+    "label": "Saint-Estève, Perpignan, Pyrénées-Orientales, Occitanie, France métropolitaine, 66240, France",
+    "lat": 42.7100287,
+    "lon": 2.8456715,
+    "needs_review": false,
+    "query_used": "SAINT ESTEVE",
+    "type": "administrative"
+  },
+  "SAINT GUILLERME": {
+    "class": "landuse",
+    "label": "Zone artisanale Mont Guillerme, Saint-Oblas, Oytier-Saint-Oblas, Vienne, Isère, Auvergne-Rhône-Alpes, France métropolitaine, 38780, France",
+    "lat": 45.5758499,
+    "lon": 5.0399624,
+    "needs_review": true,
+    "query_used": "SAINT GUILLERME (auto match is an industrial zone name coincidence, not cross-checked as the real plant)",
+    "type": "industrial"
+  },
+  "SAINT PIERRE COGNET": {
+    "class": "waterway",
+    "label": "Barrage de Saint-Pierre-Cognet, Saint-Sébastien, Saint-Pierre-de-Méaroz, Grenoble, Isère, Auvergne-Rhône-Alpes, France métropolitaine, 38350, France",
+    "lat": 44.8767096,
+    "lon": 5.8038457,
+    "needs_review": false,
+    "query_used": "SAINT PIERRE COGNET",
+    "type": "dam"
+  },
+  "SAINTE CROIX": {
+    "class": "waterway",
+    "label": "Barrage de Sainte-Croix, Sainte-Croix-du-Verdon, Digne-les-Bains, Alpes-de-Haute-Provence, France métropolitaine, France",
+    "lat": 43.7369079,
+    "lon": 6.1341489,
+    "needs_review": false,
+    "query_used": "Barrage de Sainte-Croix Verdon (manually verified — auto match was wrong)",
+    "type": "dam"
+  },
+  "SARRANS": {
+    "class": "waterway",
+    "label": "Barrage de Sarrans, Le Bousquet, Sainte-Geneviève-sur-Argence, Argences en Aubrac, Rodez, Aveyron, Occitanie, France métropolitaine, 12420, France",
+    "lat": 44.8291287,
+    "lon": 2.7405735,
+    "needs_review": false,
+    "query_used": "SARRANS",
+    "type": "dam"
+  },
+  "SAUSSAZ": {
+    "class": null,
+    "label": null,
+    "lat": null,
+    "lon": null,
+    "needs_review": true,
+    "query_used": "manually flagged uncertain (auto match was a mountain peak in Hautes-Alpes, likely not the actual hydro plant); further search ('Barrage de Saussaz Maurienne') returned nothing"
+  },
+  "SERRE PONCON": {
+    "class": "tourism",
+    "label": "Serre poncon, Sentier de Découverte, Rousset-Serre-Ponçon, Gap, Hautes-Alpes, Provence-Alpes-Côte d'Azur, France métropolitaine, 05190, France",
+    "lat": 44.4764617,
+    "lon": 6.2758535,
+    "needs_review": false,
+    "query_used": "SERRE PONCON",
+    "type": "information"
+  },
+  "SISTERON": {
+    "class": "boundary",
+    "label": "Sisteron, Forcalquier, Alpes-de-Haute-Provence, Provence-Alpes-Côte d'Azur, France métropolitaine, 04200, France",
+    "lat": 44.1963467,
+    "lon": 5.9443791,
+    "needs_review": false,
+    "query_used": "SISTERON",
+    "type": "administrative"
+  },
+  "ST ETIENNE CANTALES": {
+    "class": "boundary",
+    "label": "Saint-Étienne-Cantalès, Aurillac, Cantal, Auvergne-Rhône-Alpes, France métropolitaine, 15150, France",
+    "lat": 44.948405,
+    "lon": 2.2252598,
+    "needs_review": false,
+    "query_used": "ST ETIENNE CANTALES",
+    "type": "administrative"
+  },
+  "SUPER BISSORTE": {
+    "class": "aerialway",
+    "label": "Super-Bissorte, Sentier de Bissorte, Bissorte, Orelle, Saint-Jean-de-Maurienne, Savoie, Auvergne-Rhône-Alpes, France métropolitaine, 73140, France",
+    "lat": 45.1911276,
+    "lon": 6.5770298,
+    "needs_review": false,
+    "query_used": "SUPER BISSORTE",
+    "type": "cable_car"
+  },
+  "VILLARODIN": {
+    "class": "place",
+    "label": "Villarodin, La Norma, Villarodin-Bourget, Saint-Jean-de-Maurienne, Savoie, Auvergne-Rhône-Alpes, France métropolitaine, 73500, France",
+    "lat": 45.2082077,
+    "lon": 6.7112786,
+    "needs_review": false,
+    "query_used": "VILLARODIN",
+    "type": "hamlet"
+  },
+  "VOUGLANS": {
+    "class": "waterway",
+    "label": "Barrage de Vouglans, Vouglans, Lect, Saint-Claude, Jura, Bourgogne-Franche-Comté, France métropolitaine, 39260, France",
+    "lat": 46.3967243,
+    "lon": 5.666358,
+    "needs_review": false,
+    "query_used": "VOUGLANS",
+    "type": "dam"
+  }
+}

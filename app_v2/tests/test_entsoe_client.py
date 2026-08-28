@@ -327,3 +327,80 @@ class TestFetchUnavailabilityOfProductionUnits:
         params = kwargs["params"]
         assert params["documentType"] == "A77"
         assert params["biddingZone_Domain"] == "10YFR-RTE------C"
+
+
+class TestOutagesPagination:
+    """ENTSO-E caps this endpoint at 200 instances/request — a real bug hit
+    against the live API with a 180-day window (676 instances, HTTP 400).
+    Confirmed the real API accepts an `offset` param in steps of 200 to page
+    through the rest; these tests pin that behaviour with mocks."""
+
+    def _over_limit_ack(self, count):
+        return f"""<?xml version="1.0"?>
+<Acknowledgement_MarketDocument xmlns="{OUTAGE_NS}">
+  <mRID>x</mRID>
+  <Reason><code>999</code><text>The number of instances ({count}) exceeds the allowed maximum (200) for data item UNAVAILABILITY_OF_PRODUCTION_AND_GENERATION_UNITS.</text></Reason>
+</Acknowledgement_MarketDocument>"""
+
+    def test_paginates_past_200_limit(self):
+        client = EntsoeClient(api_token="t")
+        xml_a = _outage_document("A54", "10T-A", "SITE A", 100.0, "2026-01-01T00:00Z", "2026-01-02T00:00Z", [0.0])
+        xml_b = _outage_document("A54", "10T-B", "SITE B", 200.0, "2026-01-01T00:00Z", "2026-01-02T00:00Z", [0.0])
+        over_limit_resp = MagicMock(status_code=400, text=self._over_limit_ack(250))
+        page1_resp = MagicMock(status_code=200, content=_zip_of(xml_a), headers={"Content-Type": "application/zip"})
+        page2_resp = MagicMock(status_code=200, content=_zip_of(xml_b), headers={"Content-Type": "application/zip"})
+
+        def fake_get(*args, **kwargs):
+            offset = kwargs["params"].get("offset", 0)
+            if offset == 0:
+                return over_limit_resp
+            if offset == 200:
+                return page2_resp
+            raise AssertionError(f"unexpected offset {offset}")
+
+        with patch.object(client.session, "get", side_effect=fake_get):
+            records = client.fetch_unavailability_of_production_units(
+                datetime(2026, 1, 1, tzinfo=timezone.utc), datetime(2026, 1, 2, tzinfo=timezone.utc),
+            )
+        assert {r["unit_name"] for r in records} == {"SITE B"}
+
+    def test_stops_once_total_covered(self):
+        """250 instances -> offset 0 (over-limit signal) then offset 200 only;
+        must not request a third page (offset 400) that would exceed 250."""
+        client = EntsoeClient(api_token="t")
+        xml = _outage_document("A54", "10T-B", "SITE B", 200.0, "2026-01-01T00:00Z", "2026-01-02T00:00Z", [0.0])
+        over_limit_resp = MagicMock(status_code=400, text=self._over_limit_ack(250))
+        page_resp = MagicMock(status_code=200, content=_zip_of(xml), headers={"Content-Type": "application/zip"})
+        calls = []
+
+        def fake_get(*args, **kwargs):
+            offset = kwargs["params"].get("offset", 0)
+            calls.append(offset)
+            return over_limit_resp if offset == 0 else page_resp
+
+        with patch.object(client.session, "get", side_effect=fake_get):
+            client.fetch_unavailability_of_production_units(
+                datetime(2026, 1, 1, tzinfo=timezone.utc), datetime(2026, 1, 2, tzinfo=timezone.utc),
+            )
+        assert calls == [0, 200]
+
+    def test_under_limit_single_request_no_offset_param(self):
+        """The common case (< 200 instances) must not send an offset param at all."""
+        client = EntsoeClient(api_token="t")
+        xml = _outage_document("A54", "10T-A", "SITE A", 100.0, "2026-01-01T00:00Z", "2026-01-02T00:00Z", [0.0])
+        mock_resp = MagicMock(status_code=200, content=_zip_of(xml), headers={"Content-Type": "application/zip"})
+        with patch.object(client.session, "get", return_value=mock_resp) as mock_get:
+            client.fetch_unavailability_of_production_units(
+                datetime(2026, 1, 1, tzinfo=timezone.utc), datetime(2026, 1, 2, tzinfo=timezone.utc),
+            )
+        assert "offset" not in mock_get.call_args.kwargs["params"]
+
+    def test_genuine_400_not_mistaken_for_pagination(self):
+        """A 400 that ISN'T the over-limit message must still raise, not loop forever."""
+        client = EntsoeClient(api_token="t")
+        bad_resp = MagicMock(status_code=400, text="<Acknowledgement_MarketDocument>some other error</Acknowledgement_MarketDocument>")
+        with patch.object(client.session, "get", return_value=bad_resp):
+            with pytest.raises(EntsoeClientError, match="HTTP 400"):
+                client.fetch_unavailability_of_production_units(
+                    datetime(2026, 1, 1, tzinfo=timezone.utc), datetime(2026, 1, 2, tzinfo=timezone.utc),
+                )
