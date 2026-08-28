@@ -60,6 +60,7 @@ class RTEClient:
         limit: int = DEFAULT_LIMIT,
         offset: int = 0,
         since: datetime | None = None,
+        until: datetime | None = None,
         region_code: str | None = None,
     ) -> dict:
         """
@@ -68,7 +69,8 @@ class RTEClient:
         Args:
             limit: Max records per request (max 100).
             offset: Pagination offset.
-            since: Only records after this datetime.
+            since: Only records at or after this datetime.
+            until: Only records strictly before this datetime.
             region_code: Filter by INSEE region code (e.g. '11' for IDF).
 
         Returns:
@@ -84,6 +86,9 @@ class RTEClient:
         if since:
             iso = since.strftime("%Y-%m-%dT%H:%M:%S")
             where_clauses.append(f"date_heure >= '{iso}'")
+        if until:
+            iso = until.strftime("%Y-%m-%dT%H:%M:%S")
+            where_clauses.append(f"date_heure < '{iso}'")
         if region_code:
             where_clauses.append(f"code_insee_region = '{region_code}'")
 
@@ -101,14 +106,41 @@ class RTEClient:
         Returns:
             List of all record dicts.
         """
-        since = datetime.now(timezone.utc) - timedelta(minutes=minutes)
-        all_records = []
+        now = datetime.now(timezone.utc)
+        since = now - timedelta(minutes=minutes)
+
+        # Opendatasoft hard-caps offset+limit at 10000 on this endpoint —
+        # confirmed live: a wide historical window (tens of thousands of
+        # records) 400s partway through a flat offset walk. The normal live
+        # poll (~30min lookback, a few hundred records at most) never gets
+        # anywhere near that, so it keeps the simple single-window path;
+        # anything wider than a day is chunked day by day instead, since a
+        # single day (~12 regions x 96 slots) is comfortably under the cap
+        # on its own regardless of how wide the overall backfill is.
+        if now - since <= timedelta(days=1):
+            return self._fetch_window(since, now)
+
+        all_records: list[dict] = []
+        window_start = since
+        while window_start < now:
+            window_end = min(window_start + timedelta(days=1), now)
+            all_records.extend(self._fetch_window(window_start, window_end))
+            window_start = window_end
+
+        logger.info(
+            "Fetched %d records since %s (chunked by day)", len(all_records), since.isoformat()
+        )
+        return all_records
+
+    def _fetch_window(self, since: datetime, until: datetime) -> list[dict]:
+        """Fully paginate a single [since, until) window (must stay under the API's offset+limit<=10000 cap)."""
+        all_records: list[dict] = []
         offset = 0
         pages = 0
 
         while True:
             response = self.fetch_eco2mix_regional(
-                limit=100, offset=offset, since=since
+                limit=100, offset=offset, since=since, until=until
             )
             records = response.get("results", [])
             all_records.extend(records)
@@ -122,14 +154,11 @@ class RTEClient:
             # without this, that stretch produces zero output until the very
             # end and looks identical to a hung process.
             if pages % 20 == 0 or (total and offset >= total):
-                logger.info("Fetched %d / %d records", offset, total)
+                logger.info("Fetched %d / %d records (window ending %s)", offset, total, until.isoformat())
 
             if not records or offset >= total:
                 break
 
-        logger.info(
-            "Fetched %d records since %s", len(all_records), since.isoformat()
-        )
         return all_records
 
     def _request_with_retry(self, params: dict) -> dict:

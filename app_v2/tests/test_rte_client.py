@@ -131,3 +131,38 @@ class TestFetchAllRecent:
             records = client.fetch_all_recent(minutes=60)
 
         assert len(records) == 3
+
+    def test_wide_window_chunked_by_day(self, client):
+        """
+        A lookback wider than a day (a historical backfill, not the normal
+        live poll) must be split into daily sub-windows rather than one flat
+        offset walk — Opendatasoft hard-caps offset+limit at 10000 on this
+        endpoint, so a wide-enough single window would 400 partway through.
+        """
+        one_day = {"total_count": 5, "results": [{"n": i} for i in range(5)]}
+
+        with patch.object(
+            client, "fetch_eco2mix_regional", return_value=one_day
+        ) as mock_fetch:
+            records = client.fetch_all_recent(minutes=3 * 24 * 60)  # 3 days
+
+        # 3 daily windows x 5 records each, not one 15-record flat fetch
+        assert len(records) == 15
+        assert mock_fetch.call_count == 3
+        for call in mock_fetch.call_args_list:
+            assert call.kwargs["since"] is not None
+            assert call.kwargs["until"] is not None
+            assert call.kwargs["since"] < call.kwargs["until"]
+
+    def test_single_day_window_not_chunked(self, client):
+        """A <=1 day lookback (the normal live poll) stays a single window —
+        no unnecessary chunking for the common case."""
+        response = {"total_count": 2, "results": [{"a": 1}, {"b": 2}]}
+
+        with patch.object(
+            client, "fetch_eco2mix_regional", return_value=response
+        ) as mock_fetch:
+            records = client.fetch_all_recent(minutes=24 * 60)  # exactly 1 day
+
+        assert len(records) == 2
+        assert mock_fetch.call_count == 1
