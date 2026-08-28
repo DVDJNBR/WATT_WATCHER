@@ -1,3 +1,9 @@
+## [1.29.1](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.29.0...v1.29.1) (2026-08-28)
+
+### Bug Fixes
+
+* **rte:** chunk fetch_all_recent by day past Opendatasoft's offset+limit cap ([eaaabbc](https://github.com/DVDJNBR/WATT_WATCHER/commit/eaaabbc3456b2d9b5ad4205eac7a5c5c9f059d8d))
+
 ## [1.29.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.28.0...v1.29.0) (2026-08-28)
 
 ### Features
