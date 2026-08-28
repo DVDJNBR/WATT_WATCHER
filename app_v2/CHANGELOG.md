@@ -1,3 +1,9 @@
+## [1.28.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.27.0...v1.28.0) (2026-08-28)
+
+### Features
+
+* **pipeline:** add manual price backfill script, fix executemany perf bug ([2a5c512](https://github.com/DVDJNBR/WATT_WATCHER/commit/2a5c512568327780a7384b3e17689459d2e1d1b6))
+
 ## [1.27.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.26.2...v1.27.0) (2026-08-28)
 
 ### Features
