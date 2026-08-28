@@ -19,10 +19,13 @@ export default function OriginPage() {
         </p>
         <p>
           Ainsi, ce dashboard permet de l'anticiper au niveau national en surveillant la
-          production et la consommation de l'énergie toutes sources confondues. Pour ce
-          faire, il recueille toutes les 15 minutes les données publiées par RTE et les
-          croise avec la météo et les alertes de maintenance, qui sont stockées dans un
-          data lake pour être nettoyées avant d'être mises en base de données.
+          production et la consommation de l'énergie toutes sources confondues. Il croise
+          cinq sources, chacune à son propre rythme : la production/consommation RTE et la
+          météo toutes les 15 minutes, les prix de marché et les indisponibilités de
+          centrales publiés chaque jour par ENTSO-E, et le registre des capacités installées
+          par région (ODRE), mis à jour une fois par semaine puisqu'il ne bouge presque
+          jamais. Toutes ces données transitent par un data lake où elles sont nettoyées
+          avant d'être mises en base.
         </p>
         <p className="content-caption">
           Ce signal reste une estimation, pas une certitude : calibré sur l'année 2025
