@@ -17,6 +17,7 @@ both transparently.
 
 import io
 import logging
+import re
 import xml.etree.ElementTree as ET
 import zipfile
 from datetime import datetime, timedelta, timezone
@@ -122,7 +123,7 @@ class EntsoeClient:
         if not self.api_token:
             raise EntsoeClientError("ENTSOE_API_TOKEN not configured")
 
-        params = {
+        base_params = {
             "securityToken": self.api_token,
             "documentType": DOCUMENT_TYPE_UNAVAILABILITY_PRODUCTION,
             "biddingZone_Domain": FRANCE_DOMAIN,
@@ -130,31 +131,69 @@ class EntsoeClient:
             "periodEnd": period_end.strftime("%Y%m%d%H%M"),
         }
 
-        try:
-            response = self.session.get(BASE_URL, params=params, timeout=REQUEST_TIMEOUT)
-        except requests.exceptions.RequestException as exc:
-            raise EntsoeClientError(f"Request failed: {exc}") from exc
+        # ENTSO-E caps this endpoint at 200 instances per request (unlike
+        # prices, which never hit this). A wide-enough period_start/period_end
+        # window routinely exceeds it, so fetch page by page until the
+        # server's own reported total is covered rather than assuming one
+        # request is ever enough.
+        xml_documents: list[str] = []
+        offset = 0
+        total_expected: int | None = None
+        while True:
+            page_params = dict(base_params)
+            if offset:
+                page_params["offset"] = offset
 
-        if response.status_code == 401:
-            raise EntsoeClientError("Invalid or missing ENTSO-E security token")
-        if response.status_code != 200:
-            raise EntsoeClientError(
-                f"HTTP {response.status_code}: {response.text[:200]}"
-            )
+            try:
+                response = self.session.get(BASE_URL, params=page_params, timeout=REQUEST_TIMEOUT)
+            except requests.exceptions.RequestException as exc:
+                raise EntsoeClientError(f"Request failed: {exc}") from exc
 
-        content_type = response.headers.get("Content-Type", "")
-        if "zip" in content_type or response.content[:2] == b"PK":
-            xml_documents = self._extract_zip_xml(response.content)
-        else:
-            # No outages in range comes back as a single small XML
-            # (Acknowledgement or an empty document), not a ZIP.
-            xml_documents = [response.text]
+            if response.status_code == 401:
+                raise EntsoeClientError("Invalid or missing ENTSO-E security token")
+
+            if response.status_code == 400:
+                over_limit = self._parse_over_limit_count(response.text)
+                if over_limit is not None and offset == 0:
+                    total_expected = over_limit
+                    logger.info(
+                        "ENTSO-E outages: %d instances in range, paginating by 200", over_limit,
+                    )
+                    offset = 200
+                    continue
+                raise EntsoeClientError(f"HTTP 400: {response.text[:300]}")
+
+            if response.status_code != 200:
+                raise EntsoeClientError(f"HTTP {response.status_code}: {response.text[:200]}")
+
+            content_type = response.headers.get("Content-Type", "")
+            if "zip" in content_type or response.content[:2] == b"PK":
+                xml_documents.extend(self._extract_zip_xml(response.content))
+            else:
+                # No outages in range (or the last, partial page) comes back
+                # as a single small XML, not a ZIP.
+                xml_documents.append(response.text)
+
+            if total_expected is None or offset + 200 >= total_expected:
+                break
+            offset += 200
 
         records: list[dict] = []
         for xml_text in xml_documents:
             records.extend(self._parse_unavailability_document(xml_text))
         logger.info("Parsed %d outage records from ENTSO-E response", len(records))
         return records
+
+    @staticmethod
+    def _parse_over_limit_count(xml_text: str) -> int | None:
+        """
+        Extract the real instance count from ENTSO-E's "exceeds the allowed
+        maximum (200)" Acknowledgement, e.g. "The number of instances (676)
+        exceeds the allowed maximum (200) for data item ...". Returns None
+        for any other 400 (a genuine error, not a pagination signal).
+        """
+        match = re.search(r"number of instances \((\d+)\) exceeds", xml_text)
+        return int(match.group(1)) if match else None
 
     @staticmethod
     def _extract_zip_xml(content: bytes) -> list[str]:
