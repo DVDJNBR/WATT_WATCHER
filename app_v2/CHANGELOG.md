@@ -1,3 +1,9 @@
+## [1.27.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.26.2...v1.27.0) (2026-08-28)
+
+### Features
+
+* **entsoe:** switch geocoding to the A73 outage-independent unit registry ([9af8de8](https://github.com/DVDJNBR/WATT_WATCHER/commit/9af8de8cf34a776d09b85e8ec081e5ed5d26e9a3))
+
 ## [1.26.2](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.26.1...v1.26.2) (2026-08-28)
 
 ### Bug Fixes
