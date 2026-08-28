@@ -3,11 +3,47 @@
 from datetime import datetime, timezone
 from unittest.mock import MagicMock, patch
 
+import io
+import zipfile
+
 import pytest
 
 from functions.shared.entsoe_client import EntsoeClient, EntsoeClientError
 
 NS = "urn:iec62325.351:tc57wg16:451-3:publicationdocument:7:3"
+OUTAGE_NS = "urn:iec62325.351:tc57wg16:451-1:outagedocument:4:0"
+
+
+def _outage_document(business_type, resource_mrid, resource_name, nominal_p,
+                      period_start, period_end, quantities):
+    points_xml = "".join(
+        f"<Point><position>{i + 1}</position><quantity>{q}</quantity></Point>"
+        for i, q in enumerate(quantities)
+    )
+    return f"""<?xml version="1.0" encoding="utf-8"?>
+<Unavailability_MarketDocument xmlns="{OUTAGE_NS}">
+  <mRID>test-outage</mRID>
+  <TimeSeries>
+    <mRID>1</mRID>
+    <businessType>{business_type}</businessType>
+    <production_RegisteredResource.mRID codingScheme="A01">{resource_mrid}</production_RegisteredResource.mRID>
+    <production_RegisteredResource.name>{resource_name}</production_RegisteredResource.name>
+    <production_RegisteredResource.pSRType.powerSystemResources.nominalP>{nominal_p}</production_RegisteredResource.pSRType.powerSystemResources.nominalP>
+    <Available_Period>
+      <timeInterval><start>{period_start}</start><end>{period_end}</end></timeInterval>
+      <resolution>PT60M</resolution>
+      {points_xml}
+    </Available_Period>
+  </TimeSeries>
+</Unavailability_MarketDocument>"""
+
+
+def _zip_of(*xml_docs: str) -> bytes:
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as zf:
+        for i, doc in enumerate(xml_docs):
+            zf.writestr(f"doc_{i}.xml", doc)
+    return buf.getvalue()
 
 
 def _price_document(period_start: str, resolution: str, points: list[tuple[int, float]]) -> str:
@@ -181,3 +217,113 @@ class TestFetchDayAheadPrices:
         assert params["out_Domain"] == "10YFR-RTE------C"
         assert params["periodStart"] == "202501010000"
         assert params["periodEnd"] == "202501020000"
+
+
+class TestFetchUnavailabilityOfProductionUnits:
+    def test_missing_token_raises(self):
+        client = EntsoeClient(api_token=None)
+        with pytest.raises(EntsoeClientError, match="not configured"):
+            client.fetch_unavailability_of_production_units(
+                datetime(2026, 1, 1, tzinfo=timezone.utc),
+                datetime(2026, 1, 2, tzinfo=timezone.utc),
+            )
+
+    def test_parses_zip_of_one_outage(self, client):
+        xml = _outage_document(
+            "A54", "10T-GRAVELINES3", "GRAVELINES 3", 900.0,
+            "2026-09-01T06:00Z", "2026-09-15T18:00Z", [0.0],
+        )
+        mock_resp = MagicMock(status_code=200, content=_zip_of(xml), headers={"Content-Type": "application/zip"})
+
+        with patch.object(client.session, "get", return_value=mock_resp):
+            records = client.fetch_unavailability_of_production_units(
+                datetime(2026, 9, 1, tzinfo=timezone.utc),
+                datetime(2026, 9, 16, tzinfo=timezone.utc),
+            )
+
+        assert len(records) == 1
+        r = records[0]
+        assert r["unit_name"] == "GRAVELINES 3"
+        assert r["event_type"] == "unplanned"
+        assert r["unavailable_mw"] == 900.0
+        assert r["start_date"] == datetime(2026, 9, 1, 6, 0, tzinfo=timezone.utc)
+        assert r["end_date"] == datetime(2026, 9, 15, 18, 0, tzinfo=timezone.utc)
+
+    def test_planned_business_type(self):
+        client = EntsoeClient(api_token="t")
+        xml = _outage_document(
+            "A53", "10T-X", "SITE X", 500.0, "2026-01-01T00:00Z", "2026-01-02T00:00Z", [250.0],
+        )
+        mock_resp = MagicMock(status_code=200, content=_zip_of(xml), headers={"Content-Type": "application/zip"})
+        with patch.object(client.session, "get", return_value=mock_resp):
+            records = client.fetch_unavailability_of_production_units(
+                datetime(2026, 1, 1, tzinfo=timezone.utc), datetime(2026, 1, 3, tzinfo=timezone.utc),
+            )
+        assert records[0]["event_type"] == "planned"
+        assert records[0]["unavailable_mw"] == 250.0
+
+    def test_zero_reduction_skipped(self):
+        """A record where available == nominal (no real outage) shouldn't surface."""
+        client = EntsoeClient(api_token="t")
+        xml = _outage_document(
+            "A54", "10T-X", "SITE X", 500.0, "2026-01-01T00:00Z", "2026-01-02T00:00Z", [500.0],
+        )
+        mock_resp = MagicMock(status_code=200, content=_zip_of(xml), headers={"Content-Type": "application/zip"})
+        with patch.object(client.session, "get", return_value=mock_resp):
+            records = client.fetch_unavailability_of_production_units(
+                datetime(2026, 1, 1, tzinfo=timezone.utc), datetime(2026, 1, 3, tzinfo=timezone.utc),
+            )
+        assert records == []
+
+    def test_worst_case_within_period(self):
+        """Multiple points in one period: unavailable_mw uses the minimum
+        available quantity (worst-case reduction), not the first point."""
+        client = EntsoeClient(api_token="t")
+        xml = _outage_document(
+            "A54", "10T-X", "SITE X", 1000.0, "2026-01-01T00:00Z", "2026-01-01T03:00Z",
+            [800.0, 200.0, 600.0],
+        )
+        mock_resp = MagicMock(status_code=200, content=_zip_of(xml), headers={"Content-Type": "application/zip"})
+        with patch.object(client.session, "get", return_value=mock_resp):
+            records = client.fetch_unavailability_of_production_units(
+                datetime(2026, 1, 1, tzinfo=timezone.utc), datetime(2026, 1, 2, tzinfo=timezone.utc),
+            )
+        assert records[0]["unavailable_mw"] == 800.0  # 1000 - min(800,200,600)
+
+    def test_multiple_documents_in_zip(self):
+        client = EntsoeClient(api_token="t")
+        xml1 = _outage_document("A54", "10T-A", "SITE A", 400.0, "2026-01-01T00:00Z", "2026-01-02T00:00Z", [0.0])
+        xml2 = _outage_document("A53", "10T-B", "SITE B", 300.0, "2026-01-03T00:00Z", "2026-01-04T00:00Z", [0.0])
+        mock_resp = MagicMock(status_code=200, content=_zip_of(xml1, xml2), headers={"Content-Type": "application/zip"})
+        with patch.object(client.session, "get", return_value=mock_resp):
+            records = client.fetch_unavailability_of_production_units(
+                datetime(2026, 1, 1, tzinfo=timezone.utc), datetime(2026, 1, 5, tzinfo=timezone.utc),
+            )
+        assert {r["unit_name"] for r in records} == {"SITE A", "SITE B"}
+
+    def test_acknowledgement_returns_empty_not_error(self):
+        """Nothing in range comes back as a small XML Acknowledgement, not a ZIP."""
+        client = EntsoeClient(api_token="t")
+        xml = f"""<?xml version="1.0"?>
+<Acknowledgement_MarketDocument xmlns="{OUTAGE_NS}">
+  <Reason><code>999</code><text>No matching data found</text></Reason>
+</Acknowledgement_MarketDocument>"""
+        mock_resp = MagicMock(status_code=200, content=xml.encode("utf-8"), text=xml, headers={"Content-Type": "text/xml"})
+        with patch.object(client.session, "get", return_value=mock_resp):
+            records = client.fetch_unavailability_of_production_units(
+                datetime(2026, 1, 1, tzinfo=timezone.utc), datetime(2026, 1, 2, tzinfo=timezone.utc),
+            )
+        assert records == []
+
+    def test_request_params(self):
+        client = EntsoeClient(api_token="test-token")
+        xml = _outage_document("A54", "10T-X", "SITE X", 500.0, "2026-01-01T00:00Z", "2026-01-02T00:00Z", [0.0])
+        mock_resp = MagicMock(status_code=200, content=_zip_of(xml), headers={"Content-Type": "application/zip"})
+        with patch.object(client.session, "get", return_value=mock_resp) as mock_get:
+            client.fetch_unavailability_of_production_units(
+                datetime(2026, 1, 1, tzinfo=timezone.utc), datetime(2026, 1, 2, tzinfo=timezone.utc),
+            )
+        _, kwargs = mock_get.call_args
+        params = kwargs["params"]
+        assert params["documentType"] == "A77"
+        assert params["biddingZone_Domain"] == "10YFR-RTE------C"

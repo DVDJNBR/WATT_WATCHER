@@ -15,8 +15,10 @@ market time units on 2025-10-01 (SDAC MTU transition) — this client handles
 both transparently.
 """
 
+import io
 import logging
 import xml.etree.ElementTree as ET
+import zipfile
 from datetime import datetime, timedelta, timezone
 
 import requests
@@ -26,6 +28,8 @@ logger = logging.getLogger(__name__)
 BASE_URL = "https://web-api.tp.entsoe.eu/api"
 FRANCE_DOMAIN = "10YFR-RTE------C"  # single national bidding zone (EIC code)
 DOCUMENT_TYPE_DAY_AHEAD_PRICES = "A44"
+DOCUMENT_TYPE_UNAVAILABILITY_PRODUCTION = "A77"
+BUSINESS_TYPE_LABELS = {"A53": "planned", "A54": "unplanned"}
 REQUEST_TIMEOUT = 30
 
 # ENTSO-E's IEC 62325 namespace — the exact URI is stable across document
@@ -92,6 +96,147 @@ class EntsoeClient:
             )
 
         return self._parse_price_document(response.text)
+
+    def fetch_unavailability_of_production_units(
+        self, period_start: datetime, period_end: datetime
+    ) -> list[dict]:
+        """
+        Fetch generation unit outages (A77) for France in [period_start, period_end).
+
+        Unlike the price endpoint, this one serves a ZIP file (one or more XML
+        Unavailability_MarketDocuments inside, EU-wide regulatory reporting can
+        be verbose) and is capped at 200 items per request by ENTSO-E.
+
+        Returns:
+            List of {"event_id", "unit_name", "event_type" ("planned"/
+            "unplanned"/"unknown"), "start_date", "end_date" (datetime, UTC),
+            "unavailable_mw"} — one entry per outage period found. Best-effort:
+            entries this parser can't fully make sense of are skipped with a
+            warning rather than raising, since a malformed single record
+            shouldn't take down the whole outages fetch.
+
+        Raises:
+            EntsoeClientError: missing token, HTTP failure, or a request
+                ENTSO-E itself rejected.
+        """
+        if not self.api_token:
+            raise EntsoeClientError("ENTSOE_API_TOKEN not configured")
+
+        params = {
+            "securityToken": self.api_token,
+            "documentType": DOCUMENT_TYPE_UNAVAILABILITY_PRODUCTION,
+            "biddingZone_Domain": FRANCE_DOMAIN,
+            "periodStart": period_start.strftime("%Y%m%d%H%M"),
+            "periodEnd": period_end.strftime("%Y%m%d%H%M"),
+        }
+
+        try:
+            response = self.session.get(BASE_URL, params=params, timeout=REQUEST_TIMEOUT)
+        except requests.exceptions.RequestException as exc:
+            raise EntsoeClientError(f"Request failed: {exc}") from exc
+
+        if response.status_code == 401:
+            raise EntsoeClientError("Invalid or missing ENTSO-E security token")
+        if response.status_code != 200:
+            raise EntsoeClientError(
+                f"HTTP {response.status_code}: {response.text[:200]}"
+            )
+
+        content_type = response.headers.get("Content-Type", "")
+        if "zip" in content_type or response.content[:2] == b"PK":
+            xml_documents = self._extract_zip_xml(response.content)
+        else:
+            # No outages in range comes back as a single small XML
+            # (Acknowledgement or an empty document), not a ZIP.
+            xml_documents = [response.text]
+
+        records: list[dict] = []
+        for xml_text in xml_documents:
+            records.extend(self._parse_unavailability_document(xml_text))
+        logger.info("Parsed %d outage records from ENTSO-E response", len(records))
+        return records
+
+    @staticmethod
+    def _extract_zip_xml(content: bytes) -> list[str]:
+        """Unzip an ENTSO-E outages response into its individual XML documents."""
+        xml_documents = []
+        try:
+            with zipfile.ZipFile(io.BytesIO(content)) as zf:
+                for name in zf.namelist():
+                    if name.lower().endswith(".xml"):
+                        xml_documents.append(zf.read(name).decode("utf-8"))
+        except zipfile.BadZipFile as exc:
+            raise EntsoeClientError(f"Malformed ZIP response: {exc}") from exc
+        return xml_documents
+
+    @staticmethod
+    def _parse_unavailability_document(xml_text: str) -> list[dict]:
+        """
+        Parse an A77 Unavailability_MarketDocument into flat outage records.
+
+        Namespace-agnostic on purpose (`{*}` wildcards): ENTSO-E's outage
+        schema URI is a different, less-frequently-referenced one than the
+        price schema, and a hardcoded mismatch would silently return nothing
+        with no error — safer to match on local element names only here and
+        rely on the None-checks/logging below to surface real structural
+        surprises instead.
+        """
+        try:
+            root = ET.fromstring(xml_text)
+        except ET.ParseError as exc:
+            raise EntsoeClientError(f"Malformed XML response: {exc}") from exc
+
+        if root.tag.endswith("Acknowledgement_MarketDocument"):
+            reason = root.findtext(".//{*}Reason/{*}text") or "no reason given"
+            logger.info("ENTSO-E outages: %s (likely just 'nothing in range')", reason)
+            return []
+
+        records: list[dict] = []
+        for ts in root.findall(".//{*}TimeSeries"):
+            business_type = ts.findtext("{*}businessType")
+            event_type = BUSINESS_TYPE_LABELS.get(business_type or "", "unknown")
+
+            resource_mrid = ts.findtext(".//{*}production_RegisteredResource.mRID")
+            resource_name = ts.findtext(".//{*}production_RegisteredResource.name")
+            nominal_p_str = ts.findtext(
+                ".//{*}production_RegisteredResource.pSRType.powerSystemResources.nominalP"
+            )
+            if not resource_mrid or nominal_p_str is None:
+                logger.warning("Skipping outage TimeSeries missing resource id/nominalP")
+                continue
+            nominal_p = float(nominal_p_str)
+
+            for period in ts.findall(".//{*}Available_Period"):
+                start_str = period.findtext("{*}timeInterval/{*}start")
+                end_str = period.findtext("{*}timeInterval/{*}end")
+                if not start_str or not end_str:
+                    continue
+                start = datetime.strptime(start_str, "%Y-%m-%dT%H:%MZ").replace(tzinfo=timezone.utc)
+                end = datetime.strptime(end_str, "%Y-%m-%dT%H:%MZ").replace(tzinfo=timezone.utc)
+
+                quantities = [
+                    float(q) for q in (
+                        pt.findtext("{*}quantity") for pt in period.findall(".//{*}Point")
+                    ) if q is not None
+                ]
+                if not quantities:
+                    continue
+                # Worst-case reduction within the period, in case available
+                # capacity ramps rather than staying flat for the whole window.
+                unavailable_mw = nominal_p - min(quantities)
+                if unavailable_mw <= 0:
+                    continue
+
+                records.append({
+                    "event_id": f"{resource_mrid}_{start_str}",
+                    "unit_name": resource_name or resource_mrid,
+                    "event_type": event_type,
+                    "start_date": start,
+                    "end_date": end,
+                    "unavailable_mw": round(unavailable_mw, 1),
+                })
+
+        return records
 
     @staticmethod
     def _parse_price_document(xml_text: str) -> list[dict]:

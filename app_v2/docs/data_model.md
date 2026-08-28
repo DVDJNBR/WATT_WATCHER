@@ -28,9 +28,9 @@ dim_region ──────< fact_maintenance
 | `dim_source` | 1 row / energy source type | static list (8 sources) | rarely |
 | `fact_energy_flow` | region × time × source | RTE eco2mix-regional-tr | every 15 min |
 | `fact_meteo` | region × time | Open-Meteo (ERA5) | every 15 min |
-| `fact_capacity` | region × source × year | RTE reference data | low-frequency |
-| `fact_maintenance` | 1 row / outage event | RTE maintenance scraping | every 15 min |
-| `fact_market_price` | 1 row / time (national, no region split) | ENTSO-E Transparency (A44) | every 15 min, no purge — full history kept like every other fact table |
+| `fact_capacity` | region × source × year | ODRE reference registry | weekly (source itself changes ~yearly) |
+| `fact_maintenance` | 1 row / outage event | ENTSO-E generation outages (A77) | daily |
+| `fact_market_price` | 1 row / time (national, no region split) | ENTSO-E Transparency (A44) | daily, no purge — full history kept like every other fact table |
 
 Every source above genuinely goes through Bronze (raw JSON/CSV, ADLS)
 → Silver (cleaned Parquet, ADLS, Hive-partitioned) → Gold — this table only

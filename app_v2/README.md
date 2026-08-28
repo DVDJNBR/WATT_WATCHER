@@ -1,6 +1,6 @@
 # WATT_WATCHER
 
-Data engineering portfolio piece: an automated ETL pipeline for regional energy analysis using French Open Data (RTE, Météo-France, ODRE, grid maintenance), landing into a medallion (Bronze/Silver/Gold) architecture and surfaced through a public dataviz dashboard.
+Data engineering portfolio piece: an automated ETL pipeline for regional energy analysis using French/European Open Data (RTE, Météo-France, ODRE, ENTSO-E), landing into a medallion (Bronze/Silver/Gold) architecture and surfaced through a public dataviz dashboard.
 
 **Stack:** Azure Functions (Python 3.11, pipeline only) · ADLS Gen2 (Bronze/Silver) · Supabase/PostgreSQL (Gold) · FastAPI (dataviz API) · React/Vite (frontend) · Docker + Caddy on a VPS · Terraform IaC
 
@@ -85,13 +85,17 @@ Also requires the `AZURE_CREDENTIALS` GitHub secret (service principal) for the 
 
 Push to `main` → GitHub Actions runs tests → deploys the Functions pipeline.
 
-**Timer triggers:**
-- `*/15 * * * *` — full pipeline (Bronze → Silver → Gold) for all sources: RTE eCO2mix, Open-Meteo, ODRE capacity, grid maintenance, and ENTSO-E day-ahead prices. Every source writes raw Bronze and cleaned Silver Parquet before loading Gold.
-- `0 1 * * *` — SQL reference snapshot (`DIM_REGION`/`DIM_SOURCE`) → Bronze
+**Timer triggers — one per real refresh cadence, not one job doing everything every 15 minutes regardless of need:**
+- `*/15 * * * *` (`pipeline_15min`) — RTE eCO2mix + Open-Meteo, the two sources that genuinely change continuously. Bronze → Silver → Gold.
+- `0 6 * * *` (`pipeline_daily`) — ENTSO-E day-ahead prices + ENTSO-E generation-unit outages (A77), both published once a day.
+- `0 3 * * 0` (`pipeline_weekly`) — ODRE installed-capacity registry, which the source itself only updates ~once a year.
+- `0 1 * * *` — SQL reference snapshot (`DIM_REGION`/`DIM_SOURCE`) → Bronze.
+
+Each stage's fetch/clean/load logic lives in its own module under `functions/shared/stages/`; `function_app.py` only wires timers to stages.
 
 Bronze/Silver blobs are auto-purged by ADLS lifecycle policies (`retention_bronze_days`/`retention_silver_days` in Terraform, default 180/90 days) — no purge job needed in code. Gold tables are never purged.
 
-**Day-ahead market prices (ENTSO-E):** optional — set `ENTSOE_API_TOKEN` (see `.cloud/terraform.tfvars.example`) to enable. Ingestion is non-fatal and silently skipped if unset. See `docs/entsoe_price_integration_report.md` for the full write-up (schema, how the 40% surplus threshold on the dashboard was calibrated against real prices).
+**Day-ahead prices + generation outages (ENTSO-E):** optional — set `ENTSOE_API_TOKEN` (see `.cloud/terraform.tfvars.example`) to enable both. Ingestion is non-fatal and silently skipped if unset. `fact_maintenance` is fed from ENTSO-E outages (A77) now, not RTE web scraping — the scraper's target URL was never actually wired into Terraform, so it never ran in production; ENTSO-E reuses the same credentials/infra already in place for prices. See `docs/entsoe_price_integration_report.md` for the price-side write-up (schema, how the 40% surplus threshold on the dashboard was calibrated against real prices).
 
 ### Destroy & recreate
 
