@@ -83,7 +83,13 @@ export function ProductionChart({ data, loading = false, error = null }) {
       <section className="glass-card chart-card chart-empty" data-testid="production-chart-empty">
         <h2 className="chart-title">Production par source (MW)</h2>
         <div className="empty-state">
-          <span className="empty-state__icon" aria-hidden="true">📊</span>
+          <span className="empty-state__icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="5" y1="19" x2="5" y2="10" />
+              <line x1="12" y1="19" x2="12" y2="5" />
+              <line x1="19" y1="19" x2="19" y2="14" />
+            </svg>
+          </span>
           <p className="empty-state__title">Aucune donnée disponible</p>
           <p className="empty-state__hint">
             Le pipeline se lance toutes les 15 min.<br />
@@ -111,8 +117,8 @@ export function ProductionChart({ data, loading = false, error = null }) {
             ))}
           </defs>
           <CartesianGrid strokeDasharray="3 3" stroke="#888888" strokeOpacity={0.2} />
-          <XAxis dataKey="timestamp" tick={{ fill: '#8b9ab5', fontSize: 11 }} />
-          <YAxis tick={{ fill: '#8b9ab5', fontSize: 11 }} unit=" MW" width={70} />
+          <XAxis dataKey="timestamp" tick={{ fill: '#9a9a9e', fontSize: 11 }} />
+          <YAxis tick={{ fill: '#9a9a9e', fontSize: 11 }} unit=" MW" width={70} />
           <Tooltip
             contentStyle={{
               background: 'var(--color-surface-2)',

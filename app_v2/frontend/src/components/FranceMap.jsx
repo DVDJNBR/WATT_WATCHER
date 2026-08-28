@@ -24,12 +24,12 @@ const PROJECTION_CONFIG = { center: [2.5, 46.5], scale: 2200 }
 // chart, where prod-vs-conso is at least measured on the same national
 // market the French price actually clears on.
 
-const LOW_COLOR  = [30, 58, 95]     // #1e3a5f — dim navy
-const HIGH_COLOR = [79, 142, 247]   // #4f8ef7 — accent blue
+const LOW_COLOR  = [24, 45, 44]     // dim, desaturated teal
+const HIGH_COLOR = [45, 212, 191]   // #2dd4bf — accent teal
 
 function lerp(a, b, t) { return Math.round(a + (b - a) * t) }
 
-/** Interpolate a blue intensity from production volume relative to the region max. */
+/** Interpolate a teal intensity from production volume relative to the region max. */
 function volumeColor(prod, maxProd) {
   const t = maxProd > 0 ? Math.min(1, Math.max(0, prod / maxProd)) : 0
   const [r, g, b] = LOW_COLOR.map((c, i) => lerp(c, HIGH_COLOR[i], t))
@@ -112,7 +112,7 @@ export const FranceMap = memo(function FranceMap({
                   const prod       = regionTotals[code] ?? 0
                   const conso      = regionConsommation[code] ?? null
                   const fill       = isSelected
-                    ? '#4f8ef7'
+                    ? '#2dd4bf'
                     : hasData
                     ? volumeColor(prod, maxProd)
                     : '#1c2538'
@@ -133,20 +133,20 @@ export const FranceMap = memo(function FranceMap({
                       style={{
                         default: {
                           fill,
-                          stroke: isSelected ? '#7eb5ff' : 'rgba(79,142,247,0.4)',
+                          stroke: isSelected ? '#5eead4' : 'rgba(45,212,191,0.4)',
                           strokeWidth: isSelected ? 2 : 0.8,
                           outline: 'none',
                           cursor: hasData ? 'pointer' : 'default',
                           transition: 'fill 0.25s',
                         },
                         hover: {
-                          fill: hasData ? (isSelected ? '#6aa3ff' : '#2d6bcd') : '#111827',
-                          stroke: '#7eb5ff',
+                          fill: hasData ? (isSelected ? '#5eead4' : '#0d9488') : '#19191c',
+                          stroke: '#5eead4',
                           strokeWidth: 1.5,
                           outline: 'none',
                           cursor: hasData ? 'pointer' : 'default',
                         },
-                        pressed: { fill: '#4f8ef7', outline: 'none' },
+                        pressed: { fill: '#2dd4bf', outline: 'none' },
                       }}
                     />
                   )
@@ -164,11 +164,11 @@ export const FranceMap = memo(function FranceMap({
             >
               <strong>{hovered.name}</strong>
               <span className="map-tooltip__value">
-                ⚡ {Math.round(hovered.prod).toLocaleString('fr-FR')} MW prod.
+                {Math.round(hovered.prod).toLocaleString('fr-FR')} MW prod.
               </span>
               {hovered.conso != null && (
                 <span style={{ color: '#f59e0b', fontSize: '0.75rem' }}>
-                  🏠 {Math.round(hovered.conso).toLocaleString('fr-FR')} MW conso.
+                  {Math.round(hovered.conso).toLocaleString('fr-FR')} MW conso.
                 </span>
               )}
             </div>
