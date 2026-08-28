@@ -1,3 +1,9 @@
+## [1.24.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.23.0...v1.24.0) (2026-08-28)
+
+### Features
+
+* **app_v2:** visual refresh — no more emoji logo, generic navy/blue dark mode, or Inter ([7d199f1](https://github.com/DVDJNBR/WATT_WATCHER/commit/7d199f10c527b35e746c3a8eee01933702d71504))
+
 ## [1.23.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.22.0...v1.23.0) (2026-08-28)
 
 ### Features
