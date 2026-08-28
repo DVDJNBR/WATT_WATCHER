@@ -1,3 +1,9 @@
+## [1.29.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.28.0...v1.29.0) (2026-08-28)
+
+### Features
+
+* **pipeline:** add RTE history backfill script + recalibration query ([c025c94](https://github.com/DVDJNBR/WATT_WATCHER/commit/c025c9434e821d10239acbdf8996df7130c8ba0e))
+
 ## [1.28.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.27.0...v1.28.0) (2026-08-28)
 
 ### Features
