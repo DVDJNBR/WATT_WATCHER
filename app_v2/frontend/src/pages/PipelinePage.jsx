@@ -32,8 +32,8 @@ const API_ROUTES = [
 
 export default function PipelinePage() {
   return (
-    <main id="main-content" className="app-main content-page">
-      <section className="glass-card content-card">
+    <main id="main-content" className="app-main">
+      <section className="glass-card content-card pipeline-section">
         <p className="content-kicker">Pipeline de données</p>
         <p>
           Cinq sources publiques, un nettoyage automatisé, une base prête à
@@ -43,6 +43,7 @@ export default function PipelinePage() {
         <PipelineDiagram />
       </section>
 
+      <div className="content-page">
       <section className="glass-card content-card">
         <p className="content-heading" style={{ marginTop: 0 }}>Architecture cloud</p>
         <p>
@@ -152,6 +153,7 @@ export default function PipelinePage() {
           </tbody>
         </table>
       </section>
+      </div>
     </main>
   )
 }

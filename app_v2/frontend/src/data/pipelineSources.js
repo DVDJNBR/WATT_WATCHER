@@ -25,7 +25,7 @@ export const SOURCES = [
     color: 'var(--color-source-rte)',
     glow: 'var(--color-source-rte-glow)',
     visitedCount: 5,
-    dwell: [1300, 1300, 1500, 1100],
+    dwell: [1700, 1700, 1900, 1500],
     previews: {
       bronze: {
         kind: 'json',
@@ -65,7 +65,7 @@ export const SOURCES = [
     color: 'var(--color-source-meteo)',
     glow: 'var(--color-source-meteo-glow)',
     visitedCount: 5,
-    dwell: [1300, 1300, 1500, 1100],
+    dwell: [1700, 1700, 1900, 1500],
     previews: {
       bronze: {
         kind: 'json',
@@ -101,7 +101,7 @@ export const SOURCES = [
     color: 'var(--color-source-capacity)',
     glow: 'var(--color-source-capacity-glow)',
     visitedCount: 5,
-    dwell: [1300, 1300, 1500, 1100],
+    dwell: [1700, 1700, 1900, 1500],
     previews: {
       bronze: {
         kind: 'csv',
@@ -131,7 +131,7 @@ export const SOURCES = [
     color: 'var(--color-source-rte)',
     glow: 'var(--color-source-rte-glow)',
     visitedCount: 5,
-    dwell: [1300, 1300, 1500, 1100],
+    dwell: [1700, 1700, 1900, 1500],
     previews: {
       bronze: {
         kind: 'json',
@@ -167,7 +167,7 @@ export const SOURCES = [
     color: 'var(--color-source-price)',
     glow: 'var(--color-source-price-glow)',
     visitedCount: 3,
-    dwell: [1300, 1300],
+    dwell: [1700, 1700],
     note: "Table Gold seule — pas encore d'API/dashboard en direct pour cette donnée, elle sert au calibrage du seuil « excédent export ».",
     previews: {
       bronze: {

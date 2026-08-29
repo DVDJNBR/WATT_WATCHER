@@ -10,7 +10,9 @@ import { SOURCES, STAGES, CABLE_NOTES } from '../../data/pipelineSources.js'
 import { usePrefersReducedMotion } from '../../hooks/usePrefersReducedMotion.js'
 import { PreviewPanel } from './PreviewPanel.jsx'
 
-const DEFAULT_DWELL_MS = 1300
+const DEFAULT_DWELL_MS = 1700
+const TRAVEL_MS = 700
+const ARRIVE_PULSE_MS = 550
 
 function StageIcon({ kind }) {
   switch (kind) {
@@ -27,7 +29,7 @@ function StageIcon({ kind }) {
   }
 }
 
-function StageNode({ stage, index, visited, current, source, onDashboardClick }) {
+function StageNode({ stage, index, visited, current, arriving, source, onDashboardClick }) {
   const isDashboard = stage.kind === 'dashboard'
   const style = current ? { '--stage-color': source.color, '--stage-glow': source.glow } : undefined
 
@@ -43,6 +45,7 @@ function StageNode({ stage, index, visited, current, source, onDashboardClick })
   const className = 'pipeline-stage'
     + (visited ? '' : ' pipeline-stage--muted')
     + (current ? ' pipeline-stage--current' : '')
+    + (arriving ? ' pipeline-stage--arriving' : '')
     + (isDashboard ? ' pipeline-stage--link' : '')
 
   if (isDashboard) {
@@ -55,14 +58,26 @@ function StageNode({ stage, index, visited, current, source, onDashboardClick })
   return <div className={className} style={style}>{content}</div>
 }
 
-function Connector({ traveled, source, cableKey }) {
+function Connector({ traveled, spark, source, cableKey }) {
   const [open, setOpen] = useState(false)
   const note = cableKey && CABLE_NOTES[cableKey]
-  const style = traveled ? { '--stage-color': source.color } : undefined
+  const style = traveled ? { '--stage-color': source.color, '--stage-glow': source.glow } : undefined
 
   return (
-    <div className={'pipeline-connector' + (traveled ? ' pipeline-connector--traveled' : '')} style={style}>
+    <div
+      className={'pipeline-connector'
+        + (traveled ? ' pipeline-connector--traveled' : '')
+        + (spark ? ' pipeline-connector--spark' : '')}
+      style={style}
+    >
       <span className="pipeline-connector__line" aria-hidden="true" />
+      {spark && (
+        <span
+          className="pipeline-connector__spark"
+          style={{ '--travel-duration': `${TRAVEL_MS}ms` }}
+          aria-hidden="true"
+        />
+      )}
       {note && (
         <button
           type="button"
@@ -102,33 +117,54 @@ function SourceToggle({ source, active, onSelect }) {
 export function PipelineDiagram() {
   const [selectedId, setSelectedId] = useState(SOURCES[0].id)
   const [stageIndex, setStageIndex] = useState(0)
+  const [travelingConnector, setTravelingConnector] = useState(null)
+  const [arrivingIndex, setArrivingIndex] = useState(null)
   const reducedMotion = usePrefersReducedMotion()
   const navigate = useNavigate()
-  const timeoutRef = useRef(null)
+  const timeoutsRef = useRef([])
 
   const source = SOURCES.find(s => s.id === selectedId)
 
   useEffect(() => {
     if (reducedMotion) {
       setStageIndex(source.visitedCount - 1)
+      setTravelingConnector(null)
+      setArrivingIndex(null)
       return
     }
     let cancelled = false
-    let i = 0
-    const tick = () => {
-      if (cancelled) return
+    const schedule = (fn, ms) => {
+      const t = setTimeout(() => { if (!cancelled) fn() }, ms)
+      timeoutsRef.current.push(t)
+    }
+
+    function arriveAt(i) {
       setStageIndex(i)
+      setTravelingConnector(null)
+      setArrivingIndex(i)
+      schedule(() => setArrivingIndex(null), ARRIVE_PULSE_MS)
       if (i < source.visitedCount - 1) {
         const dwell = source.dwell?.[i] ?? DEFAULT_DWELL_MS
-        timeoutRef.current = setTimeout(() => { i += 1; tick() }, dwell)
+        schedule(() => travelTo(i + 1), dwell)
       }
     }
-    tick()
-    return () => { cancelled = true; clearTimeout(timeoutRef.current) }
+    function travelTo(i) {
+      setTravelingConnector(i - 1)
+      schedule(() => arriveAt(i), TRAVEL_MS)
+    }
+
+    arriveAt(0)
+
+    return () => {
+      cancelled = true
+      timeoutsRef.current.forEach(clearTimeout)
+      timeoutsRef.current = []
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedId, reducedMotion])
 
   const currentKind = STAGES[stageIndex].kind
+  const previewLit = arrivingIndex === stageIndex
 
   return (
     <div className="pipeline-diagram">
@@ -146,28 +182,32 @@ export function PipelineDiagram() {
             <div className="data-lake-group">
               <span className="data-lake-group__label">Data lake — ADLS Gen2</span>
               <div className="data-lake-group__stages">
-                <StageNode stage={STAGES[0]} index={0} visited={0 < source.visitedCount} current={stageIndex === 0} source={source} />
-                <Connector traveled={stageIndex >= 1} source={source} cableKey="cleaning" />
-                <StageNode stage={STAGES[1]} index={1} visited={1 < source.visitedCount} current={stageIndex === 1} source={source} />
+                <StageNode stage={STAGES[0]} index={0} visited={0 < source.visitedCount} current={stageIndex === 0} arriving={arrivingIndex === 0} source={source} />
+                <Connector traveled={stageIndex >= 1 || travelingConnector === 0} spark={travelingConnector === 0} source={source} cableKey="cleaning" />
+                <StageNode stage={STAGES[1]} index={1} visited={1 < source.visitedCount} current={stageIndex === 1} arriving={arrivingIndex === 1} source={source} />
               </div>
             </div>
 
-            <Connector traveled={stageIndex >= 2} source={source} cableKey="aggregation" />
-            <StageNode stage={STAGES[2]} index={2} visited={2 < source.visitedCount} current={stageIndex === 2} source={source} />
-            <Connector traveled={stageIndex >= 3 && 3 < source.visitedCount} source={source} />
-            <StageNode stage={STAGES[3]} index={3} visited={3 < source.visitedCount} current={stageIndex === 3} source={source} />
-            <Connector traveled={stageIndex >= 4 && 4 < source.visitedCount} source={source} />
+            <Connector traveled={stageIndex >= 2 || travelingConnector === 1} spark={travelingConnector === 1} source={source} cableKey="aggregation" />
+            <StageNode stage={STAGES[2]} index={2} visited={2 < source.visitedCount} current={stageIndex === 2} arriving={arrivingIndex === 2} source={source} />
+            <Connector traveled={(stageIndex >= 3 && 3 < source.visitedCount) || travelingConnector === 2} spark={travelingConnector === 2} source={source} />
+            <StageNode stage={STAGES[3]} index={3} visited={3 < source.visitedCount} current={stageIndex === 3} arriving={arrivingIndex === 3} source={source} />
+            <Connector traveled={(stageIndex >= 4 && 4 < source.visitedCount) || travelingConnector === 3} spark={travelingConnector === 3} source={source} />
             <StageNode
               stage={STAGES[4]}
               index={4}
               visited={4 < source.visitedCount}
               current={stageIndex === 4}
+              arriving={arrivingIndex === 4}
               source={source}
               onDashboardClick={() => navigate('/')}
             />
           </div>
 
-          <div className="preview-panel">
+          <div
+            className={'preview-panel' + (previewLit ? ' preview-panel--lit' : '')}
+            style={{ '--stage-color': source.color, '--stage-glow': source.glow }}
+          >
             <p className="preview-panel__stage-label">{STAGES[stageIndex].label}</p>
             <PreviewPanel source={source} stageKind={currentKind} />
           </div>
