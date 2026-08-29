@@ -6,9 +6,10 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { KPICard } from '../components/KPICard.jsx'
 import { FranceMap } from '../components/FranceMap.jsx'
+import { CurtailmentRiskMap } from '../components/CurtailmentRiskMap.jsx'
 import { HistoryChart } from '../components/HistoryChart.jsx'
 import { CarbonBadge, computeCarbonIntensity } from '../components/CarbonBadge.jsx'
-import { fetchProduction, fetchRegions, fetchMeteo, fetchCapacity } from '../services/api.js'
+import { fetchProduction, fetchRegions, fetchMeteo, fetchCapacity, fetchCurtailmentRisk } from '../services/api.js'
 import { ProdConsChart } from '../components/ProdConsChart.jsx'
 import { RegionSelector } from '../components/RegionSelector.jsx'
 import { MeteoChart } from '../components/MeteoChart.jsx'
@@ -166,6 +167,11 @@ export default function DashboardPage() {
   const [capacityData, setCapacityData] = useState([])
   const [drillLoading, setDrillLoading] = useState(false)
 
+  // Curtailment risk: whole-history aggregate, independent of the region/date drill-down
+  const [curtailmentData, setCurtailmentData] = useState([])
+  const [curtailmentTotal, setCurtailmentTotal] = useState(0)
+  const [curtailmentLoading, setCurtailmentLoading] = useState(true)
+
   /**
    * Load production data.
    * If regionCode is empty, result is stored in both globalData and productionData
@@ -222,6 +228,20 @@ export default function DashboardPage() {
     return () => { cancelled = true }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadData])
+
+  // Curtailment risk map: fetched once, whole history — not tied to the region/date filters
+  useEffect(() => {
+    let cancelled = false
+    fetchCurtailmentRisk()
+      .then(result => {
+        if (cancelled) return
+        setCurtailmentData(result.data || [])
+        setCurtailmentTotal(result.national_surplus_mwh_15min || 0)
+      })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setCurtailmentLoading(false) })
+    return () => { cancelled = true }
+  }, [])
 
   // Region change: drill down into a specific region (or reset to global view)
   const handleRegionChange = useCallback(async (code) => {
@@ -413,6 +433,15 @@ export default function DashboardPage() {
             loading={drillLoading}
           />
         )}
+      </div>
+
+      {/* ── Surplus renouvelable & prix négatifs ────────────────── */}
+      <div className="hero-grid hero-grid--single">
+        <CurtailmentRiskMap
+          data={curtailmentData}
+          nationalSurplus={curtailmentTotal}
+          loading={curtailmentLoading}
+        />
       </div>
 
     </main>

@@ -130,3 +130,14 @@ export async function fetchCapacity({ regionCode, annee } = {}) {
 export async function fetchMaintenance({ regionCode, limit = 100 } = {}) {
   return apiGet('/v1/maintenance', { region_code: regionCode, limit })
 }
+
+/**
+ * Fetch each region's share of national wind+solar surplus during negative-price slots.
+ * @param {Object} params
+ * @param {string} [params.startDate]
+ * @param {string} [params.endDate]
+ * @returns {Promise<{data: Array, national_surplus_mwh_15min: number, total_records: number}>}
+ */
+export async function fetchCurtailmentRisk({ startDate, endDate } = {}) {
+  return apiGet('/v1/curtailment/regional', { start_date: startDate, end_date: endDate })
+}
