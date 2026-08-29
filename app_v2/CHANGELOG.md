@@ -1,3 +1,9 @@
+## [1.30.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.29.1...v1.30.0) (2026-08-29)
+
+### Features
+
+* **dataviz:** add regional renewable-surplus map for negative-price events ([1bba4d7](https://github.com/DVDJNBR/WATT_WATCHER/commit/1bba4d78aa131815bfebaca68edcd77a35304aea))
+
 ## [1.29.1](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.29.0...v1.29.1) (2026-08-28)
 
 ### Bug Fixes
