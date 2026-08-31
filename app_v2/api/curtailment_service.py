@@ -100,3 +100,62 @@ def query_curtailment_risk(
         "total_records": len(data),
         "request_id": request_id,
     }
+
+
+def query_curtailment_calendar(
+    conn: Any,
+    request_id: Optional[str] = None,
+) -> dict:
+    """
+    Day-by-day negative-price slot counts, for a calendar heatmap, plus the
+    headline stats (total hours, record day) that make the pattern legible
+    without reading the grid.
+    """
+    sqlite_ = is_sqlite(conn)
+    ph_ = placeholder(conn)  # noqa: F841 - no params on this query, kept for consistency
+    tbl_price = "FACT_MARKET_PRICE" if sqlite_ else "fact_market_price"
+    tbl_time = "DIM_TIME" if sqlite_ else "dim_time"
+
+    date_expr = "date(t.horodatage)" if sqlite_ else "t.horodatage::date"
+    query = f"""
+        SELECT {date_expr} AS d, COUNT(*) AS n_slots, MIN(p.price_eur_mwh) AS min_price
+        FROM {tbl_price} p
+        JOIN {tbl_time} t ON p.id_date = t.id_date
+        WHERE p.price_eur_mwh < 0
+        GROUP BY {date_expr}
+        ORDER BY {date_expr}
+    """
+    cursor = conn.cursor()
+    cursor.execute(query)
+    rows = cursor.fetchall()
+
+    days = [
+        {
+            "date": row[0].isoformat() if hasattr(row[0], "isoformat") else str(row[0]),
+            "n_slots": row[1],
+            "min_price": float(row[2]),
+        }
+        for row in rows
+    ]
+
+    total_slots = sum(d["n_slots"] for d in days)
+    record = min(days, key=lambda d: d["min_price"]) if days else None
+
+    range_query = f"SELECT MIN(t.horodatage), MAX(t.horodatage) FROM {tbl_price} p JOIN {tbl_time} t ON p.id_date = t.id_date"
+    cursor.execute(range_query)
+    range_min, range_max = cursor.fetchone()
+
+    return {
+        "days": days,
+        "range": {
+            "start": range_min.date().isoformat() if range_min else None,
+            "end": range_max.date().isoformat() if range_max else None,
+        },
+        "stats": {
+            "total_days": len(days),
+            "total_hours": round(total_slots / 4, 1),
+            "record_date": record["date"] if record else None,
+            "record_price": record["min_price"] if record else None,
+        },
+        "request_id": request_id,
+    }

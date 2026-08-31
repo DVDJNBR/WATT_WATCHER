@@ -7,9 +7,10 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { KPICard } from '../components/KPICard.jsx'
 import { FranceMap } from '../components/FranceMap.jsx'
 import { CurtailmentShareChart } from '../components/CurtailmentShareChart.jsx'
+import { CurtailmentCalendar } from '../components/CurtailmentCalendar.jsx'
 import { HistoryChart } from '../components/HistoryChart.jsx'
 import { CarbonBadge, computeCarbonIntensity } from '../components/CarbonBadge.jsx'
-import { fetchProduction, fetchRegions, fetchMeteo, fetchCapacity, fetchCurtailmentRisk } from '../services/api.js'
+import { fetchProduction, fetchRegions, fetchMeteo, fetchCapacity, fetchCurtailmentRisk, fetchCurtailmentCalendar } from '../services/api.js'
 import { ProdConsChart } from '../components/ProdConsChart.jsx'
 import { RegionSelector } from '../components/RegionSelector.jsx'
 import { MeteoChart } from '../components/MeteoChart.jsx'
@@ -170,6 +171,10 @@ export default function DashboardPage() {
   // Curtailment risk: whole-history aggregate, independent of the region/date drill-down
   const [curtailmentData, setCurtailmentData] = useState([])
   const [curtailmentLoading, setCurtailmentLoading] = useState(true)
+  const [calendarDays, setCalendarDays] = useState([])
+  const [calendarRange, setCalendarRange] = useState(null)
+  const [calendarStats, setCalendarStats] = useState(null)
+  const [calendarLoading, setCalendarLoading] = useState(true)
 
   /**
    * Load production data.
@@ -238,6 +243,21 @@ export default function DashboardPage() {
       })
       .catch(() => {})
       .finally(() => { if (!cancelled) setCurtailmentLoading(false) })
+    return () => { cancelled = true }
+  }, [])
+
+  // Negative-price calendar: fetched once, whole history
+  useEffect(() => {
+    let cancelled = false
+    fetchCurtailmentCalendar()
+      .then(result => {
+        if (cancelled) return
+        setCalendarDays(result.days || [])
+        setCalendarRange(result.range || null)
+        setCalendarStats(result.stats || null)
+      })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setCalendarLoading(false) })
     return () => { cancelled = true }
   }, [])
 
@@ -435,6 +455,12 @@ export default function DashboardPage() {
 
       {/* ── Surplus renouvelable & prix négatifs ────────────────── */}
       <div className="hero-grid hero-grid--single">
+        <CurtailmentCalendar
+          days={calendarDays}
+          range={calendarRange}
+          stats={calendarStats}
+          loading={calendarLoading || !calendarStats}
+        />
         <CurtailmentShareChart
           data={curtailmentData}
           loading={curtailmentLoading}

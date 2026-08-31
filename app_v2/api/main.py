@@ -17,7 +17,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
 
 from api.capacity_service import query_capacity
-from api.curtailment_service import query_curtailment_risk
+from api.curtailment_service import query_curtailment_calendar, query_curtailment_risk
 from api.db import get_db_connection
 from api.error_handlers import bad_request, not_found, server_error
 from api.export_service import export_to_csv
@@ -172,6 +172,22 @@ def curtailment_regional(request: Request):
         return JSONResponse(result, headers={"X-Request-Id": request_id})
     except Exception:
         logger.exception("curtailment endpoint error [%s]", request_id)
+        return JSONResponse(server_error(request_id=request_id), status_code=500)
+    finally:
+        if conn:
+            conn.close()
+
+
+@app.get("/v1/curtailment/calendar")
+def curtailment_calendar(request: Request):
+    request_id = str(uuid.uuid4())
+    conn = None
+    try:
+        conn = get_db_connection()
+        result = query_curtailment_calendar(conn, request_id=request_id)
+        return JSONResponse(result, headers={"X-Request-Id": request_id})
+    except Exception:
+        logger.exception("curtailment calendar endpoint error [%s]", request_id)
         return JSONResponse(server_error(request_id=request_id), status_code=500)
     finally:
         if conn:

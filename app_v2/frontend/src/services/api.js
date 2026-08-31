@@ -141,3 +141,11 @@ export async function fetchMaintenance({ regionCode, limit = 100 } = {}) {
 export async function fetchCurtailmentRisk({ startDate, endDate } = {}) {
   return apiGet('/v1/curtailment/regional', { start_date: startDate, end_date: endDate })
 }
+
+/**
+ * Fetch day-by-day negative-price slot counts + headline stats (total hours, record day).
+ * @returns {Promise<{days: Array, stats: Object}>}
+ */
+export async function fetchCurtailmentCalendar() {
+  return apiGet('/v1/curtailment/calendar')
+}
