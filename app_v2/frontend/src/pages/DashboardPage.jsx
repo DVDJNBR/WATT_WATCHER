@@ -6,7 +6,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { KPICard } from '../components/KPICard.jsx'
 import { FranceMap } from '../components/FranceMap.jsx'
-import { CurtailmentRiskMap } from '../components/CurtailmentRiskMap.jsx'
+import { CurtailmentShareChart } from '../components/CurtailmentShareChart.jsx'
 import { HistoryChart } from '../components/HistoryChart.jsx'
 import { CarbonBadge, computeCarbonIntensity } from '../components/CarbonBadge.jsx'
 import { fetchProduction, fetchRegions, fetchMeteo, fetchCapacity, fetchCurtailmentRisk } from '../services/api.js'
@@ -169,7 +169,6 @@ export default function DashboardPage() {
 
   // Curtailment risk: whole-history aggregate, independent of the region/date drill-down
   const [curtailmentData, setCurtailmentData] = useState([])
-  const [curtailmentTotal, setCurtailmentTotal] = useState(0)
   const [curtailmentLoading, setCurtailmentLoading] = useState(true)
 
   /**
@@ -236,7 +235,6 @@ export default function DashboardPage() {
       .then(result => {
         if (cancelled) return
         setCurtailmentData(result.data || [])
-        setCurtailmentTotal(result.national_surplus_mwh_15min || 0)
       })
       .catch(() => {})
       .finally(() => { if (!cancelled) setCurtailmentLoading(false) })
@@ -437,9 +435,8 @@ export default function DashboardPage() {
 
       {/* ── Surplus renouvelable & prix négatifs ────────────────── */}
       <div className="hero-grid hero-grid--single">
-        <CurtailmentRiskMap
+        <CurtailmentShareChart
           data={curtailmentData}
-          nationalSurplus={curtailmentTotal}
           loading={curtailmentLoading}
         />
       </div>
