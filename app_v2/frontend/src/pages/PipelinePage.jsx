@@ -14,11 +14,13 @@ const SATELLITE_FACTS = [
 ]
 
 const THRESHOLD_CALIBRATION = [
-  ['5 % (ancien)', '100 %', '17 %', '100 %'],
-  ['20 %', '91 %', '19 %', '100 %'],
-  ['30 %', '71 %', '24 %', '97 %'],
-  ['40 % (actuel)', '45 %', '31 %', '81 %'],
-  ['50 %', '11 %', '36 %', '22 %'],
+  ['5 %', '90.4 %', '4.1 %', '85.7 %'],
+  ['10 %', '80.0 %', '4.1 %', '75.9 %'],
+  ['15 %', '63.3 %', '4.5 %', '65.4 %'],
+  ['20 %', '46.1 %', '5.0 %', '53.6 %'],
+  ['30 %', '17.3 %', '7.4 %', '29.5 %'],
+  ['40 % (actuel)', '5.4 %', '10.4 %', '13.1 %'],
+  ['50 %', '2.0 %', '5.4 %', '2.5 %'],
 ]
 
 const API_ROUTES = [
@@ -26,6 +28,7 @@ const API_ROUTES = [
   ['/v1/meteo/regional', 'météo par région'],
   ['/v1/capacity/regional', 'capacités installées'],
   ['/v1/maintenance', 'alertes de maintenance'],
+  ['/v1/curtailment/regional', 'part du surplus éolien+solaire par région lors des prix négatifs'],
   ['/v1/export/csv', 'export CSV filtré par date/région'],
   ['/health', 'état du service'],
 ]
@@ -102,23 +105,25 @@ export default function PipelinePage() {
           marché day-ahead unique sur ENTSO-E — il n'existe tout simplement pas de
           prix par région à stocker. C'est cette table qui a servi à calibrer
           honnêtement le seuil « excédent export » affiché sur le dashboard : en
-          croisant, jour par jour sur l'année 2025, le ratio production/consommation
-          national avec les vrais prix négatifs du marché.
+          croisant, créneau par créneau de 15 min (mars-août 2026, ~65 jours de
+          données RTE réelles), le ratio national éolien+solaire/consommation
+          (nucléaire exclu — il ne module pas, l'inclure ne fait que refléter son
+          export structurel permanent) avec les vrais prix négatifs du marché.
         </p>
         <table className="content-table content-table--stats">
           <thead>
             <tr>
               <th>Seuil</th>
-              <th>Jours déclenchés / an</th>
+              <th>Créneaux déclenchés</th>
               <th>Précision</th>
               <th>Rappel</th>
             </tr>
           </thead>
           <tbody>
-            {THRESHOLD_CALIBRATION.map(([seuil, jours, precision, rappel]) => (
+            {THRESHOLD_CALIBRATION.map(([seuil, declenches, precision, rappel]) => (
               <tr key={seuil} className={seuil.includes('actuel') ? 'is-current' : undefined}>
                 <td>{seuil}</td>
-                <td>{jours}</td>
+                <td>{declenches}</td>
                 <td>{precision}</td>
                 <td>{rappel}</td>
               </tr>
@@ -126,12 +131,13 @@ export default function PipelinePage() {
           </tbody>
         </table>
         <p className="content-caption">
-          Précision = part des jours où le seuil est dépassé qui coïncident vraiment
-          avec un prix négatif. Rappel = part des jours à prix négatif effectivement
-          détectés par le seuil. 40 % reste le meilleur compromis testé, mais aucun
-          seuil ne rend ce signal fiable au sens strict : c'est un indicateur bruité,
-          pas un détecteur — la vraie décision d'arrêt se prend poste par poste, à une
-          échelle que les données publiques ne permettent pas de voir.
+          Précision = part des créneaux où le seuil est dépassé qui coïncident vraiment
+          avec un prix négatif. Rappel = part des créneaux à prix négatif effectivement
+          détectés par le seuil. 40 % reste le meilleur compromis testé (précision la
+          plus haute, 10 %), mais aucun seuil ne rend ce signal fiable au sens strict :
+          c'est un indicateur bruité, pas un détecteur — la vraie décision d'arrêt se
+          prend poste par poste, à une échelle que les données publiques ne permettent
+          pas de voir.
         </p>
       </section>
 
