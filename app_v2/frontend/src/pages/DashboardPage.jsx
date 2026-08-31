@@ -6,11 +6,10 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { KPICard } from '../components/KPICard.jsx'
 import { FranceMap } from '../components/FranceMap.jsx'
-import { CurtailmentShareChart } from '../components/CurtailmentShareChart.jsx'
 import { CurtailmentCalendar } from '../components/CurtailmentCalendar.jsx'
 import { HistoryChart } from '../components/HistoryChart.jsx'
 import { CarbonBadge, computeCarbonIntensity } from '../components/CarbonBadge.jsx'
-import { fetchProduction, fetchRegions, fetchMeteo, fetchCapacity, fetchCurtailmentRisk, fetchCurtailmentCalendar } from '../services/api.js'
+import { fetchProduction, fetchRegions, fetchMeteo, fetchCapacity, fetchCurtailmentCalendar } from '../services/api.js'
 import { ProdConsChart } from '../components/ProdConsChart.jsx'
 import { RegionSelector } from '../components/RegionSelector.jsx'
 import { MeteoChart } from '../components/MeteoChart.jsx'
@@ -168,9 +167,7 @@ export default function DashboardPage() {
   const [capacityData, setCapacityData] = useState([])
   const [drillLoading, setDrillLoading] = useState(false)
 
-  // Curtailment risk: whole-history aggregate, independent of the region/date drill-down
-  const [curtailmentData, setCurtailmentData] = useState([])
-  const [curtailmentLoading, setCurtailmentLoading] = useState(true)
+  // Negative-price calendar: whole-history aggregate, independent of the region/date drill-down
   const [calendarDays, setCalendarDays] = useState([])
   const [calendarRange, setCalendarRange] = useState(null)
   const [calendarStats, setCalendarStats] = useState(null)
@@ -232,19 +229,6 @@ export default function DashboardPage() {
     return () => { cancelled = true }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadData])
-
-  // Curtailment risk map: fetched once, whole history — not tied to the region/date filters
-  useEffect(() => {
-    let cancelled = false
-    fetchCurtailmentRisk()
-      .then(result => {
-        if (cancelled) return
-        setCurtailmentData(result.data || [])
-      })
-      .catch(() => {})
-      .finally(() => { if (!cancelled) setCurtailmentLoading(false) })
-    return () => { cancelled = true }
-  }, [])
 
   // Negative-price calendar: fetched once, whole history
   useEffect(() => {
@@ -453,17 +437,13 @@ export default function DashboardPage() {
         )}
       </div>
 
-      {/* ── Surplus renouvelable & prix négatifs ────────────────── */}
+      {/* ── Prix négatifs ────────────────────────────────────────── */}
       <div className="hero-grid hero-grid--single">
         <CurtailmentCalendar
           days={calendarDays}
           range={calendarRange}
           stats={calendarStats}
           loading={calendarLoading || !calendarStats}
-        />
-        <CurtailmentShareChart
-          data={curtailmentData}
-          loading={curtailmentLoading}
         />
       </div>
 

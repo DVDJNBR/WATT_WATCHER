@@ -2,11 +2,9 @@
  * CurtailmentCalendar — headline stats + a GitHub-style calendar heatmap of
  * every day the national market price went negative.
  *
- * The regional bar chart (CurtailmentShareChart) answers "who contributed
- * most" but reads as an abstract percentage with no emotional weight. This
- * answers a more visceral question — "how often, and how bad" — with two
- * numbers anyone can feel (hours at negative price; the record €/MWh) and a
- * pattern (clustering) the grid makes visible at a glance.
+ * Facts only, no interpretation: two numbers (hours at negative price; the
+ * record €/MWh) and the grid itself. No narrative caption underneath —
+ * reading the pattern is left to the viewer.
  */
 import { memo, useMemo, useState } from 'react'
 
@@ -29,6 +27,11 @@ function cellColor(nSlots, maxSlots) {
 function formatDateLong(iso) {
   const d = new Date(iso + 'T00:00:00')
   return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })
+}
+
+function formatMonthYear(iso) {
+  const d = new Date(iso + 'T00:00:00')
+  return d.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })
 }
 
 /**
@@ -93,14 +96,14 @@ export const CurtailmentCalendar = memo(function CurtailmentCalendar({
           <div className="curtailment-stats">
             <div className="curtailment-stat">
               <span className="curtailment-stat__value">{stats.total_hours}h</span>
-              <span className="curtailment-stat__label">à prix négatif sur {stats.total_days} jours ({range?.start && formatDateLong(range.start)} → {range?.end && formatDateLong(range.end)})</span>
+              <span className="curtailment-stat__label">à prix négatif sur {stats.total_days} jours ({range?.start && formatMonthYear(range.start)} → {range?.end && formatMonthYear(range.end)})</span>
             </div>
             <div className="curtailment-stat">
               <span className="curtailment-stat__value curtailment-stat__value--record">
                 {stats.record_price?.toFixed(2).replace('.', ',')} €/MWh
               </span>
               <span className="curtailment-stat__label">
-                record le {stats.record_date && formatDateLong(stats.record_date)} — RTE payait pour qu'on consomme
+                record le {stats.record_date && formatDateLong(stats.record_date)}
               </span>
             </div>
           </div>
@@ -149,11 +152,6 @@ export const CurtailmentCalendar = memo(function CurtailmentCalendar({
           )}
         </>
       )}
-
-      <p className="content-caption">
-        Chaque case = un jour. Plus la case est claire, plus il y a eu de créneaux de 15 min à prix
-        négatif ce jour-là. Donnée ENTSO-E day-ahead, zone de marché France unique.
-      </p>
     </section>
   )
 })
