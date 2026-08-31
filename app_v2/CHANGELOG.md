@@ -1,3 +1,9 @@
+## [1.31.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.30.1...v1.31.0) (2026-08-31)
+
+### Features
+
+* **dataviz:** add negative-price calendar heatmap with headline stats ([a6ffb09](https://github.com/DVDJNBR/WATT_WATCHER/commit/a6ffb099ee9345a4090afa04dc495ac7d156bf27))
+
 ## [1.30.1](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.30.0...v1.30.1) (2026-08-31)
 
 ## [1.30.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.29.1...v1.30.0) (2026-08-29)
