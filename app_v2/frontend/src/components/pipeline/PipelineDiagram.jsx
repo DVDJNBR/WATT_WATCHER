@@ -1,8 +1,15 @@
 /**
  * PipelineDiagram — the data journey as a source-by-source animation.
- * Pick a source; a single indicator travels Bronze → Silver → Gold → API →
- * Dashboard (most sources) or stops at Gold (ENTSO-E prices, which have no
- * live API route yet). Each arrival lights up the matching preview below.
+ *
+ * Horizontal row of stage columns spanning the full width — Bronze/Silver
+ * (grouped as the data lake), Gold, API, Dashboard — each with its own
+ * always-visible example underneath (JSON / parquet-row / table-row / route
+ * name). Below a width breakpoint the row becomes a vertical stack instead
+ * of scrolling sideways.
+ *
+ * Pick a source; a spark travels Bronze → Silver → Gold → API → Dashboard
+ * (most sources) or stops at Gold (ENTSO-E prices, no live API route yet).
+ * Each arrival lights up that stage's own example panel below it.
  */
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -29,7 +36,7 @@ function StageIcon({ kind }) {
   }
 }
 
-function StageNode({ stage, index, visited, current, arriving, source, onDashboardClick }) {
+function StageNode({ stage, visited, current, arriving, source, onDashboardClick }) {
   const isDashboard = stage.kind === 'dashboard'
   const style = current ? { '--stage-color': source.color, '--stage-glow': source.glow } : undefined
 
@@ -99,6 +106,21 @@ function Connector({ traveled, spark, source, cableKey }) {
   )
 }
 
+/** A stage node plus its always-visible example, stacked — one column of the flow. */
+function PipelineColumn({ stage, visited, current, arriving, source, onDashboardClick }) {
+  return (
+    <div className={'pipeline-column' + (visited ? '' : ' pipeline-column--muted')}>
+      <StageNode stage={stage} visited={visited} current={current} arriving={arriving} source={source} onDashboardClick={onDashboardClick} />
+      <div
+        className={'pipeline-column__example' + (arriving ? ' pipeline-column__example--lit' : '')}
+        style={{ '--stage-color': source.color, '--stage-glow': source.glow }}
+      >
+        <PreviewPanel source={source} stageKind={stage.kind} />
+      </div>
+    </div>
+  )
+}
+
 function SourceToggle({ source, active, onSelect }) {
   return (
     <button
@@ -163,55 +185,40 @@ export function PipelineDiagram() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedId, reducedMotion])
 
-  const currentKind = STAGES[stageIndex].kind
-  const previewLit = arrivingIndex === stageIndex
+  const columnProps = i => ({
+    stage: STAGES[i],
+    visited: i < source.visitedCount,
+    current: stageIndex === i,
+    arriving: arrivingIndex === i,
+    source,
+  })
 
   return (
     <div className="pipeline-diagram">
-      <div className="pipeline-diagram__body">
-        <div className="source-toggle-col" role="tablist" aria-label="Choisir une source">
-          {SOURCES.map(s => (
-            <SourceToggle key={s.id} source={s} active={s.id === selectedId} onSelect={setSelectedId} />
-          ))}
-        </div>
+      <div className="pipeline-source-row" role="tablist" aria-label="Choisir une source">
+        {SOURCES.map(s => (
+          <SourceToggle key={s.id} source={s} active={s.id === selectedId} onSelect={setSelectedId} />
+        ))}
+      </div>
 
-        <div className="pipeline-diagram__main">
-          {source.note && <p className="pipeline-diagram__source-note">{source.note}</p>}
+      {source.note && <p className="pipeline-diagram__source-note">{source.note}</p>}
 
-          <div className="pipeline-diagram__track">
-            <div className="data-lake-group">
-              <span className="data-lake-group__label">Data lake — ADLS Gen2</span>
-              <div className="data-lake-group__stages">
-                <StageNode stage={STAGES[0]} index={0} visited={0 < source.visitedCount} current={stageIndex === 0} arriving={arrivingIndex === 0} source={source} />
-                <Connector traveled={stageIndex >= 1 || travelingConnector === 0} spark={travelingConnector === 0} source={source} cableKey="cleaning" />
-                <StageNode stage={STAGES[1]} index={1} visited={1 < source.visitedCount} current={stageIndex === 1} arriving={arrivingIndex === 1} source={source} />
-              </div>
-            </div>
-
-            <Connector traveled={stageIndex >= 2 || travelingConnector === 1} spark={travelingConnector === 1} source={source} cableKey="aggregation" />
-            <StageNode stage={STAGES[2]} index={2} visited={2 < source.visitedCount} current={stageIndex === 2} arriving={arrivingIndex === 2} source={source} />
-            <Connector traveled={(stageIndex >= 3 && 3 < source.visitedCount) || travelingConnector === 2} spark={travelingConnector === 2} source={source} />
-            <StageNode stage={STAGES[3]} index={3} visited={3 < source.visitedCount} current={stageIndex === 3} arriving={arrivingIndex === 3} source={source} />
-            <Connector traveled={(stageIndex >= 4 && 4 < source.visitedCount) || travelingConnector === 3} spark={travelingConnector === 3} source={source} />
-            <StageNode
-              stage={STAGES[4]}
-              index={4}
-              visited={4 < source.visitedCount}
-              current={stageIndex === 4}
-              arriving={arrivingIndex === 4}
-              source={source}
-              onDashboardClick={() => navigate('/')}
-            />
-          </div>
-
-          <div
-            className={'preview-panel' + (previewLit ? ' preview-panel--lit' : '')}
-            style={{ '--stage-color': source.color, '--stage-glow': source.glow }}
-          >
-            <p className="preview-panel__stage-label">{STAGES[stageIndex].label}</p>
-            <PreviewPanel source={source} stageKind={currentKind} />
+      <div className="pipeline-flow">
+        <div className="pipeline-flow__group">
+          <span className="data-lake-group__label">Data lake — ADLS Gen2</span>
+          <div className="pipeline-flow__row">
+            <PipelineColumn {...columnProps(0)} />
+            <Connector traveled={stageIndex >= 1 || travelingConnector === 0} spark={travelingConnector === 0} source={source} cableKey="cleaning" />
+            <PipelineColumn {...columnProps(1)} />
           </div>
         </div>
+
+        <Connector traveled={stageIndex >= 2 || travelingConnector === 1} spark={travelingConnector === 1} source={source} cableKey="aggregation" />
+        <PipelineColumn {...columnProps(2)} />
+        <Connector traveled={(stageIndex >= 3 && 3 < source.visitedCount) || travelingConnector === 2} spark={travelingConnector === 2} source={source} />
+        <PipelineColumn {...columnProps(3)} />
+        <Connector traveled={(stageIndex >= 4 && 4 < source.visitedCount) || travelingConnector === 3} spark={travelingConnector === 3} source={source} />
+        <PipelineColumn {...columnProps(4)} onDashboardClick={() => navigate('/')} />
       </div>
     </div>
   )

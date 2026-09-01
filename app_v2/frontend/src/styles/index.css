@@ -1181,20 +1181,11 @@ input[type="date"] {
 /* ── Pipeline diagram (source-by-source animated flow) ────────────────────── */
 .pipeline-diagram { margin-top: 4px; }
 
-.pipeline-diagram__body {
+.pipeline-source-row {
   display: flex;
-  align-items: flex-start;
-  gap: 24px;
-  margin-top: 16px;
-}
-
-.pipeline-diagram__main { flex: 1; min-width: 0; }
-
-.source-toggle-col {
-  display: flex;
-  flex-direction: column;
+  flex-wrap: wrap;
   gap: 6px;
-  flex: 0 0 200px;
+  margin-top: 16px;
 }
 
 .source-toggle {
@@ -1236,18 +1227,23 @@ input[type="date"] {
   color: var(--color-text-muted);
 }
 
-.pipeline-diagram__track {
+/* The flow itself — fully fluid widths (flex ratios, no fixed px), spans
+   whatever width its container gives it. Switches to a vertical stack
+   below the breakpoint instead of forcing horizontal scroll. */
+.pipeline-flow {
   display: flex;
   align-items: stretch;
+  gap: clamp(8px, 2vw, 20px);
   margin-top: 24px;
-  overflow-x: auto;
-  padding-bottom: 4px;
+  width: 100%;
 }
 
-.data-lake-group {
+.pipeline-flow__group {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  flex: 2 1 0;
+  min-width: 0;
   padding: 10px;
   border: 1px dashed var(--color-border);
   background: rgba(255,255,255,0.02);
@@ -1261,7 +1257,24 @@ input[type="date"] {
   color: var(--color-text-muted);
 }
 
-.data-lake-group__stages { display: flex; align-items: stretch; }
+.pipeline-flow__row {
+  display: flex;
+  align-items: stretch;
+  gap: clamp(6px, 1.5vw, 16px);
+  flex: 1;
+  min-height: 0;
+}
+
+.pipeline-column {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: 1 1 0;
+  min-width: 0;
+  transition: opacity var(--transition);
+}
+
+.pipeline-column--muted { opacity: 0.4; }
 
 .pipeline-stage {
   position: relative;
@@ -1270,8 +1283,8 @@ input[type="date"] {
   align-items: center;
   justify-content: center;
   gap: 3px;
-  min-width: 104px;
-  padding: 14px 10px;
+  width: 100%;
+  padding: 14px 8px;
   border: 1px solid var(--color-border);
   background: var(--color-surface-2);
   color: var(--color-text);
@@ -1281,8 +1294,6 @@ input[type="date"] {
   cursor: default;
   transition: border-color var(--transition), color var(--transition);
 }
-
-.pipeline-stage--muted { opacity: 0.35; }
 
 .pipeline-stage--current { border-color: var(--stage-color); color: var(--stage-color); }
 
@@ -1321,12 +1332,30 @@ input[type="date"] {
 }
 .pipeline-stage--current .pipeline-stage__sub { color: inherit; opacity: 0.75; }
 
+/* The always-visible example under each stage — lights up when the spark arrives. */
+.pipeline-column__example {
+  flex: 1;
+  padding: 12px;
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  transition: border-color 300ms, box-shadow 300ms;
+}
+
+.pipeline-column__example--lit {
+  border-color: var(--stage-color, var(--color-accent));
+  box-shadow: 0 0 24px -6px var(--stage-color, var(--color-accent));
+}
+
 .pipeline-connector {
   position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
-  flex: 0 0 30px;
+  flex: 0 1 clamp(16px, 3vw, 48px);
+  align-self: center;
 }
 
 .pipeline-connector__line {
@@ -1416,19 +1445,6 @@ input[type="date"] {
   color: var(--color-accent);
 }
 
-.preview-panel {
-  margin-top: 28px;
-  padding: 18px 20px;
-  background: var(--color-surface-2);
-  border: 1px solid var(--color-border);
-  transition: border-color 300ms, box-shadow 300ms;
-}
-
-.preview-panel--lit {
-  border-color: var(--stage-color, var(--color-accent));
-  box-shadow: 0 0 30px -6px var(--stage-color, var(--color-accent));
-}
-
 .preview-panel__stage-label {
   font-size: 0.68rem;
   font-weight: 600;
@@ -1440,39 +1456,36 @@ input[type="date"] {
 
 .preview-panel__path {
   font-family: ui-monospace, 'SF Mono', Menlo, monospace;
-  font-size: 0.72rem;
+  font-size: 0.68rem;
   color: var(--color-text-muted);
   margin-bottom: 6px;
   word-break: break-all;
 }
 
 .preview-panel__table-wrap { overflow-x: auto; }
-.preview-panel__table { margin-top: 0; min-width: 420px; }
+.preview-panel__table { margin-top: 0; min-width: 0; }
 
 .preview-panel__route {
   display: flex;
   align-items: center;
   gap: 8px;
   font-size: 0.85rem;
+  flex-wrap: wrap;
 }
 
 .preview-panel__empty {
   color: var(--color-text-muted);
-  font-size: 0.85rem;
+  font-size: 0.8rem;
   font-style: italic;
 }
 
-@media (max-width: 1024px) {
-  .pipeline-diagram__body { flex-direction: column; }
-  .source-toggle-col { flex-direction: row; flex-wrap: wrap; flex-basis: auto; width: 100%; }
-  .pipeline-diagram__track,
-  .data-lake-group__stages {
-    flex-direction: column;
-    overflow-x: visible;
-  }
-  .pipeline-connector { flex: 0 0 30px; width: 100%; }
-  .pipeline-connector__line { width: 2px; height: 100%; }
+/* Below the breakpoint: vertical stack, connectors rotate to short vertical
+   lines between rows instead of forcing the row to scroll sideways. */
+@media (max-width: 860px) {
+  .pipeline-flow { flex-direction: column; }
+  .pipeline-flow__row { flex-direction: column; }
+  .pipeline-connector { flex: 0 0 24px; width: 100%; align-self: stretch; }
+  .pipeline-connector__line { width: 2px; height: 100%; margin: 0 auto; }
   .pipeline-connector__note-toggle { top: 50%; left: -22px; transform: translateY(-50%); }
   .pipeline-connector__note { left: 28px; top: 50%; transform: translateY(-50%); }
-  .pipeline-stage { width: 100%; }
 }
