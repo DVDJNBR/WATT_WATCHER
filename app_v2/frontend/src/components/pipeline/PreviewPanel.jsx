@@ -45,10 +45,13 @@ function TablePreview({ preview }) {
 }
 
 function ApiPreview({ preview }) {
+  // Route name only — no query string, no /v1/ prefix. The full path lives
+  // on the Pipeline page's API route list for anyone who wants it.
+  const name = preview.route.replace(/^GET /, '').split('?')[0].replace(/^\/v1\//, '')
   return (
     <p className="preview-panel__route">
       <span className="method-badge">GET</span>
-      <code>{preview.route.replace(/^GET /, '')}</code>
+      <code>{name}</code>
     </p>
   )
 }
