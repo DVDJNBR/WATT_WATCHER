@@ -1,3 +1,53 @@
+## [1.31.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.30.1...v1.31.0) (2026-08-31)
+
+### Features
+
+* **dataviz:** add negative-price calendar heatmap with headline stats ([a6ffb09](https://github.com/DVDJNBR/WATT_WATCHER/commit/a6ffb099ee9345a4090afa04dc495ac7d156bf27))
+
+## [1.30.1](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.30.0...v1.30.1) (2026-08-31)
+
+## [1.30.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.29.1...v1.30.0) (2026-08-29)
+
+### Features
+
+* **dataviz:** add regional renewable-surplus map for negative-price events ([1bba4d7](https://github.com/DVDJNBR/WATT_WATCHER/commit/1bba4d78aa131815bfebaca68edcd77a35304aea))
+
+## [1.29.1](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.29.0...v1.29.1) (2026-08-28)
+
+### Bug Fixes
+
+* **rte:** chunk fetch_all_recent by day past Opendatasoft's offset+limit cap ([eaaabbc](https://github.com/DVDJNBR/WATT_WATCHER/commit/eaaabbc3456b2d9b5ad4205eac7a5c5c9f059d8d))
+
+## [1.29.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.28.0...v1.29.0) (2026-08-28)
+
+### Features
+
+* **pipeline:** add RTE history backfill script + recalibration query ([c025c94](https://github.com/DVDJNBR/WATT_WATCHER/commit/c025c9434e821d10239acbdf8996df7130c8ba0e))
+
+## [1.28.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.27.0...v1.28.0) (2026-08-28)
+
+### Features
+
+* **pipeline:** add manual price backfill script, fix executemany perf bug ([2a5c512](https://github.com/DVDJNBR/WATT_WATCHER/commit/2a5c512568327780a7384b3e17689459d2e1d1b6))
+
+## [1.27.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.26.2...v1.27.0) (2026-08-28)
+
+### Features
+
+* **entsoe:** switch geocoding to the A73 outage-independent unit registry ([9af8de8](https://github.com/DVDJNBR/WATT_WATCHER/commit/9af8de8cf34a776d09b85e8ec081e5ed5d26e9a3))
+
+## [1.26.2](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.26.1...v1.26.2) (2026-08-28)
+
+### Bug Fixes
+
+* **geodata:** resolve 4 more production units via web search ([10a803d](https://github.com/DVDJNBR/WATT_WATCHER/commit/10a803deb4c8ed46332a7708eb204e90b420120c))
+
+## [1.26.1](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.26.0...v1.26.1) (2026-08-28)
+
+### Bug Fixes
+
+* **entsoe:** paginate outage requests past the 200-item API cap ([e0dc30c](https://github.com/DVDJNBR/WATT_WATCHER/commit/e0dc30c5f6f1ee13441084e85e1b814d8c088cd1))
+
 ## [1.26.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.25.0...v1.26.0) (2026-08-28)
 
 ### Features

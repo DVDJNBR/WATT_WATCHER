@@ -278,11 +278,15 @@ class DimLoader:
                 rows,
             )
         else:
-            # PostgreSQL: batch INSERT ... ON CONFLICT DO NOTHING
-            cursor.executemany(
+            # executemany() is just a client-side loop of execute() in
+            # psycopg2 — not real batching, one round trip per row regardless.
+            # execute_values() sends a genuine multi-row VALUES list.
+            from psycopg2.extras import execute_values
+            execute_values(
+                cursor,
                 """INSERT INTO dim_time
                    (horodatage, jour, mois, annee, heure, jour_semaine, est_weekend)
-                   VALUES (%s, %s, %s, %s, %s, %s, %s)
+                   VALUES %s
                    ON CONFLICT (horodatage) DO NOTHING""",
                 rows,
             )

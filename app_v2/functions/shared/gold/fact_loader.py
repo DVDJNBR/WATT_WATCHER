@@ -185,9 +185,15 @@ class FactLoader:
                 )
                 for row in long_df.to_dict("records")
             ]
+            # executemany() is just a client-side loop of execute() in
+            # psycopg2 — one network round trip per row regardless of how
+            # it's chunked in Python. execute_values() sends a genuine
+            # multi-row INSERT per chunk; BATCH is now about progress
+            # visibility and temp-table memory, not round-trip count.
+            from psycopg2.extras import execute_values
             BATCH = 5000
             for i in range(0, len(stg_rows), BATCH):
-                cursor.executemany("INSERT INTO stg_fact VALUES (%s,%s,%s,%s,%s,%s)", stg_rows[i:i+BATCH])
+                execute_values(cursor, "INSERT INTO stg_fact VALUES %s", stg_rows[i:i+BATCH])
                 logger.info("Staged %d / %d", min(i+BATCH, len(stg_rows)), len(stg_rows))
             cursor.execute("""
                 INSERT INTO fact_energy_flow (id_date, id_region, id_source, valeur_mw, facteur_charge, temperature_moyenne, consommation_mw)
