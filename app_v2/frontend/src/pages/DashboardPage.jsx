@@ -9,7 +9,7 @@ import { FranceMap } from '../components/FranceMap.jsx'
 import { CurtailmentCalendar } from '../components/CurtailmentCalendar.jsx'
 import { HistoryChart } from '../components/HistoryChart.jsx'
 import { CarbonBadge, computeCarbonIntensity } from '../components/CarbonBadge.jsx'
-import { fetchProduction, fetchRegions, fetchMeteo, fetchCapacity, fetchCurtailmentCalendar } from '../services/api.js'
+import { fetchAllProduction, fetchRegions, fetchMeteo, fetchCapacity, fetchCurtailmentCalendar } from '../services/api.js'
 import { ProdConsChart } from '../components/ProdConsChart.jsx'
 import { RegionSelector } from '../components/RegionSelector.jsx'
 import { MeteoChart } from '../components/MeteoChart.jsx'
@@ -182,10 +182,12 @@ export default function DashboardPage() {
   const loadData = useCallback(async (regionCode, start, end, updateGlobal = false) => {
     try {
       setError(null)
-      const params = { limit: 500, startDate: start, endDate: end }
+      const params = { startDate: start, endDate: end }
       if (regionCode) params.regionCode = regionCode
-      const result = await fetchProduction(params)
-      const data = result.data || []
+      const result = await fetchAllProduction(params)
+      // API returns newest-first (DESC) per page; consumers (KPI "latest point"
+      // logic, charts) assume ascending chronological order.
+      const data = (result.data || []).sort((a, b) => (a.timestamp < b.timestamp ? -1 : 1))
       setProductionData(data)
       if (updateGlobal || !regionCode) setGlobalData(data)
       setLastUpdated(new Date())
@@ -199,8 +201,8 @@ export default function DashboardPage() {
     setDrillLoading(true)
     try {
       const meteoParams = code
-        ? { regionCode: code, startDate: start, endDate: end }
-        : { startDate: start, endDate: end }
+        ? { regionCode: code, startDate: start, endDate: end, limit: 5000 }
+        : { startDate: start, endDate: end, limit: 5000 }
       const [meteoRes, capacityRes] = await Promise.allSettled([
         fetchMeteo(meteoParams),
         code ? fetchCapacity({ regionCode: code }) : Promise.resolve({ data: [] }),
@@ -316,8 +318,11 @@ export default function DashboardPage() {
     [selectedRegion, meteoData]
   )
 
-  // Derive KPIs from current data (region-specific or global)
-  const displayData = selectedRegion ? productionData : globalData
+  // Derive KPIs from current data (region-specific or global).
+  // Global view must use the aggregated (summed-across-regions) series, not
+  // raw globalData — that's per-region rows, so its "last point" would be a
+  // single arbitrary region's MW, not France's total.
+  const displayData = selectedRegion ? productionData : aggregatedProdData
   const lastSources = displayData.length
     ? (displayData[displayData.length - 1].sources || {})
     : {}
