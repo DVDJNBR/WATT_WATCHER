@@ -112,7 +112,7 @@ export function ProdConsChart({ data = [], region, loading = false }) {
     return (
       <section className="glass-card chart-card" data-testid="prod-cons-chart-loading">
         <h2 className="chart-title">{title}</h2>
-        <div className="skeleton" style={{ height: 320 }} />
+        <div className="skeleton" style={{ flex: '1 1 0', minHeight: 0 }} />
       </section>
     )
   }
@@ -141,7 +141,8 @@ export function ProdConsChart({ data = [], region, loading = false }) {
       aria-label={`Graphique ${title}`}>
       <h2 className="chart-title">{title}</h2>
 
-      <ResponsiveContainer width="100%" height={320}>
+      <div style={{ flex: '1 1 0', minHeight: 0 }}>
+      <ResponsiveContainer width="100%" height="100%">
         <ComposedChart data={chartData} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
           <defs>
             <linearGradient id="surplusGrad" x1="0" y1="0" x2="0" y2="1">
@@ -200,6 +201,7 @@ export function ProdConsChart({ data = [], region, loading = false }) {
           />
         </ComposedChart>
       </ResponsiveContainer>
+      </div>
 
       <CustomLegend />
     </section>

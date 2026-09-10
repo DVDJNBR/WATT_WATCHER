@@ -160,7 +160,7 @@ export const FranceMap = memo(function FranceMap({
       </div>
 
       {loading ? (
-        <div className="skeleton" style={{ height: 420 }} />
+        <div className="skeleton" style={{ flex: '1 1 0', minHeight: 0 }} />
       ) : (
         <div className="map-wrapper">
           <ComposableMap
@@ -168,7 +168,7 @@ export const FranceMap = memo(function FranceMap({
             projectionConfig={PROJECTION_CONFIG}
             width={600}
             height={460}
-            style={{ width: '100%', height: 'auto' }}
+            style={{ width: '100%', height: '100%' }}
           >
             <ZoomableGroup
               zoom={position.zoom}
