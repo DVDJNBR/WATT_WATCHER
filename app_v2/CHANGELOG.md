@@ -1,3 +1,9 @@
+## [1.32.1](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.32.0...v1.32.1) (2026-09-10)
+
+### Bug Fixes
+
+* **dashboard:** fit viewport height, move sub-tabs above the toolbar ([d41d456](https://github.com/DVDJNBR/WATT_WATCHER/commit/d41d4560d28cd7ff4fd6a2611f9e0efb9e0fcd42))
+
 ## [1.32.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.31.2...v1.32.0) (2026-09-10)
 
 ### Features
