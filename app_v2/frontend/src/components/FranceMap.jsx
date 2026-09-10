@@ -5,12 +5,75 @@
  * for low, bright blue for high. Hovering shows name + value.
  * Clicking a region triggers onSelect(code_insee) for drill-down.
  */
-import { memo, useState, useMemo } from 'react'
-import { ComposableMap, Geographies, Geography, ZoomableGroup } from 'react-simple-maps'
+import { memo, useState, useEffect, useMemo } from 'react'
+import { ComposableMap, Geographies, Geography, Marker, ZoomableGroup } from 'react-simple-maps'
+import { fetchProductionUnits } from '../services/api.js'
 
 const GEO_URL = '/france-regions.geojson'
 
 const PROJECTION_CONFIG = { center: [2.5, 46.5], scale: 2200 }
+
+// Simple geometric line-icons, one per ENTSO-E psr_type family — same visual
+// language as the nav icons (Layout.jsx): stroke-only, no fills, no emoji.
+const SOURCE_ICON_PATHS = {
+  nuclear: (
+    <>
+      <circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none" />
+      <ellipse cx="12" cy="12" rx="9" ry="3.6" />
+      <ellipse cx="12" cy="12" rx="9" ry="3.6" transform="rotate(60 12 12)" />
+      <ellipse cx="12" cy="12" rx="9" ry="3.6" transform="rotate(120 12 12)" />
+    </>
+  ),
+  wind_offshore: (
+    <>
+      <circle cx="12" cy="12" r="1.3" fill="currentColor" stroke="none" />
+      <path d="M12 12 4 9.5" />
+      <path d="M12 12 17.5 4.5" />
+      <path d="M12 12 15 19.5" />
+    </>
+  ),
+  hydro: (
+    <path d="M4 15c1.6-2 3.4-2 5 0s3.4 2 5 0 3.4-2 5 0M4 19c1.6-2 3.4-2 5 0s3.4 2 5 0 3.4-2 5 0" />
+  ),
+  fossil_gas: (
+    <path d="M12 3c-3 4-5 6-5 9.5A5 5 0 0 0 12 17.5a5 5 0 0 0 5-5c0-1.5-1-2.5-2-3 .3 2-1 3-1.5 3-1 0-1-1-1-1.5C12.5 8 12 5 12 3Z" />
+  ),
+  other: <circle cx="12" cy="12" r="4" />,
+}
+
+const SOURCE_LABEL = {
+  nuclear: 'Nucléaire',
+  wind_offshore: 'Éolien',
+  hydro_water_reservoir: 'Hydraulique',
+  hydro_run_of_river: 'Hydraulique',
+  hydro_pumped_storage: 'Hydraulique (STEP)',
+  fossil_gas: 'Gaz',
+  fossil_oil: 'Fioul',
+  fossil_hard_coal: 'Charbon',
+  other: 'Autre',
+}
+
+function iconKeyFor(psrType) {
+  if (psrType === 'nuclear') return 'nuclear'
+  if (psrType === 'wind_offshore') return 'wind_offshore'
+  if (psrType?.startsWith('hydro')) return 'hydro'
+  if (psrType === 'fossil_gas') return 'fossil_gas'
+  return 'other'
+}
+
+/** A production-unit pictogram: small circular badge + the matching source icon. */
+function UnitMarker({ unit }) {
+  const key = iconKeyFor(unit.psr_type)
+  return (
+    <Marker coordinates={[unit.lon, unit.lat]}>
+      <title>{`${unit.name} — ${SOURCE_LABEL[unit.psr_type] || 'Autre'}`}</title>
+      <circle r={6} fill="#121214" stroke="#2dd4bf" strokeWidth={1.2} />
+      <g transform="translate(-4,-4) scale(0.33)" fill="none" stroke="#2dd4bf" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        {SOURCE_ICON_PATHS[key]}
+      </g>
+    </Marker>
+  )
+}
 
 // A per-region prod/conso ratio isn't a meaningful "surproduction" signal:
 // French regions aren't independent grids — nuclear-heavy regions
@@ -63,6 +126,18 @@ export const FranceMap = memo(function FranceMap({
     () => Math.max(0, ...Object.values(regionTotals)),
     [regionTotals]
   )
+
+  // Production-unit pictograms: only fetched (and only shown) once a région
+  // is selected — 120 pins on the national view would just be noise.
+  const [units, setUnits] = useState([])
+  useEffect(() => {
+    if (!selectedRegionName) { setUnits([]); return }
+    let cancelled = false
+    fetchProductionUnits({ region: selectedRegionName })
+      .then(res => { if (!cancelled) setUnits(res.data || []) })
+      .catch(() => { if (!cancelled) setUnits([]) })
+    return () => { cancelled = true }
+  }, [selectedRegionName])
 
   return (
     <section className="glass-card map-card" data-testid="france-map">
@@ -153,6 +228,7 @@ export const FranceMap = memo(function FranceMap({
                 })
               }
             </Geographies>
+            {units.map(unit => <UnitMarker key={unit.name} unit={unit} />)}
             </ZoomableGroup>
           </ComposableMap>
 
@@ -191,8 +267,8 @@ export const FranceMap = memo(function FranceMap({
 
       <p className="map-hint">
         {selectedCode
-          ? 'Cliquez sur une autre région pour comparer · ← Vue nationale pour revenir'
-          : 'Cliquez sur une région pour afficher l\'historique de production'}
+          ? `${units.length ? `${units.length} installation${units.length > 1 ? 's' : ''} affichée${units.length > 1 ? 's' : ''} · ` : ''}Cliquez sur une autre région pour comparer · ← Vue nationale pour revenir`
+          : 'Cliquez sur une région pour afficher son historique et ses principales installations'}
       </p>
     </section>
   )

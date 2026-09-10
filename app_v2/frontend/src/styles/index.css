@@ -267,6 +267,39 @@ body {
 
 .app-tab--active svg { opacity: 1; }
 
+/* Sub-tabs within the dashboard page (overview / detail / prices) — same
+   active-state language as .app-tab (accent + underline) at a smaller,
+   secondary scale so the page nav above stays the primary hierarchy. */
+.tab-bar {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--color-border);
+  margin: 20px 0 4px;
+  overflow-x: auto;
+}
+
+.tab-bar__item {
+  padding: 8px 14px;
+  border-radius: var(--radius) var(--radius) 0 0;
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--color-text-muted);
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color var(--transition), background var(--transition), border-color var(--transition);
+}
+
+.tab-bar__item:hover { color: var(--color-text); background: var(--color-surface-2); }
+
+.tab-bar__item--active {
+  color: var(--color-accent);
+  font-weight: 600;
+  border-bottom-color: var(--color-accent);
+}
+
 /* ── Dashboard toolbar (region + date range + status) ────────────────────── */
 .dashboard-toolbar {
   display: flex;

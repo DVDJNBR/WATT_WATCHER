@@ -25,6 +25,7 @@ from api.maintenance_service import query_maintenance
 from api.meteo_service import query_meteo
 from api.models import parse_export_request, parse_production_request
 from api.production_service import query_production
+from api.units_service import query_units
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -192,6 +193,17 @@ def curtailment_calendar(request: Request):
     finally:
         if conn:
             conn.close()
+
+
+@app.get("/v1/production/units")
+def production_units(request: Request):
+    request_id = str(uuid.uuid4())
+    try:
+        result = query_units(region=request.query_params.get("region") or None)
+        return JSONResponse(result, headers={"X-Request-Id": request_id})
+    except Exception:
+        logger.exception("units endpoint error [%s]", request_id)
+        return JSONResponse(server_error(request_id=request_id), status_code=500)
 
 
 @app.get("/v1/maintenance")
