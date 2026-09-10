@@ -1,3 +1,13 @@
+## [1.32.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.31.2...v1.32.0) (2026-09-10)
+
+### Features
+
+* **dashboard:** sub-tabs + production-unit pictograms on the map ([151db11](https://github.com/DVDJNBR/WATT_WATCHER/commit/151db11368f0277ca6f8b08c35c919914c2f1bac))
+
+### Bug Fixes
+
+* **dashboard:** paginate production API calls, fix national KPI aggregation ([3154f60](https://github.com/DVDJNBR/WATT_WATCHER/commit/3154f60d0e26736a237d902179dc6833d82c5b4a))
+
 ## [1.31.2](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.31.1...v1.31.2) (2026-09-04)
 
 ### Bug Fixes
