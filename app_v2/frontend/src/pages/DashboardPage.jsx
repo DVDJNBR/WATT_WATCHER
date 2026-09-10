@@ -341,6 +341,13 @@ export default function DashboardPage() {
 
   const selectedRegionName = regions.find(r => r.code_insee === selectedRegion)?.region
 
+  const [activeTab, setActiveTab] = useState('overview')
+  const TABS = [
+    { id: 'overview', label: 'Vue d\'ensemble' },
+    { id: 'detail',   label: 'Détail & météo' },
+    { id: 'prices',   label: 'Prix négatifs' },
+  ]
+
   return (
     <main id="main-content" className="app-main">
 
@@ -405,52 +412,73 @@ export default function DashboardPage() {
         />
       </div>
 
-      {/* ── 2×2 grid : [prod/conso | sources] / [carte | météo] ── */}
-      <div className="hero-grid">
-        {/* Ligne 1 gauche — prod vs conso */}
-        <ProdConsChart
-          data={aggregatedProdData}
-          region={selectedRegionName}
-          loading={loading || refreshing}
-        />
-        {/* Ligne 1 droite — stacked par source */}
-        <HistoryChart
-          data={aggregatedProdData}
-          region={selectedRegionName || 'France'}
-          loading={loading || refreshing}
-        />
-        {/* Ligne 2 gauche — carte France */}
-        <FranceMap
-          regions={regions}
-          regionTotals={regionTotals}
-          regionConsommation={regionConsommation}
-          selectedCode={selectedRegion}
-          onSelect={handleRegionChange}
-          loading={loading}
-        />
-        {/* Ligne 2 droite — météo */}
-        {error ? (
-          <div className="glass-card chart-card chart-error" data-testid="app-error">
-            <p>Erreur : {error}</p>
-          </div>
-        ) : (
+      {/* ── Sous-onglets : vue d'ensemble / détail / prix négatifs ── */}
+      <div className="tab-bar" role="tablist" aria-label="Sections du dashboard">
+        {TABS.map(t => (
+          <button
+            key={t.id}
+            role="tab"
+            aria-selected={activeTab === t.id}
+            className={`tab-bar__item${activeTab === t.id ? ' tab-bar__item--active' : ''}`}
+            onClick={() => setActiveTab(t.id)}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {error && (
+        <div className="glass-card chart-card chart-error" data-testid="app-error">
+          <p>Erreur : {error}</p>
+        </div>
+      )}
+
+      {/* ── Vue d'ensemble : le plus important — prod/conso + carte ── */}
+      {activeTab === 'overview' && !error && (
+        <div className="hero-grid">
+          <ProdConsChart
+            data={aggregatedProdData}
+            region={selectedRegionName}
+            loading={loading || refreshing}
+          />
+          <FranceMap
+            regions={regions}
+            regionTotals={regionTotals}
+            regionConsommation={regionConsommation}
+            selectedCode={selectedRegion}
+            onSelect={handleRegionChange}
+            loading={loading}
+          />
+        </div>
+      )}
+
+      {/* ── Détail : mix par source + météo ── */}
+      {activeTab === 'detail' && !error && (
+        <div className="hero-grid">
+          <HistoryChart
+            data={aggregatedProdData}
+            region={selectedRegionName || 'France'}
+            loading={loading || refreshing}
+          />
           <MeteoChart
             data={aggregatedMeteoData}
             region={selectedRegionName}
             loading={drillLoading}
           />
-        )}
-      </div>
+        </div>
+      )}
 
       {/* ── Prix négatifs ────────────────────────────────────────── */}
-      <div className="hero-grid hero-grid--single">
-        <CurtailmentCalendar
-          days={calendarDays}
-          range={calendarRange}
-          stats={calendarStats}
-          loading={calendarLoading || !calendarStats}
-        />
-      </div>
+      {activeTab === 'prices' && (
+        <div className="hero-grid hero-grid--single">
+          <CurtailmentCalendar
+            days={calendarDays}
+            range={calendarRange}
+            stats={calendarStats}
+            loading={calendarLoading || !calendarStats}
+          />
+        </div>
+      )}
 
     </main>
   )
