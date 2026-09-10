@@ -73,7 +73,7 @@ export function HistoryChart({ data, region, loading = false }) {
   if (loading) {
     return (
       <div className="glass-card chart-card" data-testid="history-chart-loading">
-        <div className="skeleton" style={{ height: 320 }} />
+        <div className="skeleton" style={{ flex: '1 1 0', minHeight: 0 }} />
       </div>
     )
   }
@@ -107,7 +107,8 @@ export function HistoryChart({ data, region, loading = false }) {
     <section className="glass-card chart-card" data-testid="history-chart">
       <h2 className="chart-title">Historique de production — {region}</h2>
 
-      <ResponsiveContainer width="100%" height={320}>
+      <div style={{ flex: '1 1 0', minHeight: 0 }}>
+      <ResponsiveContainer width="100%" height="100%">
         <ComposedChart data={chartData} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
           <defs>
             {sources.map(src => (
@@ -148,6 +149,7 @@ export function HistoryChart({ data, region, loading = false }) {
           />
         </ComposedChart>
       </ResponsiveContainer>
+      </div>
     </section>
   )
 }

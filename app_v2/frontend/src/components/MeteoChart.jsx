@@ -44,7 +44,7 @@ export function MeteoChart({ data = [], region, loading = false }) {
     return (
       <section className="glass-card chart-card" data-testid="meteo-chart-loading">
         <h2 className="chart-title">Météo — {region || 'France'}</h2>
-        <div className="skeleton" style={{ height: 240 }} />
+        <div className="skeleton" style={{ flex: '1 1 0', minHeight: 0 }} />
       </section>
     )
   }
@@ -73,7 +73,8 @@ export function MeteoChart({ data = [], region, loading = false }) {
     <section className="glass-card chart-card" data-testid="meteo-chart">
       <h2 className="chart-title">Météo — {region || 'France'}</h2>
 
-      <ResponsiveContainer width="100%" height={240}>
+      <div style={{ flex: '1 1 0', minHeight: 0 }}>
+      <ResponsiveContainer width="100%" height="100%">
         <ComposedChart data={chartData} margin={{ top: 8, right: 60, left: 0, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#888" strokeOpacity={0.15} />
           <XAxis
@@ -138,6 +139,7 @@ export function MeteoChart({ data = [], region, loading = false }) {
           />
         </ComposedChart>
       </ResponsiveContainer>
+      </div>
     </section>
   )
 }

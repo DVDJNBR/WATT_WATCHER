@@ -351,6 +351,23 @@ export default function DashboardPage() {
   return (
     <main id="main-content" className="app-main">
 
+      {/* ── Sous-onglets : vue d'ensemble / détail / prix négatifs ── */}
+      {/* First thing under the page nav, not buried below the toolbar/KPIs —
+          this is the primary way to move around the dashboard. */}
+      <div className="tab-bar" role="tablist" aria-label="Sections du dashboard">
+        {TABS.map(t => (
+          <button
+            key={t.id}
+            role="tab"
+            aria-selected={activeTab === t.id}
+            className={`tab-bar__item${activeTab === t.id ? ' tab-bar__item--active' : ''}`}
+            onClick={() => setActiveTab(t.id)}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
       {/* Region selector + refresh status + date range */}
       <div className="dashboard-toolbar">
         <RegionSelector
@@ -412,73 +429,62 @@ export default function DashboardPage() {
         />
       </div>
 
-      {/* ── Sous-onglets : vue d'ensemble / détail / prix négatifs ── */}
-      <div className="tab-bar" role="tablist" aria-label="Sections du dashboard">
-        {TABS.map(t => (
-          <button
-            key={t.id}
-            role="tab"
-            aria-selected={activeTab === t.id}
-            className={`tab-bar__item${activeTab === t.id ? ' tab-bar__item--active' : ''}`}
-            onClick={() => setActiveTab(t.id)}
-          >
-            {t.label}
-          </button>
-        ))}
+      {/* Content fills whatever height remains below the tabs/toolbar/KPIs —
+          this is the only piece allowed to scroll, and only if it has to. */}
+      <div className="dashboard-content">
+        {error && (
+          <div className="glass-card chart-card chart-error" data-testid="app-error">
+            <p>Erreur : {error}</p>
+          </div>
+        )}
+
+        {/* ── Vue d'ensemble : le plus important — prod/conso + carte ── */}
+        {activeTab === 'overview' && !error && (
+          <div className="hero-grid">
+            <ProdConsChart
+              data={aggregatedProdData}
+              region={selectedRegionName}
+              loading={loading || refreshing}
+            />
+            <FranceMap
+              regions={regions}
+              regionTotals={regionTotals}
+              regionConsommation={regionConsommation}
+              selectedCode={selectedRegion}
+              onSelect={handleRegionChange}
+              loading={loading}
+            />
+          </div>
+        )}
+
+        {/* ── Détail : mix par source + météo ── */}
+        {activeTab === 'detail' && !error && (
+          <div className="hero-grid">
+            <HistoryChart
+              data={aggregatedProdData}
+              region={selectedRegionName || 'France'}
+              loading={loading || refreshing}
+            />
+            <MeteoChart
+              data={aggregatedMeteoData}
+              region={selectedRegionName}
+              loading={drillLoading}
+            />
+          </div>
+        )}
+
+        {/* ── Prix négatifs ────────────────────────────────────────── */}
+        {activeTab === 'prices' && (
+          <div className="hero-grid hero-grid--single">
+            <CurtailmentCalendar
+              days={calendarDays}
+              range={calendarRange}
+              stats={calendarStats}
+              loading={calendarLoading || !calendarStats}
+            />
+          </div>
+        )}
       </div>
-
-      {error && (
-        <div className="glass-card chart-card chart-error" data-testid="app-error">
-          <p>Erreur : {error}</p>
-        </div>
-      )}
-
-      {/* ── Vue d'ensemble : le plus important — prod/conso + carte ── */}
-      {activeTab === 'overview' && !error && (
-        <div className="hero-grid">
-          <ProdConsChart
-            data={aggregatedProdData}
-            region={selectedRegionName}
-            loading={loading || refreshing}
-          />
-          <FranceMap
-            regions={regions}
-            regionTotals={regionTotals}
-            regionConsommation={regionConsommation}
-            selectedCode={selectedRegion}
-            onSelect={handleRegionChange}
-            loading={loading}
-          />
-        </div>
-      )}
-
-      {/* ── Détail : mix par source + météo ── */}
-      {activeTab === 'detail' && !error && (
-        <div className="hero-grid">
-          <HistoryChart
-            data={aggregatedProdData}
-            region={selectedRegionName || 'France'}
-            loading={loading || refreshing}
-          />
-          <MeteoChart
-            data={aggregatedMeteoData}
-            region={selectedRegionName}
-            loading={drillLoading}
-          />
-        </div>
-      )}
-
-      {/* ── Prix négatifs ────────────────────────────────────────── */}
-      {activeTab === 'prices' && (
-        <div className="hero-grid hero-grid--single">
-          <CurtailmentCalendar
-            days={calendarDays}
-            range={calendarRange}
-            stats={calendarStats}
-            loading={calendarLoading || !calendarStats}
-          />
-        </div>
-      )}
 
     </main>
   )
