@@ -1,3 +1,9 @@
+## [1.31.2](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.31.1...v1.31.2) (2026-09-04)
+
+### Bug Fixes
+
+* **dashboard:** paginate production API calls, fix national KPI aggregation ([e53d4b9](https://github.com/DVDJNBR/WATT_WATCHER/commit/e53d4b9fb126516864ce9746322b9e297fe340bf))
+
 ## [1.31.1](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.31.0...v1.31.1) (2026-08-31)
 
 ## [1.31.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.30.1...v1.31.0) (2026-08-31)
