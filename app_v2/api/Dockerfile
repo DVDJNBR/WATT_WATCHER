@@ -6,6 +6,7 @@ COPY api/requirements.txt ./requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY api/ ./api/
+COPY functions/shared/reference/production_unit_locations.json ./reference/production_unit_locations.json
 
 ENV PYTHONUNBUFFERED=1
 EXPOSE 8000

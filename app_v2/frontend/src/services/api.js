@@ -185,3 +185,14 @@ export async function fetchMaintenance({ regionCode, limit = 100 } = {}) {
 export async function fetchCurtailmentCalendar() {
   return apiGet('/v1/curtailment/calendar')
 }
+
+/**
+ * Fetch large production unit locations (nuclear plants, wind farms, dams...)
+ * for the map's source pictograms.
+ * @param {Object} params
+ * @param {string} [params.region]  full région name (e.g. "Bretagne"), not an INSEE code
+ * @returns {Promise<{data: Array, total_records: number}>}
+ */
+export async function fetchProductionUnits({ region } = {}) {
+  return apiGet('/v1/production/units', { region })
+}
