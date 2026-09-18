@@ -75,36 +75,48 @@ export async function fetchProduction({ regionCode, startDate, endDate, sourceTy
 }
 
 /**
- * Fetch every page of a paginated endpoint, following `total_records` until
- * exhausted. Needed because the API caps `limit` per request (1000 for
- * production/regional) — a wide date range x 12 regions can exceed that in
- * one page, so a single fetchProduction call silently truncates to the most
- * recent slice instead of the full requested range.
+ * Fetch every record of a paginated endpoint.
+ *
+ * query_production() (the only caller today) fetches and aggregates the
+ * *entire* requested date range internally in one DB query no matter what
+ * `limit` is passed — pagination only slices that already-computed result
+ * afterward. Chunking the fetch into 1000-row pages therefore used to mean
+ * ~9 sequential HTTP round-trips for a week of data, each one redoing that
+ * same full-range aggregation from scratch for nothing (confirmed: this
+ * was the dominant cost in the dashboard's ~20-25s cold load, well above
+ * the backend's actual per-query time). One request with a big enough
+ * limit does the same backend work exactly once.
  *
  * @param {(params: Object) => Promise<{data: Array, total_records: number}>} fetchFn
  * @param {Object} params
- * @param {number} pageSize
+ * @param {number} pageSize  Unused for the common single-shot path; only
+ *   sizes the fallback pages below (kept as a parameter so callers can tune
+ *   it, e.g. for endpoints with a smaller server-side limit cap).
  * @returns {Promise<{data: Array, total_records: number}>}
  */
 async function fetchAllPages(fetchFn, params, pageSize) {
-  // Safety net, not a real constraint: the widest quick-select is 30 days x
-  // 12 regions x 96 slots/day = ~34.5k rows. 45 pages @ 1000/page covers that
-  // with margin without risking an unbounded fetch loop on a bad response.
+  // Covers the widest range exposed in the UI (30 days x 12 regions x 96
+  // slots/day ≈ 34.5k aggregated records) in one request — matches the
+  // server-side cap in api/models.py.
+  const SINGLE_SHOT_LIMIT = 50000
+  // Safety net, not a real constraint, for the fallback path below.
   const MAX_PAGES = 45
 
-  // Page 0 tells us total_records; every remaining page is then known and
-  // independent, so fire them in parallel rather than one at a time — the
-  // backend still processes them sequentially (a 30-day/12-region range is
-  // ~35 pages and takes ~25s either way), but this at least avoids paying
-  // the browser's per-request round-trip serially on top of that.
-  const first = await fetchFn({ ...params, limit: pageSize, offset: 0 })
+  const first = await fetchFn({ ...params, limit: SINGLE_SHOT_LIMIT, offset: 0 })
   const firstData = first.data || []
   const total = first.total_records ?? firstData.length
-  const totalPages = Math.min(Math.ceil(total / pageSize), MAX_PAGES)
 
+  if (firstData.length >= total) {
+    return { data: firstData, total_records: total }
+  }
+
+  // Only reached for a range wider than SINGLE_SHOT_LIMIT can cover in one
+  // shot — not reachable via the UI's own controls, but a manually-typed
+  // date range could exceed it. Page the remainder the old way.
+  const totalPages = Math.min(Math.ceil(total / pageSize), MAX_PAGES)
   const rest = await Promise.all(
     Array.from({ length: Math.max(totalPages - 1, 0) }, (_, i) => {
-      const offset = (i + 1) * pageSize
+      const offset = firstData.length + i * pageSize
       return fetchFn({ ...params, limit: pageSize, offset }).then(r => r.data || [])
     })
   )
@@ -127,16 +139,18 @@ export async function fetchAllProduction(params = {}) {
  * last 30 days on purpose. An unbounded query has no WHERE clause to filter
  * on, so the backend falls back to sorting up to 700k rows with no index to
  * lean on; harmless while fact_energy_flow was small, but it now hangs
- * outright since the history backfill grew that table ~6x. The set of
- * active regions doesn't change day to day, so a bounded window returns the
- * same answer for a fraction of the cost.
+ * outright since the history backfill grew that table ~6x. All 12 regions
+ * report every 15 minutes, so even 2 days is generous margin for a brief
+ * regional outage — narrower than that just makes query_production's
+ * internal full-range aggregation (see fetchAllPages) needlessly expensive
+ * for a call that only needs "which regions exist right now."
  *
  * @returns {Promise<Array<{code_insee: string, region: string}>>}
  */
 export async function fetchRegions() {
   const end = new Date()
   const start = new Date(end)
-  start.setDate(start.getDate() - 30)
+  start.setDate(start.getDate() - 2)
   const iso = d => d.toISOString().slice(0, 10)
   const result = await fetchProduction({ limit: 1000, startDate: iso(start), endDate: iso(end) })
   const seen = new Map()

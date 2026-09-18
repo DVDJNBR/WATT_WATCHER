@@ -61,8 +61,16 @@ def parse_production_request(params: dict) -> tuple["ProductionRequest", Optiona
     except (ValueError, TypeError):
         return ProductionRequest(), "limit and offset must be integers"
 
-    if limit < 1 or limit > 1000:
-        return ProductionRequest(), "limit must be between 1 and 1000"
+    # query_production() already fetches and aggregates the *entire*
+    # requested date range internally in one query, independent of `limit`
+    # (see build_production_query's span-based sql_limit) — pagination only
+    # slices the already-computed result afterward. Capping this at 1000
+    # forced the frontend into ~9 sequential page requests per load, each
+    # one redoing that full-range aggregation from scratch for nothing.
+    # 50000 covers the widest range exposed in the UI (30 days, ~34.5k
+    # aggregated records) in a single request.
+    if limit < 1 or limit > 50000:
+        return ProductionRequest(), "limit must be between 1 and 50000"
     if offset < 0:
         return ProductionRequest(), "offset must be >= 0"
 

@@ -279,17 +279,22 @@ export default function DashboardPage() {
     }
   }, [])
 
-  // Initial load: fetch all regions without filter (choropleth view)
+  // Initial load: fetch all regions without filter (choropleth view).
+  // These three are independent of each other's *results* (loadData/
+  // loadDrillData don't need the regions list to run) — only firing them
+  // sequentially was serializing three separate network round-trips for no
+  // reason, so run them concurrently instead.
   useEffect(() => {
     let cancelled = false
     ;(async () => {
       setLoading(true)
-      const regsResult = await fetchRegions().catch(() => [])
+      const [regsResult] = await Promise.all([
+        fetchRegions().catch(() => []),
+        loadData('', startDate, endDate, true),
+        loadDrillData('', startDate, endDate),
+      ])
       if (!cancelled) {
         setRegions(regsResult)
-        // Load ALL regions data for the choropleth (no region filter)
-        await loadData('', startDate, endDate, true)
-        await loadDrillData('', startDate, endDate)
         setLoading(false)
       }
     })()

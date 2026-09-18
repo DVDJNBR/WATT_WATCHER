@@ -142,9 +142,9 @@ class TestModels:
         assert "integer" in err
 
     def test_parse_production_limit_out_of_range(self):
-        _, err = parse_production_request({"limit": "5000"})
+        _, err = parse_production_request({"limit": "50001"})
         assert err is not None
-        assert "1000" in err
+        assert "50000" in err
 
     def test_parse_production_negative_offset(self):
         _, err = parse_production_request({"offset": "-1"})
@@ -425,7 +425,7 @@ class TestHTTPIntegration:
         assert "request_id" in body
 
     def test_production_400_limit_too_high(self, client):
-        resp = client.get("/v1/production/regional", params={"limit": "9999"})
+        resp = client.get("/v1/production/regional", params={"limit": "50001"})
         assert resp.status_code == 400
 
     def test_production_404_no_data(self, client):
