@@ -1,3 +1,9 @@
+## [1.33.4](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.33.3...v1.33.4) (2026-09-18)
+
+### Bug Fixes
+
+* **dashboard:** region dropdown opens upward, discreet Maj text ([b4b1027](https://github.com/DVDJNBR/WATT_WATCHER/commit/b4b102781966aa0d18bfc8cea7acece0399a4e1b))
+
 ## [1.33.3](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.33.2...v1.33.3) (2026-09-18)
 
 ### Bug Fixes
