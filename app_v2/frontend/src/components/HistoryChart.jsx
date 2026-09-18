@@ -1,7 +1,15 @@
 /**
  * HistoryChart — production history for a selected region.
  *
- * Shows stacked area (production by source) + total production bold line.
+ * Overlaid (not stacked) areas per source — each line's height is that
+ * source's own value, directly comparable to the others. A stacked chart
+ * was tried first, but it has an unavoidable readability problem: the
+ * *bottom* series in a stack only ever shows its own value (nothing added
+ * below it), while every series above it shows a cumulative sum that's
+ * always higher — so the single dominant source (Nucléaire, ~70% of the
+ * mix) structurally ends up with the *lowest* line on the chart, no matter
+ * what order the stack is in. Overlaying instead of stacking removes that
+ * cumulative-sum confusion entirely: line height = actual value, period.
  * Displayed below the France map when a region is selected.
  */
 import {
@@ -40,13 +48,7 @@ function transformData(data) {
   return data.map(r => ({ timestamp: formatTs(r.timestamp), ...r.sources }))
 }
 
-/**
- * Sources ordered by total magnitude, largest first — stacked area charts
- * are read by band thickness, but a peaky small source stacked *above* a
- * flatter large one (e.g. Solaire above Nucléaire, arbitrary insertion
- * order) visually reads as bigger since its peak reaches higher on the
- * page. Largest at the bottom gives a stable, correctly-dominant base band.
- */
+/** Sources ordered by total magnitude, largest first — drives the legend's reading order. */
 function deriveAllSources(chartData) {
   const totals = new Map()
   for (const row of chartData) {
@@ -114,10 +116,15 @@ export function HistoryChart({ data, region, loading = false }) {
             areas — and their day gridlines — aligned when stacked. */}
         <ComposedChart data={chartData} margin={{ top: 8, right: 120, left: 0, bottom: 0 }}>
           <defs>
+            {/* Fills stay faint (max 0.18, was 0.35) — these now overlap
+                instead of stacking, so several fills can sit on top of each
+                other at once; a subtler fill keeps the overlap legible
+                instead of turning into a muddy blend. The stroke lines
+                (fully opaque) carry the actual comparison. */}
             {sources.map(src => (
               <linearGradient key={src} id={`hgrad-${src}`} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%"  stopColor={SOURCE_COLORS[src] || '#888'} stopOpacity={0.35} />
-                <stop offset="95%" stopColor={SOURCE_COLORS[src] || '#888'} stopOpacity={0.04} />
+                <stop offset="5%"  stopColor={SOURCE_COLORS[src] || '#888'} stopOpacity={0.18} />
+                <stop offset="95%" stopColor={SOURCE_COLORS[src] || '#888'} stopOpacity={0.02} />
               </linearGradient>
             ))}
           </defs>
@@ -131,9 +138,7 @@ export function HistoryChart({ data, region, loading = false }) {
             // declaration order and an explicit `payload` override here —
             // observed alphabetical by raw dataKey regardless. A custom
             // content renderer is the only way to actually guarantee the
-            // legend's reading order matches the stack's bottom-to-top
-            // order (largest first) instead of two different orderings on
-            // the same chart.
+            // legend reads largest-first, matching the sources array.
             content={() => (
               <ul className="history-legend">
                 {sources.map(src => (
@@ -146,16 +151,20 @@ export function HistoryChart({ data, region, loading = false }) {
             )}
           />
 
-          {/* Stacked areas per source */}
+          {/* Overlaid (not stacked) — each drawn independently from 0, so a
+              line's height is that source's own value. Rendered largest
+              first (sources is sorted descending) so smaller series' lines
+              draw on top and stay visible instead of hiding under
+              Nucléaire's much taller fill. */}
           {sources.map(src => (
             <Area
               key={src}
               type="monotone"
               dataKey={src}
-              stackId="sources"
               stroke={SOURCE_COLORS[src] || '#888'}
               fill={`url(#hgrad-${src})`}
               strokeWidth={1.5}
+              isAnimationActive={false}
             />
           ))}
         </ComposedChart>
