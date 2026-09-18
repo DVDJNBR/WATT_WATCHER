@@ -1,3 +1,9 @@
+## [1.33.2](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.33.1...v1.33.2) (2026-09-18)
+
+### Bug Fixes
+
+* **dashboard:** stack order + legend order + mix bar precision ([3b83b3c](https://github.com/DVDJNBR/WATT_WATCHER/commit/3b83b3c3bb4bb671ed0dd052151b2ddd33360105))
+
 ## [1.33.1](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.33.0...v1.33.1) (2026-09-18)
 
 ### Performance Improvements
