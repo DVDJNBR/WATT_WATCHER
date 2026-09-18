@@ -40,14 +40,22 @@ function transformData(data) {
   return data.map(r => ({ timestamp: formatTs(r.timestamp), ...r.sources }))
 }
 
+/**
+ * Sources ordered by total magnitude, largest first — stacked area charts
+ * are read by band thickness, but a peaky small source stacked *above* a
+ * flatter large one (e.g. Solaire above Nucléaire, arbitrary insertion
+ * order) visually reads as bigger since its peak reaches higher on the
+ * page. Largest at the bottom gives a stable, correctly-dominant base band.
+ */
 function deriveAllSources(chartData) {
-  const seen = new Set()
+  const totals = new Map()
   for (const row of chartData) {
-    for (const key of Object.keys(row)) {
-      if (key !== 'timestamp') seen.add(key)
+    for (const [key, val] of Object.entries(row)) {
+      if (key === 'timestamp') continue
+      if (typeof val === 'number') totals.set(key, (totals.get(key) || 0) + val)
     }
   }
-  return Array.from(seen)
+  return Array.from(totals.keys()).sort((a, b) => totals.get(b) - totals.get(a))
 }
 
 const tooltipStyle = {
@@ -119,9 +127,23 @@ export function HistoryChart({ data, region, loading = false }) {
           <YAxis tick={{ fill: '#9a9a9e', fontSize: 11 }} unit=" MW" width={50} />
           <Tooltip {...tooltipStyle} />
           <Legend
-            formatter={name => SOURCE_LABELS[name] || name}
-            wrapperStyle={{ fontSize: 10, paddingTop: 4, lineHeight: 1.4 }}
-            iconSize={7}
+            // Recharts' auto-generated legend order ignores both children
+            // declaration order and an explicit `payload` override here —
+            // observed alphabetical by raw dataKey regardless. A custom
+            // content renderer is the only way to actually guarantee the
+            // legend's reading order matches the stack's bottom-to-top
+            // order (largest first) instead of two different orderings on
+            // the same chart.
+            content={() => (
+              <ul className="history-legend">
+                {sources.map(src => (
+                  <li key={src} className="history-legend__item">
+                    <span className="history-legend__dot" style={{ background: SOURCE_COLORS[src] || '#888' }} />
+                    {SOURCE_LABELS[src] || src}
+                  </li>
+                ))}
+              </ul>
+            )}
           />
 
           {/* Stacked areas per source */}

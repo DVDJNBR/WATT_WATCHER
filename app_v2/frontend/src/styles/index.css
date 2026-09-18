@@ -772,6 +772,32 @@ body {
 }
 
 .chart-error { color: #ef4444; }
+
+/* Custom legend for HistoryChart — bypasses recharts' auto-generated
+   legend, which ignores declaration order (observed alphabetical by raw
+   dataKey), so it can match the stack's bottom-to-top order instead. */
+.history-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  list-style: none;
+  padding: 0;
+  margin: 4px 0 0;
+  font-size: 0.625rem;
+  color: var(--color-text-muted);
+}
+.history-legend__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+.history-legend__dot {
+  flex: 0 0 auto;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
 .chart-error p { font-size: 0.875rem; }
 
 /* ── Empty state ──────────────────────────────────────────────────────────── */
