@@ -87,6 +87,17 @@ class DimLoader:
                     UNIQUE(id_region, id_source, annee)
                 );
 
+                -- RTE's national eco2mix dataset is the only one that splits fossil
+                -- thermal by fuel type (gaz/charbon/fioul) — the regional feed only
+                -- ever carries a combined "thermique" figure. No region dimension here.
+                CREATE TABLE IF NOT EXISTS FACT_NATIONAL_MIX (
+                    id_fact INTEGER PRIMARY KEY AUTOINCREMENT,
+                    id_date INTEGER NOT NULL REFERENCES DIM_TIME(id_date),
+                    id_source INTEGER NOT NULL REFERENCES DIM_SOURCE(id_source),
+                    valeur_mw REAL NOT NULL,
+                    UNIQUE(id_date, id_source)
+                );
+
                 CREATE TABLE IF NOT EXISTS FACT_MAINTENANCE (
                     id_fact INTEGER PRIMARY KEY AUTOINCREMENT,
                     event_id TEXT NOT NULL UNIQUE,
@@ -105,6 +116,15 @@ class DimLoader:
                     price_eur_mwh REAL NOT NULL,
                     retrieved_at TEXT NOT NULL,
                     UNIQUE(id_date)
+                );
+
+                CREATE TABLE IF NOT EXISTS FACT_CROSS_BORDER_FLOW (
+                    id_fact INTEGER PRIMARY KEY AUTOINCREMENT,
+                    id_date INTEGER NOT NULL REFERENCES DIM_TIME(id_date),
+                    border_code TEXT NOT NULL,
+                    flow_mw REAL NOT NULL,
+                    retrieved_at TEXT NOT NULL,
+                    UNIQUE(id_date, border_code)
                 );
             """)
             self.conn.commit()
@@ -177,6 +197,16 @@ class DimLoader:
                        annee                   INT             NULL,
                        UNIQUE (id_region, id_source, annee)
                    )""",
+                # RTE's national eco2mix dataset is the only one that splits fossil
+                # thermal by fuel type (gaz/charbon/fioul) — the regional feed only
+                # ever carries a combined "thermique" figure. No region dimension here.
+                """CREATE TABLE IF NOT EXISTS fact_national_mix (
+                       id_fact         BIGSERIAL       PRIMARY KEY,
+                       id_date         INT             NOT NULL REFERENCES dim_time(id_date),
+                       id_source       INT             NOT NULL REFERENCES dim_source(id_source),
+                       valeur_mw       NUMERIC(10,2)   NOT NULL,
+                       UNIQUE (id_date, id_source)
+                   )""",
                 """CREATE TABLE IF NOT EXISTS fact_maintenance (
                        id_fact         BIGSERIAL       PRIMARY KEY,
                        event_id        VARCHAR(100)    NOT NULL UNIQUE,
@@ -196,6 +226,15 @@ class DimLoader:
                        UNIQUE (id_date)
                    )""",
                 "CREATE INDEX IF NOT EXISTS ix_fact_market_price_date ON fact_market_price (id_date)",
+                """CREATE TABLE IF NOT EXISTS fact_cross_border_flow (
+                       id_fact         BIGSERIAL       PRIMARY KEY,
+                       id_date         INT             NOT NULL REFERENCES dim_time(id_date),
+                       border_code     VARCHAR(8)      NOT NULL,
+                       flow_mw         NUMERIC(10,2)   NOT NULL,
+                       retrieved_at    TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
+                       UNIQUE (id_date, border_code)
+                   )""",
+                "CREATE INDEX IF NOT EXISTS ix_fact_cross_border_date ON fact_cross_border_flow (id_date)",
             ]
             for stmt in statements:
                 cursor.execute(stmt)
@@ -310,6 +349,7 @@ class DimLoader:
                 {"source_name": "charbon", "is_green": False},
                 {"source_name": "fioul", "is_green": False},
                 {"source_name": "bioenergies", "is_green": True},
+                {"source_name": "thermique", "is_green": False},
             ]
 
         cursor = self.conn.cursor()

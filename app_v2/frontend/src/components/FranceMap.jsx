@@ -1,91 +1,21 @@
 /**
  * FranceMap — choropleth map of the 13 French metropolitan regions.
  *
- * Each region is colored by its latest total production (MW) — dark blue
- * for low, bright blue for high. Hovering shows name + value.
+ * Modes recolor + relabel the same map rather than switching components,
+ * so it stays visually anchored in the same spot across every dashboard tab.
  * Clicking a region triggers onSelect(code_insee) for drill-down.
+ *
+ * Production-unit pins used to live here (fetched per selected region) —
+ * moved out entirely: showing installations on every tab's map was noise,
+ * they now only appear once, on the dedicated MaintenanceMap.
  */
-import { memo, useState, useEffect, useMemo } from 'react'
+import { memo, useState, useMemo } from 'react'
 import { ComposableMap, Geographies, Geography, Marker, ZoomableGroup } from 'react-simple-maps'
-import { fetchProductionUnits } from '../services/api.js'
+import { geoCentroid } from 'd3-geo'
 
 const GEO_URL = '/france-regions.geojson'
 
 const PROJECTION_CONFIG = { center: [2.5, 46.5], scale: 2200 }
-
-// Simple geometric line-icons, one per ENTSO-E psr_type family — same visual
-// language as the nav icons (Layout.jsx): stroke-only, no fills, no emoji.
-const SOURCE_ICON_PATHS = {
-  nuclear: (
-    <>
-      <circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none" />
-      <ellipse cx="12" cy="12" rx="9" ry="3.6" />
-      <ellipse cx="12" cy="12" rx="9" ry="3.6" transform="rotate(60 12 12)" />
-      <ellipse cx="12" cy="12" rx="9" ry="3.6" transform="rotate(120 12 12)" />
-    </>
-  ),
-  wind_offshore: (
-    <>
-      <circle cx="12" cy="12" r="1.3" fill="currentColor" stroke="none" />
-      <path d="M12 12 4 9.5" />
-      <path d="M12 12 17.5 4.5" />
-      <path d="M12 12 15 19.5" />
-    </>
-  ),
-  hydro: (
-    <path d="M4 15c1.6-2 3.4-2 5 0s3.4 2 5 0 3.4-2 5 0M4 19c1.6-2 3.4-2 5 0s3.4 2 5 0 3.4-2 5 0" />
-  ),
-  fossil_gas: (
-    <path d="M12 3c-3 4-5 6-5 9.5A5 5 0 0 0 12 17.5a5 5 0 0 0 5-5c0-1.5-1-2.5-2-3 .3 2-1 3-1.5 3-1 0-1-1-1-1.5C12.5 8 12 5 12 3Z" />
-  ),
-  other: <circle cx="12" cy="12" r="4" />,
-}
-
-const SOURCE_LABEL = {
-  nuclear: 'Nucléaire',
-  wind_offshore: 'Éolien',
-  hydro_water_reservoir: 'Hydraulique',
-  hydro_run_of_river: 'Hydraulique',
-  hydro_pumped_storage: 'Hydraulique (STEP)',
-  fossil_gas: 'Gaz',
-  fossil_oil: 'Fioul',
-  fossil_hard_coal: 'Charbon',
-  other: 'Autre',
-}
-
-function iconKeyFor(psrType) {
-  if (psrType === 'nuclear') return 'nuclear'
-  if (psrType === 'wind_offshore') return 'wind_offshore'
-  if (psrType?.startsWith('hydro')) return 'hydro'
-  if (psrType === 'fossil_gas') return 'fossil_gas'
-  return 'other'
-}
-
-/** A production-unit pictogram: small circular badge + the matching source icon. */
-function UnitMarker({ unit }) {
-  const key = iconKeyFor(unit.psr_type)
-  return (
-    <Marker coordinates={[unit.lon, unit.lat]}>
-      <title>{`${unit.name} — ${SOURCE_LABEL[unit.psr_type] || 'Autre'}`}</title>
-      <circle r={6} fill="#121214" stroke="#2dd4bf" strokeWidth={1.2} />
-      <g transform="translate(-4,-4) scale(0.33)" fill="none" stroke="#2dd4bf" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-        {SOURCE_ICON_PATHS[key]}
-      </g>
-    </Marker>
-  )
-}
-
-// A per-region prod/conso ratio isn't a meaningful "surproduction" signal:
-// French regions aren't independent grids — nuclear-heavy regions
-// structurally export several times their own consumption to neighbouring
-// regions as their permanent, normal state (e.g. Centre-Val de Loire sits
-// around +300% essentially always), while import-dependent regions like
-// Île-de-France sit permanently around -95%. There is no fixed threshold
-// that means "anomaly" across regions this different — so the map colours
-// by production volume instead, and the one place that surfaces a
-// (nationally calibrated) surplus signal is the production/consumption
-// chart, where prod-vs-conso is at least measured on the same national
-// market the French price actually clears on.
 
 const LOW_COLOR  = [24, 45, 44]     // dim, desaturated teal
 const HIGH_COLOR = [45, 212, 191]   // #2dd4bf — accent teal
@@ -97,6 +27,37 @@ function volumeColor(prod, maxProd) {
   const t = maxProd > 0 ? Math.min(1, Math.max(0, prod / maxProd)) : 0
   const [r, g, b] = LOW_COLOR.map((c, i) => lerp(c, HIGH_COLOR[i], t))
   return `rgb(${r}, ${g}, ${b})`
+}
+
+/** Same 4 thresholds as the national carbon badge — green<100, lime<250, amber<400, red>=400. */
+function carbonColor(intensity) {
+  if (intensity == null) return '#1c2538'
+  if (intensity < 100) return '#10b981'
+  if (intensity < 250) return '#84cc16'
+  if (intensity < 400) return '#f59e0b'
+  return '#ef4444'
+}
+
+// Diverging color for "export" mode: how far a region's own production sits
+// above (teal, structural exporter) or below (amber, structural importer)
+// its own consumption — not a claim about physical flow direction, French
+// regions share one grid, but a legible proxy for "who's a net contributor".
+function balanceColor(ratio) {
+  if (ratio == null) return '#1c2538'
+  const t = Math.max(-1, Math.min(1, ratio / 2))  // ±200% saturates the scale
+  if (t >= 0) {
+    const [r, g, b] = [24, 45, 44].map((c, i) => lerp(c, [45, 212, 191][i], t))
+    return `rgb(${r}, ${g}, ${b})`
+  }
+  const [r, g, b] = [45, 40, 24].map((c, i) => lerp(c, [245, 158, 11][i], -t))
+  return `rgb(${r}, ${g}, ${b})`
+}
+
+const MODE_LABELS = {
+  volume:  'Production par région',
+  carbon:  'Intensité carbone par région',
+  share:   'Part de la production nationale',
+  balance: 'Régions exportatrices / importatrices',
 }
 
 /**
@@ -113,9 +74,13 @@ export const FranceMap = memo(function FranceMap({
   regions = [],
   regionTotals = {},
   regionConsommation = {},
+  regionCarbon = {},   // { [code_insee]: gCO2/kWh } — used when mode="carbon"
   selectedCode,
   onSelect,
   loading = false,
+  mode = 'volume',       // 'volume' | 'carbon' | 'share' | 'balance'
+  onModeChange = null,   // (mode) => void — omit to hide the toggle
+  availableModes = ['volume', 'carbon', 'share'],
 }) {
   const [hovered, setHovered] = useState(null)   // { name, prod, conso, x, y }
   const [position, setPosition] = useState({ coordinates: [2.5, 46.5], zoom: 1 })
@@ -126,37 +91,47 @@ export const FranceMap = memo(function FranceMap({
     () => Math.max(0, ...Object.values(regionTotals)),
     [regionTotals]
   )
-
-  // Production-unit pictograms: only fetched (and only shown) once a région
-  // is selected — 120 pins on the national view would just be noise.
-  const [units, setUnits] = useState([])
-  useEffect(() => {
-    if (!selectedRegionName) { setUnits([]); return }
-    let cancelled = false
-    fetchProductionUnits({ region: selectedRegionName })
-      .then(res => { if (!cancelled) setUnits(res.data || []) })
-      .catch(() => { if (!cancelled) setUnits([]) })
-    return () => { cancelled = true }
-  }, [selectedRegionName])
+  const nationalTotal = useMemo(
+    () => Object.values(regionTotals).reduce((s, v) => s + v, 0),
+    [regionTotals]
+  )
 
   return (
     <section className="glass-card map-card" data-testid="france-map">
       <div className="map-header">
         <h2 className="chart-title">
-          Production par région
+          {MODE_LABELS[mode]}
           {selectedRegionName && (
             <span className="map-selected-label"> — {selectedRegionName}</span>
           )}
         </h2>
-        {selectedCode && (
-          <button
-            className="btn btn-ghost btn-xs"
-            onClick={() => onSelect('')}
-            title="Revenir à la vue nationale"
-          >
-            ← Vue nationale
-          </button>
-        )}
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          {onModeChange && (
+            <div className="tab-bar" role="tablist" aria-label="Mode de la carte" style={{ padding: 0 }}>
+              {[
+                { id: 'volume',  label: 'Volume' },
+                { id: 'carbon',  label: 'Carbone' },
+                { id: 'share',   label: 'Part nat.' },
+                { id: 'balance', label: 'Export/Import' },
+              ].filter(m => availableModes.includes(m.id)).map(m => (
+                <button key={m.id} role="tab" aria-selected={mode === m.id}
+                  className={`tab-bar__item${mode === m.id ? ' tab-bar__item--active' : ''}`}
+                  onClick={() => onModeChange(m.id)}>
+                  {m.label}
+                </button>
+              ))}
+            </div>
+          )}
+          {selectedCode && (
+            <button
+              className="btn btn-ghost btn-xs"
+              onClick={() => onSelect('')}
+              title="Revenir à la vue nationale"
+            >
+              ← Vue nationale
+            </button>
+          )}
+        </div>
       </div>
 
       {loading ? (
@@ -186,11 +161,18 @@ export const FranceMap = memo(function FranceMap({
                   const hasData    = availableCodes.has(code)
                   const prod       = regionTotals[code] ?? 0
                   const conso      = regionConsommation[code] ?? null
+                  const carbon     = regionCarbon[code] ?? null
+                  const share      = nationalTotal > 0 ? (prod / nationalTotal) * 100 : 0
+                  const balance    = conso != null && conso > 0 ? (prod - conso) / conso : null
                   const fill       = isSelected
                     ? '#2dd4bf'
-                    : hasData
-                    ? volumeColor(prod, maxProd)
-                    : '#1c2538'
+                    : !hasData
+                    ? '#1c2538'
+                    : mode === 'carbon'
+                    ? carbonColor(carbon)
+                    : mode === 'balance'
+                    ? balanceColor(balance)
+                    : volumeColor(prod, maxProd)
 
                   return (
                     <Geography
@@ -199,7 +181,7 @@ export const FranceMap = memo(function FranceMap({
                       onClick={() => hasData && onSelect(code)}
                       onMouseEnter={e => {
                         if (!hasData) return
-                        setHovered({ name: nom, prod, conso, x: e.clientX, y: e.clientY })
+                        setHovered({ name: nom, prod, conso, carbon, share, balance, x: e.clientX, y: e.clientY })
                       }}
                       onMouseMove={e => {
                         if (hovered) setHovered(h => ({ ...h, x: e.clientX, y: e.clientY }))
@@ -228,7 +210,32 @@ export const FranceMap = memo(function FranceMap({
                 })
               }
             </Geographies>
-            {units.map(unit => <UnitMarker key={unit.name} unit={unit} />)}
+            {mode === 'volume' && (
+              <Geographies geography={GEO_URL}>
+                {({ geographies }) =>
+                  geographies
+                    .filter(geo => availableCodes.has(geo.properties.code) && geo.properties.code !== selectedCode)
+                    .map(geo => {
+                      const code = geo.properties.code
+                      const prod = regionTotals[code] ?? 0
+                      const pct = nationalTotal > 0 ? (prod / nationalTotal) * 100 : 0
+                      const centroid = geoCentroid(geo)
+                      return (
+                        <Marker key={geo.rsmKey} coordinates={centroid}>
+                          <text textAnchor="middle" y={-2} className="map-region-label"
+                            style={{ fontSize: 9, fontWeight: 700, fill: '#fff', pointerEvents: 'none' }}>
+                            {Math.round(prod).toLocaleString('fr-FR')} MW
+                          </text>
+                          <text textAnchor="middle" y={9} className="map-region-label"
+                            style={{ fontSize: 8, fontWeight: 600, fill: '#fff', opacity: 0.95, pointerEvents: 'none' }}>
+                            {pct.toFixed(1)}%
+                          </text>
+                        </Marker>
+                      )
+                    })
+                }
+              </Geographies>
+            )}
             </ZoomableGroup>
           </ComposableMap>
 
@@ -242,7 +249,22 @@ export const FranceMap = memo(function FranceMap({
               <span className="map-tooltip__value">
                 {Math.round(hovered.prod).toLocaleString('fr-FR')} MW prod.
               </span>
-              {hovered.conso != null && (
+              {mode === 'carbon' && hovered.carbon != null && (
+                <span style={{ color: carbonColor(hovered.carbon), fontSize: '0.75rem' }}>
+                  {hovered.carbon} gCO₂/kWh
+                </span>
+              )}
+              {mode === 'share' && (
+                <span style={{ color: '#2dd4bf', fontSize: '0.75rem' }}>
+                  {hovered.share.toFixed(1)} % de la prod. nationale
+                </span>
+              )}
+              {mode === 'balance' && (
+                <span style={{ color: hovered.balance >= 0 ? '#2dd4bf' : '#f59e0b', fontSize: '0.75rem' }}>
+                  {hovered.balance != null ? `${hovered.balance >= 0 ? '+' : ''}${Math.round(hovered.balance * 100)} % vs sa conso.` : '—'}
+                </span>
+              )}
+              {mode === 'volume' && hovered.conso != null && (
                 <span style={{ color: '#f59e0b', fontSize: '0.75rem' }}>
                   {Math.round(hovered.conso).toLocaleString('fr-FR')} MW conso.
                 </span>
@@ -252,10 +274,27 @@ export const FranceMap = memo(function FranceMap({
         </div>
       )}
 
-      {/* Volume legend */}
-      {!loading && (
+      {!loading && mode === 'carbon' && (
         <div className="map-legend">
-          <span className="map-legend__item">Production</span>
+          <span className="map-legend__item" style={{ color: '#10b981' }}>● &lt;100</span>
+          <span className="map-legend__item" style={{ color: '#84cc16' }}>● &lt;250</span>
+          <span className="map-legend__item" style={{ color: '#f59e0b' }}>● &lt;400</span>
+          <span className="map-legend__item" style={{ color: '#ef4444' }}>● ≥400 gCO₂/kWh</span>
+        </div>
+      )}
+      {!loading && mode === 'balance' && (
+        <div className="map-legend">
+          <span className="map-legend__item" style={{ color: '#f59e0b' }}>● Importatrice</span>
+          <span
+            className="map-legend__gradient"
+            style={{ background: `linear-gradient(90deg, #f59e0b, rgb(45,40,24), rgb(24,45,44), #2dd4bf)` }}
+          />
+          <span className="map-legend__item" style={{ color: '#2dd4bf' }}>● Exportatrice</span>
+        </div>
+      )}
+      {!loading && (mode === 'volume' || mode === 'share') && (
+        <div className="map-legend">
+          <span className="map-legend__item">{mode === 'share' ? 'Part nationale' : 'Production'}</span>
           <span
             className="map-legend__gradient"
             style={{ background: `linear-gradient(90deg, rgb(${LOW_COLOR.join(',')}), rgb(${HIGH_COLOR.join(',')}))` }}
@@ -267,8 +306,8 @@ export const FranceMap = memo(function FranceMap({
 
       <p className="map-hint">
         {selectedCode
-          ? `${units.length ? `${units.length} installation${units.length > 1 ? 's' : ''} affichée${units.length > 1 ? 's' : ''} · ` : ''}Cliquez sur une autre région pour comparer · ← Vue nationale pour revenir`
-          : 'Cliquez sur une région pour afficher son historique et ses principales installations'}
+          ? 'Cliquez sur une autre région pour comparer · ← Vue nationale pour revenir'
+          : 'Cliquez sur une région pour afficher son historique'}
       </p>
     </section>
   )

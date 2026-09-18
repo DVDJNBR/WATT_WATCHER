@@ -47,6 +47,8 @@ export const CurtailmentCalendar = memo(function CurtailmentCalendar({
   range,
   stats,
   loading = false,
+  hideStats = false,
+  compact = false,
 }) {
   const [hovered, setHovered] = useState(null)
 
@@ -86,14 +88,14 @@ export const CurtailmentCalendar = memo(function CurtailmentCalendar({
   }, [days, range])
 
   return (
-    <section className="glass-card content-card" data-testid="curtailment-calendar">
+    <section className={`glass-card content-card${compact ? ' chart-card' : ''}`} data-testid="curtailment-calendar">
       <p className="content-kicker">Prix négatifs — fréquence et intensité</p>
 
       {loading ? (
         <div className="skeleton" style={{ height: 260, marginTop: 16 }} />
       ) : (
         <>
-          <div className="curtailment-stats">
+          {!hideStats && <div className="curtailment-stats">
             <div className="curtailment-stat">
               <span className="curtailment-stat__value">{stats.total_hours}h</span>
               <span className="curtailment-stat__label">à prix négatif sur {stats.total_days} jours ({range?.start && formatMonthYear(range.start)} → {range?.end && formatMonthYear(range.end)})</span>
@@ -106,7 +108,7 @@ export const CurtailmentCalendar = memo(function CurtailmentCalendar({
                 record le {stats.record_date && formatDateLong(stats.record_date)}
               </span>
             </div>
-          </div>
+          </div>}
 
           <div className="curtailment-calendar-wrap">
             <div className="curtailment-calendar-months">

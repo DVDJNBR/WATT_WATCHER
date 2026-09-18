@@ -31,9 +31,24 @@ FRANCE_DOMAIN = "10YFR-RTE------C"  # single national bidding zone (EIC code)
 DOCUMENT_TYPE_DAY_AHEAD_PRICES = "A44"
 DOCUMENT_TYPE_UNAVAILABILITY_PRODUCTION = "A77"
 DOCUMENT_TYPE_ACTUAL_GENERATION_PER_UNIT = "A73"
+DOCUMENT_TYPE_CROSS_BORDER_PHYSICAL_FLOW = "A11"
 PROCESS_TYPE_REALISED = "A16"
 BUSINESS_TYPE_LABELS = {"A53": "planned", "A54": "unplanned"}
 REQUEST_TIMEOUT = 30
+
+# France's four directly-interconnected borders that RTE eco2mix itself
+# reports individually (it groups Germany+Belgium into one "Core" figure,
+# skipped here — a fifth interconnector, not one of these four, would be
+# needed to add it, and it's not required for a first cut). EIC bidding-zone
+# codes are stable identifiers, not guesses, but verify against ENTSO-E's
+# published Area list (https://www.entsoe.eu/data/energy-identification-codes-eic/)
+# if a border ever comes back structurally empty rather than "no flow".
+BORDER_DOMAINS = {
+    "GB": "10YGB----------A",   # Great Britain
+    "CH": "10YCH-SWISSGRIDZ",   # Switzerland
+    "IT": "10Y1001A1001A73I",   # Italy, IT-Nord zone (the one bordering France)
+    "ES": "10YES-REE------0",   # Spain
+}
 
 # ENTSO-E PSR (Power System Resource) type codes, EIC standard — used to
 # label each unit's fuel/technology on the A73 generation-unit registry.
@@ -111,6 +126,90 @@ class EntsoeClient:
             )
 
         return self._parse_price_document(response.text)
+
+    def fetch_cross_border_physical_flow(
+        self, out_domain: str, in_domain: str, period_start: datetime, period_end: datetime
+    ) -> list[dict]:
+        """
+        Fetch physical MW flow (A11) FROM out_domain TO in_domain, in
+        [period_start, period_end) (UTC). Unlike commercial trade, physical
+        flow is always reported as a positive quantity in one direction —
+        there is no "negative export"; a border's net position is the
+        caller's job (fetch both directions, subtract).
+
+        Returns:
+            List of {"timestamp": datetime (UTC), "flow_mw": float}.
+
+        Raises:
+            EntsoeClientError: missing token, HTTP failure, or a request
+                ENTSO-E itself rejected.
+        """
+        if not self.api_token:
+            raise EntsoeClientError("ENTSOE_API_TOKEN not configured")
+
+        params = {
+            "securityToken": self.api_token,
+            "documentType": DOCUMENT_TYPE_CROSS_BORDER_PHYSICAL_FLOW,
+            "out_Domain": out_domain,
+            "in_Domain": in_domain,
+            "periodStart": period_start.strftime("%Y%m%d%H%M"),
+            "periodEnd": period_end.strftime("%Y%m%d%H%M"),
+        }
+
+        try:
+            response = self.session.get(BASE_URL, params=params, timeout=REQUEST_TIMEOUT)
+        except requests.exceptions.RequestException as exc:
+            raise EntsoeClientError(f"Request failed: {exc}") from exc
+
+        if response.status_code == 401:
+            raise EntsoeClientError("Invalid or missing ENTSO-E security token")
+        if response.status_code != 200:
+            raise EntsoeClientError(
+                f"HTTP {response.status_code}: {response.text[:200]}"
+            )
+
+        return self._parse_flow_document(response.text)
+
+    @staticmethod
+    def _parse_flow_document(xml_text: str) -> list[dict]:
+        """
+        Parse an A11 Publication_MarketDocument into flat flow records.
+
+        Namespace-agnostic (`{*}` wildcards) like the outages parser, not
+        pinned like the price parser — A11's schema URI hasn't been
+        cross-checked against a live response the way A44's has.
+        """
+        try:
+            root = ET.fromstring(xml_text)
+        except ET.ParseError as exc:
+            raise EntsoeClientError(f"Malformed XML response: {exc}") from exc
+
+        if root.tag.endswith("Acknowledgement_MarketDocument"):
+            reason = root.findtext(".//{*}Reason/{*}text") or "no reason given"
+            logger.info("ENTSO-E cross-border flow: %s (likely just 'nothing in range')", reason)
+            return []
+
+        records: list[dict] = []
+        for period in root.findall(".//{*}TimeSeries/{*}Period"):
+            start_str = period.findtext("{*}timeInterval/{*}start")
+            resolution = period.findtext("{*}resolution")
+            step = _RESOLUTION_STEP.get(resolution or "")
+            if not start_str or step is None:
+                logger.warning("Skipping flow Period with unhandled resolution %r", resolution)
+                continue
+
+            period_start = datetime.strptime(start_str, "%Y-%m-%dT%H:%MZ").replace(tzinfo=timezone.utc)
+
+            for point in period.findall("{*}Point"):
+                position_str = point.findtext("{*}position")
+                quantity_str = point.findtext("{*}quantity")
+                if position_str is None or quantity_str is None:
+                    continue
+                position = int(position_str)
+                ts = period_start + step * (position - 1)
+                records.append({"timestamp": ts, "flow_mw": float(quantity_str)})
+
+        return records
 
     def fetch_unavailability_of_production_units(
         self, period_start: datetime, period_end: datetime

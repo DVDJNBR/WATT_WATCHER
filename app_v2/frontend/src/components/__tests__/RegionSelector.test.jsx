@@ -1,5 +1,9 @@
 /**
  * RegionSelector tests — Story 5.1, Task 6.1
+ *
+ * RegionSelector is a custom button+listbox dropdown (not a native
+ * <select> — see the component's own docstring for why), so these open it
+ * via the trigger button before asserting on its options.
  */
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
@@ -12,39 +16,49 @@ const REGIONS = [
 ]
 
 describe('RegionSelector', () => {
-  it('renders label and select', () => {
+  it('renders label and trigger button', () => {
     render(<RegionSelector regions={[]} selected="" onChange={() => {}} />)
     expect(screen.getByTestId('region-selector')).toBeInTheDocument()
     expect(screen.getByTestId('region-select')).toBeInTheDocument()
     expect(screen.getByText('Région')).toBeInTheDocument()
   })
 
-  it('renders "Toutes les régions" default option', () => {
+  it('shows "Toutes" as the closed-state label when nothing is selected', () => {
     render(<RegionSelector regions={[]} selected="" onChange={() => {}} />)
+    expect(screen.getByTestId('region-select')).toHaveTextContent('Toutes')
+  })
+
+  it('renders "Toutes les régions" default option in the open list', async () => {
+    const user = userEvent.setup()
+    render(<RegionSelector regions={[]} selected="" onChange={() => {}} />)
+    await user.click(screen.getByTestId('region-select'))
     expect(screen.getByText('Toutes les régions')).toBeInTheDocument()
   })
 
-  it('renders all region options', () => {
+  it('renders all region options in the open list', async () => {
+    const user = userEvent.setup()
     render(<RegionSelector regions={REGIONS} selected="" onChange={() => {}} />)
+    await user.click(screen.getByTestId('region-select'))
     expect(screen.getByText('Île-de-France')).toBeInTheDocument()
     expect(screen.getByText('Auvergne-Rhône-Alpes')).toBeInTheDocument()
   })
 
-  it('calls onChange when user selects a region', async () => {
+  it('calls onChange when user picks a region', async () => {
     const user = userEvent.setup()
     const onChange = vi.fn()
     render(<RegionSelector regions={REGIONS} selected="" onChange={onChange} />)
-    await user.selectOptions(screen.getByTestId('region-select'), '11')
+    await user.click(screen.getByTestId('region-select'))
+    await user.click(screen.getByText('Île-de-France'))
     expect(onChange).toHaveBeenCalledWith('11')
   })
 
-  it('disables select when loading', () => {
+  it('disables the trigger button when loading', () => {
     render(<RegionSelector regions={REGIONS} selected="" onChange={() => {}} loading />)
     expect(screen.getByTestId('region-select')).toBeDisabled()
   })
 
-  it('reflects the selected value', () => {
+  it('reflects the selected value as its abbreviated closed-state label', () => {
     render(<RegionSelector regions={REGIONS} selected="84" onChange={() => {}} />)
-    expect(screen.getByTestId('region-select')).toHaveValue('84')
+    expect(screen.getByTestId('region-select')).toHaveTextContent('ARA')
   })
 })

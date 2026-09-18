@@ -145,6 +145,16 @@ def query_curtailment_calendar(
     cursor.execute(range_query)
     range_min, range_max = cursor.fetchone()
 
+    # Counterpart to "record négatif" — the single highest price in the whole
+    # history, not just among the negative-price days above.
+    best_query = f"""
+        SELECT {date_expr} AS d, p.price_eur_mwh
+        FROM {tbl_price} p JOIN {tbl_time} t ON p.id_date = t.id_date
+        ORDER BY p.price_eur_mwh DESC LIMIT 1
+    """
+    cursor.execute(best_query)
+    best_row = cursor.fetchone()
+
     return {
         "days": days,
         "range": {
@@ -156,6 +166,8 @@ def query_curtailment_calendar(
             "total_hours": round(total_slots / 4, 1),
             "record_date": record["date"] if record else None,
             "record_price": record["min_price"] if record else None,
+            "best_date": best_row[0].isoformat() if best_row and hasattr(best_row[0], "isoformat") else (str(best_row[0]) if best_row else None),
+            "best_price": float(best_row[1]) if best_row else None,
         },
         "request_id": request_id,
     }

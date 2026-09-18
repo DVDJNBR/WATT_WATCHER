@@ -29,10 +29,15 @@ DROP_COLUMNS = ["column_68", "column_30"]
 MW_CAST_COLUMNS = [
     "pompage", "stockage_batterie", "destockage_batterie",
     "eolien", "solaire", "hydraulique", "nucleaire", "gaz",
-    "charbon", "fioul", "bioenergies",
+    "charbon", "fioul", "bioenergies", "thermique",
 ]
 
 # Rename map: raw API names → clean snake_case
+# Note: RTE's regional feed never actually carries gaz/charbon/fioul as
+# separate columns — that fuel-type split only exists on the *national*
+# eco2mix dataset. Regionally, fossil thermal only comes as one combined
+# "thermique" figure; the gaz/charbon/fioul entries below are dead mappings
+# kept for forward-compat in case RTE ever splits it regionally.
 RENAME_MAP = {
     "consommation": "consommation_mw",
     "nucleaire": "nucleaire_mw",
@@ -43,6 +48,7 @@ RENAME_MAP = {
     "charbon": "charbon_mw",
     "bioenergies": "bioenergies_mw",
     "fioul": "fioul_mw",
+    "thermique": "thermique_mw",
     "pompage": "pompage_mw",
     "stockage_batterie": "stockage_batterie_mw",
     "destockage_batterie": "destockage_batterie_mw",

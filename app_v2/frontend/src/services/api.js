@@ -123,12 +123,22 @@ export async function fetchAllProduction(params = {}) {
 
 /**
  * Fetch list of available regions from production data.
- * Derives unique regions from a broad production query.
+ * Derives unique regions from a recent production query — bounded to the
+ * last 30 days on purpose. An unbounded query has no WHERE clause to filter
+ * on, so the backend falls back to sorting up to 700k rows with no index to
+ * lean on; harmless while fact_energy_flow was small, but it now hangs
+ * outright since the history backfill grew that table ~6x. The set of
+ * active regions doesn't change day to day, so a bounded window returns the
+ * same answer for a fraction of the cost.
  *
  * @returns {Promise<Array<{code_insee: string, region: string}>>}
  */
 export async function fetchRegions() {
-  const result = await fetchProduction({ limit: 1000 })
+  const end = new Date()
+  const start = new Date(end)
+  start.setDate(start.getDate() - 30)
+  const iso = d => d.toISOString().slice(0, 10)
+  const result = await fetchProduction({ limit: 1000, startDate: iso(start), endDate: iso(end) })
   const seen = new Map()
   for (const record of result.data) {
     if (!seen.has(record.code_insee)) {
@@ -168,6 +178,24 @@ export async function fetchCapacity({ regionCode, annee } = {}) {
 }
 
 /**
+ * Fetch the national gaz/charbon/fioul fossil-thermal split from
+ * fact_national_mix. France-wide only — RTE never publishes this per
+ * region, only the combined "thermique" figure does (see production data).
+ * @param {Object} params
+ * @param {string} [params.startDate]
+ * @param {string} [params.endDate]
+ * @param {number} [params.limit]
+ * @returns {Promise<{data: Array, total_records: number}>}
+ */
+export async function fetchNationalMix({ startDate, endDate, limit = 200 } = {}) {
+  return apiGet('/v1/production/national-mix', {
+    start_date: startDate,
+    end_date:   endDate,
+    limit,
+  })
+}
+
+/**
  * Fetch grid maintenance events from fact_maintenance.
  * @param {Object} params
  * @param {string} [params.regionCode]
@@ -184,6 +212,18 @@ export async function fetchMaintenance({ regionCode, limit = 100 } = {}) {
  */
 export async function fetchCurtailmentCalendar() {
   return apiGet('/v1/curtailment/calendar')
+}
+
+/**
+ * Fetch net cross-border physical flow (France <-> GB/CH/IT/ES) from
+ * fact_cross_border_flow. Positive flow_mw = France exporting.
+ * @param {Object} params
+ * @param {string} [params.startDate]
+ * @param {string} [params.endDate]
+ * @returns {Promise<{data: Array, summary: Array, total_records: number}>}
+ */
+export async function fetchCrossBorder({ startDate, endDate } = {}) {
+  return apiGet('/v1/export/cross-border', { start_date: startDate, end_date: endDate })
 }
 
 /**

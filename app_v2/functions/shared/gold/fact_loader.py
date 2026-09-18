@@ -26,6 +26,7 @@ SOURCE_COLUMN_MAP = {
     "charbon_mw": "charbon",
     "fioul_mw": "fioul",
     "bioenergies_mw": "bioenergies",
+    "thermique_mw": "thermique",
 }
 
 

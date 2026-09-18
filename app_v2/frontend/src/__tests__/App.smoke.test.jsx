@@ -8,14 +8,20 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import App from '../App.jsx'
-import { fetchProduction, fetchRegions } from '../services/api.js'
+import { fetchAllProduction, fetchRegions } from '../services/api.js'
 
 // vi.mock hoisted above imports — factory must NOT reference module-level vars
 vi.mock('../services/api.js', () => ({
-  fetchProduction: vi.fn(),
-  fetchRegions:    vi.fn(),
-  fetchMeteo:      vi.fn().mockResolvedValue({ data: [] }),
-  fetchCapacity:   vi.fn().mockResolvedValue({ data: [] }),
+  fetchProduction:        vi.fn(),
+  fetchAllProduction:     vi.fn().mockResolvedValue({ data: [], total_records: 0 }),
+  fetchRegions:           vi.fn(),
+  fetchMeteo:             vi.fn().mockResolvedValue({ data: [] }),
+  fetchCapacity:          vi.fn().mockResolvedValue({ data: [] }),
+  fetchNationalMix:       vi.fn().mockResolvedValue({ data: [] }),
+  fetchMaintenance:       vi.fn().mockResolvedValue({ data: [] }),
+  fetchCurtailmentCalendar: vi.fn().mockResolvedValue({ days: [], range: null, stats: null }),
+  fetchCrossBorder:       vi.fn().mockResolvedValue({ summary: [] }),
+  fetchProductionUnits:   vi.fn().mockResolvedValue({ data: [] }),
 }))
 
 // FranceMap uses react-simple-maps which fetches a GeoJSON URL —
@@ -58,7 +64,7 @@ const MOCK_REGIONS = [
 describe('App smoke test (Task 6.3)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    fetchProduction.mockResolvedValue({ data: MOCK_DATA, total_records: 2, request_id: 'smoke-1' })
+    fetchAllProduction.mockResolvedValue({ data: MOCK_DATA, total_records: 2, request_id: 'smoke-1' })
     fetchRegions.mockResolvedValue(MOCK_REGIONS)
   })
 
@@ -82,9 +88,10 @@ describe('App smoke test (Task 6.3)', () => {
     expect(screen.getByTestId('theme-toggle')).toBeInTheDocument()
   })
 
-  it('renders 4 KPI cards', () => {
+  it('renders the Production tab KPI row (mix bar + trend card)', () => {
     render(<App />)
-    expect(screen.getByTestId('kpi-grid').children).toHaveLength(4)
+    expect(screen.getByTestId('mix-bar')).toBeInTheDocument()
+    expect(screen.getByTestId('trend-kpi-card')).toBeInTheDocument()
   })
 
   it('shows last-updated timestamp after data loads (AC #1)', async () => {
@@ -94,10 +101,10 @@ describe('App smoke test (Task 6.3)', () => {
     })
   })
 
-  it('calls fetchProduction on mount (AC #1 — real-time data)', async () => {
+  it('calls fetchAllProduction on mount (AC #1 — real-time data)', async () => {
     render(<App />)
     await waitFor(() => {
-      expect(fetchProduction).toHaveBeenCalled()
+      expect(fetchAllProduction).toHaveBeenCalled()
     })
   })
 

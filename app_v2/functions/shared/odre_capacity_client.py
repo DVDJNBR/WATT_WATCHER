@@ -45,6 +45,12 @@ FILIERE_MAP = {
     "charbon": "charbon",
     "thermique fioul": "fioul",
     "fioul": "fioul",
+    # ODRE's actual current export doesn't split thermal fossil by fuel — it's one
+    # combined "Thermique non renouvelable" bucket (gas + coal + fuel-oil + other).
+    # Mapped to gaz since gas is the overwhelming majority of that bucket in France
+    # today (coal/fuel-oil capacity is marginal and being phased out) — charbon/fioul
+    # can't be split back out from this dataset alone.
+    "thermique non renouvelable": "gaz",
     "bioénergies": "bioenergies",
     "bioenergies": "bioenergies",
     "bioénergie": "bioenergies",

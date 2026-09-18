@@ -124,11 +124,10 @@ body {
 /* ── Layout ───────────────────────────────────────────────────────────────── */
 .app-layout {
   display: grid;
-  grid-template-rows: 64px auto 1fr;
+  grid-template-rows: 64px 1fr;
   grid-template-columns: 1fr;
   grid-template-areas:
     "header"
-    "tabs"
     "main";
   height: 100vh;
   overflow: hidden;
@@ -152,36 +151,226 @@ body {
   .hero-grid { grid-template-columns: 1fr; }
 }
 
+/* ── Power-BI style fixed layout : graphes (1/2) + carte + contrôles (1/2) ── */
+.pbi-layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr;
+  gap: 16px;
+  flex: 1 1 0;
+  min-height: 0;
+}
+.pbi-layout > * { min-width: 0; }
+
+.pbi-layout__left {
+  display: grid;
+  grid-template-rows: auto 1fr 1fr;
+  gap: 16px;
+  min-height: 0;
+}
+
+.pbi-layout__left--single { grid-template-rows: auto 1fr; }
+/* Production tab: the 2 KPI cards live above the map instead (see
+   .pbi-layout__kpi-row--compact), so the left column is just 2 chart rows. */
+.pbi-layout__left--no-kpi { grid-template-rows: 1fr 1fr; }
+
+.pbi-layout__kpi-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+/* Right column: map on top (grows to fill), controls row below it. */
+.pbi-layout__right {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-height: 0;
+}
+
+/* Sitting above the map instead of the chart grid — kept short so the map
+   still gets most of the column's height. */
+.pbi-layout__kpi-row--compact {
+  flex: 0 0 auto;
+  max-height: 110px;
+}
+.pbi-layout__kpi-row--compact > * { min-height: 0; }
+
+.pbi-layout__map-wrap {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: grid;
+}
+
+/* ── Controls row (below the map) — période / région / màj, horizontal ── */
+.pbi-layout__controls-col {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: 0 0 auto;
+}
+
+.controls-line {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: flex-start;
+  gap: 16px;
+  min-width: 0;
+}
+
+/* Région + Màj travel together as one unit — if .controls-line wraps, they
+   wrap as a pair rather than Màj landing on its own orphaned line. */
+.controls-region-status {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+.controls-block { display: flex; flex-direction: column; gap: 8px; }
+.controls-block__row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.controls-block--status {
+  flex-direction: row;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  width: fit-content;
+}
+
+/* Middle column — key numbers, stacked vertically, map now has the right
+   column entirely to itself so it can grow. */
+.pbi-layout__kpis-col {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+  overflow-y: auto;
+}
+.pbi-layout__kpis-col > * { flex: 0 0 auto; }
+
+.pbi-layout__kpis {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  min-height: 0;
+}
+
+@media (max-width: 1024px) {
+  .pbi-layout { grid-template-columns: 1fr; }
+}
+
+/* ── Trend KPI card : chiffre clé + mini courbe pleine largeur ───────────── */
+.trend-kpi-card {
+  display: flex;
+  flex-direction: column;
+  padding: 14px 18px;
+  min-height: 0;
+}
+.trend-kpi-card .kpi-title { margin-bottom: 4px; }
+.trend-kpi-card .kpi-value { margin-bottom: 6px; }
+.trend-kpi-card .trend-kpi-card__chart { flex: 1 1 0; min-height: 30px; }
+
+/* ── Mix bar card : barre fine de répartition + légende classique ───────── */
+.mix-bar-card {
+  display: flex;
+  flex-direction: column;
+  padding: 14px 18px;
+  min-height: 0;
+  overflow: hidden;
+}
+.mix-bar__track {
+  display: flex;
+  height: 8px;
+  border-radius: 4px;
+  overflow: hidden;
+  gap: 2px;
+  flex: 0 0 auto;
+  margin-top: 10px;
+}
+.mix-bar__seg {
+  min-width: 2px;
+  transition: flex-basis var(--transition);
+}
+.mix-bar__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin-top: 8px;
+  font-size: 0.68rem;
+  color: var(--color-text-muted);
+}
+.mix-bar__legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+.mix-bar__legend-dot {
+  flex: 0 0 auto;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
 /* ── Date bar ─────────────────────────────────────────────────────────────── */
 .date-bar {
   display: flex;
   align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
+  gap: 6px;
+  flex-wrap: nowrap;
   width: fit-content;
 }
 
 .date-bar__input {
   width: auto;
-  min-width: 130px;
-  max-width: 160px;
+  min-width: 100px;
+  max-width: 118px;
 }
 
 /* override selector-input width: 100% inside date-bar */
 .date-bar .selector-input {
   width: auto;
-  min-width: 130px;
-  max-width: 160px;
+  min-width: 100px;
+  max-width: 118px;
   background-image: none;
-  padding-right: 12px;
+  padding-right: 10px;
 }
+
+/* Compact segmented control — one shared border instead of 3 separate
+   outlined buttons, meaningfully narrower so Période + Région fit on
+   one line together. */
+.date-bar__presets {
+  display: flex;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  overflow: hidden;
+  flex: 0 0 auto;
+}
+.date-bar__presets button {
+  padding: 3px 7px;
+  font-size: 0.68rem;
+  font-weight: 500;
+  border: none;
+  border-right: 1px solid var(--color-border);
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: background var(--transition), color var(--transition);
+}
+.date-bar__presets button:last-child { border-right: none; }
+.date-bar__presets button:hover { background: var(--color-surface-2); color: var(--color-text); }
 
 /* ── Header ───────────────────────────────────────────────────────────────── */
 .app-header {
   grid-area: header;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 16px;
   padding: 0 24px;
   background: var(--glass-bg);
   border-bottom: 1px solid var(--glass-border);
@@ -190,6 +379,9 @@ body {
   top: 0;
   z-index: 100;
 }
+
+.app-header .logo { flex: 0 0 auto; }
+.app-header .header-actions { flex: 0 0 auto; }
 
 .app-header .logo {
   display: flex;
@@ -219,33 +411,34 @@ body {
 
 .header-actions { display: flex; align-items: center; gap: 12px; }
 
-/* ── Tab navigation ───────────────────────────────────────────────────────── */
+/* ── Tab navigation — folder-tab look: sits centered in the header, flush
+   against its bottom edge, active tab "pokes into" the page below ─────────── */
 .app-tabs {
-  grid-area: tabs;
+  flex: 1 1 auto;
   display: flex;
-  align-items: center;
+  align-items: flex-end;
+  justify-content: center;
   gap: 4px;
-  padding: 8px 24px;
-  background: var(--glass-bg);
-  border-bottom: 1px solid var(--glass-border);
-  backdrop-filter: blur(var(--glass-blur));
-  overflow-x: auto;
+  height: 100%;
+  overflow: visible;
 }
 
 .app-tab {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 14px;
-  border-radius: var(--radius);
+  gap: 7px;
+  padding: 9px 16px 8px;
+  margin-bottom: 0;
+  border-radius: 10px 10px 0 0;
+  border: 1px solid transparent;
+  border-bottom: none;
   font-size: 0.85rem;
   font-weight: 500;
   color: var(--color-text-muted);
   text-decoration: none;
   white-space: nowrap;
   box-sizing: border-box;
-  border-bottom: 2px solid transparent;
-  transition: color var(--transition), background var(--transition), border-color var(--transition);
+  transition: color var(--transition), background var(--transition), margin var(--transition);
 }
 
 .app-tab svg {
@@ -261,9 +454,12 @@ body {
 
 .app-tab--active {
   color: var(--color-accent);
-  background: var(--color-accent-glow);
+  background: var(--color-bg);
+  border-color: var(--glass-border);
+  border-bottom: 1px solid var(--color-bg);
   font-weight: 600;
-  border-bottom-color: var(--color-accent);
+  margin-bottom: -1px;
+  box-shadow: 0 -6px 16px -8px rgba(45, 212, 191, 0.35);
 }
 
 .app-tab--active svg { opacity: 1; }
@@ -302,12 +498,69 @@ body {
   border-bottom-color: var(--color-accent);
 }
 
+/* ── Footer theme tabs (dashboard) — Power-BI-style pill bar, pinned bottom ── */
+/* Mirrors the header's folder tabs exactly, flipped vertically: rounded
+   bottom corners instead of top, active tab pokes UP into the content above
+   instead of down, glow points down into the footer instead of up. */
+.dashboard-footer-tabs {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 4px;
+  border-top: 1px solid var(--color-border);
+  flex: 0 0 auto;
+}
+
+.footer-tab {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 16px 9px;
+  margin-top: 0;
+  border-radius: 0 0 10px 10px;
+  border: 1px solid transparent;
+  border-top: none;
+  background: none;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: color var(--transition), background var(--transition), margin var(--transition);
+}
+
+.footer-tab svg { width: 15px; height: 15px; opacity: 0.75; }
+
+.footer-tab:hover { color: var(--color-text); background: var(--color-surface-2); }
+
+.footer-tab--active {
+  color: var(--color-accent);
+  background: var(--color-bg);
+  border-color: var(--glass-border);
+  border-top: 1px solid var(--color-bg);
+  font-weight: 600;
+  margin-top: -1px;
+  box-shadow: 0 6px 16px -8px rgba(45, 212, 191, 0.35);
+}
+.footer-tab--active svg { opacity: 1; }
+
 /* ── Dashboard toolbar (region + date range + status) ────────────────────── */
 .dashboard-toolbar {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  align-items: flex-end;
+  gap: 16px;
+}
+
+.dashboard-toolbar__period {
   display: flex;
   align-items: flex-end;
   flex-wrap: wrap;
   gap: 16px;
+}
+
+@media (max-width: 1024px) {
+  .dashboard-toolbar { grid-template-columns: 1fr; }
 }
 
 .dashboard-toolbar__status {
@@ -353,7 +606,8 @@ body {
 }
 
 .dashboard-content .hero-grid,
-.dashboard-content .hero-grid--single {
+.dashboard-content .hero-grid--single,
+.dashboard-content .pbi-layout {
   flex: 1 1 0;
   min-height: 0;
 }
@@ -491,12 +745,21 @@ body {
   color: var(--color-text-muted);
 }
 
+.kpi-sublabel {
+  font-size: 0.74rem;
+  color: var(--color-text-muted);
+  margin-top: 4px;
+}
+
 /* ── Chart card ───────────────────────────────────────────────────────────── */
 .chart-card {
   padding: 14px 18px;
   display: flex;
   flex-direction: column;
-  min-height: 0;
+  /* A real floor, not 0 — on a short viewport this stops recharts'
+     absolutely-positioned Legend from collapsing onto the title instead of
+     below the (starved) plot area. .dashboard-content scrolls past this. */
+  min-height: 160px;
 }
 
 .chart-title {
@@ -822,8 +1085,64 @@ input[type="date"] {
 .region-selector {
   display: flex;
   flex-direction: column;
+  align-items: center;
   gap: 6px;
+  position: relative;
 }
+
+.region-selector__button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: fit-content;
+  min-width: 72px;
+  padding: 8px 12px;
+  border-radius: var(--radius);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-2);
+  color: var(--color-text);
+  font-size: 0.875rem;
+  font-weight: 600;
+  font-family: var(--font-sans);
+  cursor: pointer;
+  transition: border-color var(--transition);
+}
+.region-selector__button:hover { border-color: var(--color-text-muted); }
+.region-selector__button:disabled { opacity: 0.5; cursor: not-allowed; }
+.region-selector__button svg { flex-shrink: 0; opacity: 0.7; }
+
+.region-selector__list {
+  position: absolute;
+  top: calc(100% + 6px);
+  /* Right-anchored, not centered: the button sits at the right edge of its
+     column, so a centered dropdown routinely overflowed past the viewport
+     edge. Opening flush against the button's right edge and growing left
+     keeps it on-screen regardless of where the button itself sits. */
+  right: 0;
+  z-index: 50;
+  min-width: 220px;
+  max-width: min(280px, calc(100vw - 32px));
+  max-height: 280px;
+  overflow-y: auto;
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  box-shadow: 0 12px 32px rgba(0,0,0,0.35);
+  list-style: none;
+  padding: 4px;
+}
+
+.region-selector__option {
+  padding: 8px 12px;
+  border-radius: calc(var(--radius) - 2px);
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.region-selector__option:hover { background: var(--color-bg); color: var(--color-text); }
+.region-selector__option--active { color: var(--color-accent); font-weight: 600; }
 
 .selector-label {
   font-size: 0.75rem;

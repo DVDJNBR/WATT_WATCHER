@@ -66,6 +66,20 @@ export function Layout() {
           WATT WATCHER
         </span>
 
+        <nav className="app-tabs" aria-label="Navigation principale">
+          {TABS.map(({ to, label, end, icon }) => (
+            <NavLink
+              key={to}
+              to={to}
+              end={end}
+              className={({ isActive }) => 'app-tab' + (isActive ? ' app-tab--active' : '')}
+            >
+              {TAB_ICONS[icon]}
+              {label}
+            </NavLink>
+          ))}
+        </nav>
+
         <div className="header-actions">
           <button
             className="btn btn-ghost"
@@ -86,20 +100,6 @@ export function Layout() {
           </button>
         </div>
       </header>
-
-      <nav className="app-tabs" aria-label="Navigation principale">
-        {TABS.map(({ to, label, end, icon }) => (
-          <NavLink
-            key={to}
-            to={to}
-            end={end}
-            className={({ isActive }) => 'app-tab' + (isActive ? ' app-tab--active' : '')}
-          >
-            {TAB_ICONS[icon]}
-            {label}
-          </NavLink>
-        ))}
-      </nav>
 
       <Outlet />
     </div>

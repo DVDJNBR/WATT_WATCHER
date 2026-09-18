@@ -10,9 +10,9 @@ under shared/stages/ — this file only wires timers to stages.
 
 - pipeline_15min  : RTE eCO2mix (production/consumption) + Open-Meteo —
                     the two sources that genuinely change continuously.
-- pipeline_daily  : ENTSO-E day-ahead prices + ENTSO-E generation outages —
-                    both published once a day, checking more often gains
-                    nothing.
+- pipeline_daily  : ENTSO-E day-ahead prices + ENTSO-E generation outages +
+                    ENTSO-E cross-border physical flow — all published once
+                    a day, checking more often gains nothing.
 - pipeline_weekly : ODRE installed-capacity registry — changes ~yearly,
                     weekly is a comfortable margin, not a requirement.
 
@@ -37,7 +37,7 @@ except ImportError:
 from shared.bronze_storage import BronzeStorage
 from shared.silver_storage import SilverStorage
 from shared.db import get_db_connection
-from shared.stages import rte_stage, meteo_stage, capacity_stage, price_stage, outages_stage
+from shared.stages import rte_stage, national_stage, meteo_stage, capacity_stage, price_stage, outages_stage, cross_border_stage
 
 logger = logging.getLogger(__name__)
 
@@ -63,6 +63,11 @@ def run_15min_pipeline(job_id: str | None = None, local_mode: bool = False, minu
         results["failed_stage"] = "rte"
         return results
 
+    # Non-fatal: the national gaz/charbon/fioul split is a nice-to-have detail
+    # on top of the regional "thermique" bucket, not core to the pipeline —
+    # a failure here shouldn't fail the whole 15-min run.
+    results["stages"]["national"] = national_stage.run(job_id, bronze, silver, local_mode=local_mode, minutes=minutes)
+
     results["stages"]["meteo"] = meteo_stage.run(job_id, bronze, silver)
     results["status"] = "success"
     return results
@@ -76,6 +81,7 @@ def run_daily_pipeline(job_id: str | None = None, local_mode: bool = False) -> d
 
     results["stages"]["price"] = price_stage.run(job_id, bronze, silver)
     results["stages"]["outages"] = outages_stage.run(job_id, bronze, silver)
+    results["stages"]["cross_border"] = cross_border_stage.run(job_id, bronze, silver)
     results["status"] = "success"
     return results
 

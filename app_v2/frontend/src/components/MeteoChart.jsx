@@ -98,7 +98,7 @@ export function MeteoChart({ data = [], region, loading = false }) {
             domain={[0, 100]}
           />
           <Tooltip {...tooltipStyle} />
-          <Legend />
+          <Legend wrapperStyle={{ fontSize: 11, paddingTop: 4, lineHeight: 1.4 }} iconSize={8} />
 
           {/* Cloudcover area (background, behind wind) */}
           {hasCloud && (

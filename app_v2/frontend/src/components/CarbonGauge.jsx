@@ -9,7 +9,13 @@ import { RadialBarChart, RadialBar, PolarAngleAxis, ResponsiveContainer } from '
 
 const MAX_INTENSITY = 600  // gCO₂/kWh — grid max for France scale
 
-/** Emission factors (gCO₂eq/kWh) — simplified IPCC medians */
+/**
+ * Emission factors (gCO₂eq/kWh) — simplified IPCC medians.
+ * gaz/fioul/charbon are kept for forward-compat but RTE's regional feed
+ * never actually splits fossil thermal that finely (only nationally) —
+ * "thermique" is the one that carries real regional data, weighted
+ * toward gas since that's the dominant fossil plant type in France.
+ */
 const EMISSION_FACTORS = {
   nucleaire:   12,
   eolien:      11,
@@ -19,6 +25,7 @@ const EMISSION_FACTORS = {
   gaz:         490,
   fioul:       733,
   charbon:     820,
+  thermique:   520,
 }
 
 /**

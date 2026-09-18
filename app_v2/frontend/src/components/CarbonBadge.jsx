@@ -41,7 +41,7 @@ export function CarbonBadge({ intensity = 0, sparkData = [], loading = false }) 
         <div className="skeleton" style={{ height: 88 }} data-testid="carbon-badge-skeleton" />
       ) : (
         <>
-          <p className="carbon-badge__label">Intensité CO₂</p>
+          <p className="carbon-badge__label" title="Moyenne pondérée des émissions de CO₂ du mix électrique actuel, en grammes par kWh produit — plus c'est bas, plus la production est décarbonée.">Intensité CO₂</p>
           <div className="carbon-badge__row">
             <span className="carbon-badge__number" style={{ color }}>{intensity}</span>
             <span className="carbon-badge__unit">gCO₂/kWh</span>

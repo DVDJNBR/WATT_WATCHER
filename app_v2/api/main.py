@@ -17,6 +17,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
 
 from api.capacity_service import query_capacity
+from api.cross_border_service import query_cross_border
 from api.curtailment_service import query_curtailment_calendar, query_curtailment_risk
 from api.db import get_db_connection
 from api.error_handlers import bad_request, not_found, server_error
@@ -24,6 +25,7 @@ from api.export_service import export_to_csv
 from api.maintenance_service import query_maintenance
 from api.meteo_service import query_meteo
 from api.models import parse_export_request, parse_production_request
+from api.national_mix_service import query_national_mix
 from api.production_service import query_production
 from api.units_service import query_units
 
@@ -135,6 +137,30 @@ def meteo_regional(request: Request):
             conn.close()
 
 
+@app.get("/v1/production/national-mix")
+def production_national_mix(request: Request):
+    """Gaz/charbon/fioul fossil-thermal split — France-wide only, no region filter."""
+    request_id = str(uuid.uuid4())
+    params = request.query_params
+    conn = None
+    try:
+        conn = get_db_connection()
+        result = query_national_mix(
+            conn,
+            start_date=params.get("start_date") or None,
+            end_date=params.get("end_date") or None,
+            limit=min(int(params.get("limit", 500)), 5000),
+            request_id=request_id,
+        )
+        return JSONResponse(result, headers={"X-Request-Id": request_id})
+    except Exception:
+        logger.exception("national-mix endpoint error [%s]", request_id)
+        return JSONResponse(server_error(request_id=request_id), status_code=500)
+    finally:
+        if conn:
+            conn.close()
+
+
 @app.get("/v1/capacity/regional")
 def capacity_regional(request: Request):
     request_id = str(uuid.uuid4())
@@ -204,6 +230,28 @@ def production_units(request: Request):
     except Exception:
         logger.exception("units endpoint error [%s]", request_id)
         return JSONResponse(server_error(request_id=request_id), status_code=500)
+
+
+@app.get("/v1/export/cross-border")
+def export_cross_border(request: Request):
+    request_id = str(uuid.uuid4())
+    params = request.query_params
+    conn = None
+    try:
+        conn = get_db_connection()
+        result = query_cross_border(
+            conn,
+            start_date=params.get("start_date") or None,
+            end_date=params.get("end_date") or None,
+            request_id=request_id,
+        )
+        return JSONResponse(result, headers={"X-Request-Id": request_id})
+    except Exception:
+        logger.exception("cross-border endpoint error [%s]", request_id)
+        return JSONResponse(server_error(request_id=request_id), status_code=500)
+    finally:
+        if conn:
+            conn.close()
 
 
 @app.get("/v1/maintenance")

@@ -90,7 +90,7 @@ class TestDimLoader:
 
     def test_upsert_sources(self, dim):
         count = dim.upsert_sources()
-        assert count == 8  # 8 default French energy sources
+        assert count == 9  # 8 default French energy sources + thermique (national fossil split)
         assert dim.get_source_id("nucleaire") is not None
         assert dim.get_source_id("eolien") is not None
 

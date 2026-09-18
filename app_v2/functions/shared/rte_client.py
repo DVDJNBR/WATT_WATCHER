@@ -21,6 +21,12 @@ logger = logging.getLogger(__name__)
 # ─── Configuration ──────────────────────────────────────────────────────────
 BASE_URL = "https://odre.opendatasoft.com/api/explore/v2.1/catalog/datasets"
 DATASET_REGIONAL = "eco2mix-regional-tr"
+# National dataset is the only one RTE splits fossil thermal by fuel type
+# (gaz/charbon/fioul) — the regional feed only ever carries one combined
+# "thermique" figure. Same client, same fetch_eco2mix_regional()/
+# fetch_all_recent() machinery works unchanged (region_code just stays
+# unused) — only the dataset (and therefore records_url) differs.
+DATASET_NATIONAL = "eco2mix-national-tr"
 
 # Retry config (FR7, NFR-R1)
 MAX_RETRIES = 3

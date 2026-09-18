@@ -5,7 +5,7 @@
  * Displayed below the France map when a region is selected.
  */
 import {
-  ComposedChart, Area, Line,
+  ComposedChart, Area,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from 'recharts'
 
@@ -14,10 +14,8 @@ const SOURCE_COLORS = {
   eolien:      '#10b981',
   solaire:     '#f59e0b',
   hydraulique: '#3b82f6',
-  gaz:         '#ef4444',
   bioenergies: '#84cc16',
-  charbon:     '#6b7280',
-  fioul:       '#f97316',
+  thermique:   '#ef4444',
 }
 
 const SOURCE_LABELS = {
@@ -25,10 +23,8 @@ const SOURCE_LABELS = {
   eolien:      'Éolien',
   solaire:     'Solaire',
   hydraulique: 'Hydraulique',
-  gaz:         'Gaz',
   bioenergies: 'Bioénergies',
-  charbon:     'Charbon',
-  fioul:       'Fioul',
+  thermique:   'Thermique fossile',
 }
 
 function formatTs(ts) {
@@ -41,19 +37,14 @@ function formatTs(ts) {
 }
 
 function transformData(data) {
-  return data.map(r => {
-    const total = Math.round(
-      Object.values(r.sources).reduce((s, v) => s + (v > 0 ? v : 0), 0)
-    )
-    return { timestamp: formatTs(r.timestamp), total, ...r.sources }
-  })
+  return data.map(r => ({ timestamp: formatTs(r.timestamp), ...r.sources }))
 }
 
 function deriveAllSources(chartData) {
   const seen = new Set()
   for (const row of chartData) {
     for (const key of Object.keys(row)) {
-      if (key !== 'timestamp' && key !== 'total') seen.add(key)
+      if (key !== 'timestamp') seen.add(key)
     }
   }
   return Array.from(seen)
@@ -109,7 +100,11 @@ export function HistoryChart({ data, region, loading = false }) {
 
       <div style={{ flex: '1 1 0', minHeight: 0 }}>
       <ResponsiveContainer width="100%" height="100%">
-        <ComposedChart data={chartData} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
+        {/* right:120 (not 60) — MeteoChart reserves an extra 60px for its
+            second (right-side) Y-axis that this chart doesn't have; matching
+            the total reserved width, not just the margin, keeps both plot
+            areas — and their day gridlines — aligned when stacked. */}
+        <ComposedChart data={chartData} margin={{ top: 8, right: 120, left: 0, bottom: 0 }}>
           <defs>
             {sources.map(src => (
               <linearGradient key={src} id={`hgrad-${src}`} x1="0" y1="0" x2="0" y2="1">
@@ -121,9 +116,13 @@ export function HistoryChart({ data, region, loading = false }) {
 
           <CartesianGrid strokeDasharray="3 3" stroke="#888" strokeOpacity={0.2} />
           <XAxis dataKey="timestamp" tick={{ fill: '#9a9a9e', fontSize: 10 }} interval="preserveStartEnd" />
-          <YAxis tick={{ fill: '#9a9a9e', fontSize: 11 }} unit=" MW" width={70} />
+          <YAxis tick={{ fill: '#9a9a9e', fontSize: 11 }} unit=" MW" width={50} />
           <Tooltip {...tooltipStyle} />
-          <Legend formatter={name => name === 'total' ? 'Production totale' : (SOURCE_LABELS[name] || name)} />
+          <Legend
+            formatter={name => SOURCE_LABELS[name] || name}
+            wrapperStyle={{ fontSize: 10, paddingTop: 4, lineHeight: 1.4 }}
+            iconSize={7}
+          />
 
           {/* Stacked areas per source */}
           {sources.map(src => (
@@ -137,16 +136,6 @@ export function HistoryChart({ data, region, loading = false }) {
               strokeWidth={1.5}
             />
           ))}
-
-          {/* Total production bold line */}
-          <Line
-            type="monotone"
-            dataKey="total"
-            stroke="#2dd4bf"
-            strokeWidth={2.5}
-            dot={false}
-            name="total"
-          />
         </ComposedChart>
       </ResponsiveContainer>
       </div>
