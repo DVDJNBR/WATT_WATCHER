@@ -231,14 +231,12 @@ body {
 
 .controls-block { display: flex; flex-direction: column; gap: 8px; }
 .controls-block__row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+/* Plain, not a pill — worth having but shouldn't compete visually with
+   Région for attention. */
 .controls-block--status {
   flex-direction: row;
   align-items: center;
-  gap: 7px;
-  padding: 5px 12px;
-  border-radius: 999px;
-  background: var(--color-surface-2);
-  border: 1px solid var(--color-border);
+  gap: 6px;
   width: fit-content;
 }
 
@@ -1140,7 +1138,12 @@ input[type="date"] {
 
 .region-selector__list {
   position: absolute;
-  top: calc(100% + 6px);
+  /* Opens upward (bottom, not top) — this control sits right above the
+     footer tabs, near the bottom of the viewport, by design. Opening
+     downward left most of a 280px-tall list rendered off-screen below the
+     fold (confirmed: list bottom edge landed ~220px past the viewport
+     bottom). There's always more room above it (map + charts). */
+  bottom: calc(100% + 6px);
   /* Right-anchored, not centered: the button sits at the right edge of its
      column, so a centered dropdown routinely overflowed past the viewport
      edge. Opening flush against the button's right edge and growing left
