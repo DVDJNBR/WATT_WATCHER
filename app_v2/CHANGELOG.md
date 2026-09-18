@@ -1,3 +1,9 @@
+## [1.33.1](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.33.0...v1.33.1) (2026-09-18)
+
+### Performance Improvements
+
+* **dashboard:** cut initial load time ~3-4x (25-38s -> 8-10s) ([83356e1](https://github.com/DVDJNBR/WATT_WATCHER/commit/83356e153b4d276c13525ba8fdf8f75b68df4200))
+
 ## [1.33.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.32.1...v1.33.0) (2026-09-18)
 
 ### Features
