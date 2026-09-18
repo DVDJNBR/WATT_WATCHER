@@ -30,19 +30,28 @@ const SOURCE_COLORS = {
   solaire:     '#f59e0b',
   hydraulique: '#3b82f6',
   bioenergies: '#84cc16',
-  // Fossil family stays in black/gray shades rather than its own hue —
-  // keeps the bar from needing yet another color for a niche detail.
+  // Gaz gets its own red — the dominant fossil source, worth flagging on
+  // sight. Charbon/fioul/thermique stay black/gray rather than adding yet
+  // more hues for what's usually a sliver.
+  gaz:         '#ef4444',
   thermique:   '#111827',
   charbon:     '#1f2937',
   fioul:       '#374151',
-  gaz:         '#6b7280',
 }
 
-/** 26.6% for anything sizable, more decimals once it's under 1% so a 0.3% slice still reads as something. */
+/**
+ * 26.6% for anything sizable, more decimals the smaller it gets — down to
+ * real precision, not a "basically nothing" placeholder. Whether charbon
+ * is exactly 0% or a genuine 0.0001% is itself the interesting fact (the
+ * latter means France briefly fired up a coal plant — worth seeing, not
+ * hiding behind a generic "< 0.05%").
+ */
 function formatPct(pct) {
+  if (pct === 0) return '0%'
   if (pct >= 1) return `${pct.toFixed(1)}%`
-  if (pct >= 0.05) return `${pct.toFixed(2)}%`
-  return '< 0,05%'
+  if (pct >= 0.01) return `${pct.toFixed(2)}%`
+  if (pct >= 0.0001) return `${pct.toFixed(4)}%`
+  return '< 0,0001%'
 }
 
 /** @param {{ sources: Object, nationalDetail?: Object|null, loading?: boolean }} props */
@@ -60,8 +69,12 @@ export function MixBar({ sources = {}, nationalDetail = null, loading = false })
       for (const [src, mw] of Object.entries(nationalDetail)) {
         if (mw > 0) merged[src] = mw
       }
+      // Charbon sitting at 0 is itself the interesting fact (France's coal
+      // plants idle) — show it even then, unlike other sources which just
+      // disappear when absent.
+      if (merged.charbon == null) merged.charbon = nationalDetail.charbon ?? 0
     }
-    const filtered = Object.entries(merged).filter(([, v]) => v > 0)
+    const filtered = Object.entries(merged).filter(([src, v]) => v > 0 || src === 'charbon')
     const total = filtered.reduce((s, [, v]) => s + v, 0)
     const sorted = [...filtered].sort(([, a], [, b]) => b - a)
     return { entries: sorted, total }
