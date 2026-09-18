@@ -1,3 +1,9 @@
+## [1.33.3](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.33.2...v1.33.3) (2026-09-18)
+
+### Bug Fixes
+
+* **dashboard:** HistoryChart overlays instead of stacks ([12688a0](https://github.com/DVDJNBR/WATT_WATCHER/commit/12688a02e978cbcc4172f21378575ed772f91d62))
+
 ## [1.33.2](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.33.1...v1.33.2) (2026-09-18)
 
 ### Bug Fixes
