@@ -1,3 +1,9 @@
+## [1.33.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.32.1...v1.33.0) (2026-09-18)
+
+### Features
+
+* **dashboard:** national gaz/charbon/fioul split, connection pooling, layout fixes ([4265b1b](https://github.com/DVDJNBR/WATT_WATCHER/commit/4265b1b3643cc98aac80e66755e41500b61cdb79))
+
 ## [1.32.1](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.32.0...v1.32.1) (2026-09-10)
 
 ### Bug Fixes
