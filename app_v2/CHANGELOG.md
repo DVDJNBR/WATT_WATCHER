@@ -1,3 +1,9 @@
+## [1.33.10](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.33.9...v1.33.10) (2026-09-19)
+
+### Bug Fixes
+
+* **dashboard:** more contrast on Consommation tab's heatmap + ranking bars ([d83bb17](https://github.com/DVDJNBR/WATT_WATCHER/commit/d83bb1753404907d3a7f6664dcac9ef7a6777214))
+
 ## [1.33.9](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.33.8...v1.33.9) (2026-09-19)
 
 ## [1.33.8](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.33.7...v1.33.8) (2026-09-19)
