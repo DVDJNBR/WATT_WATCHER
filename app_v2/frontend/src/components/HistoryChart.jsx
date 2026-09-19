@@ -110,11 +110,11 @@ export function HistoryChart({ data, region, loading = false }) {
 
       <div style={{ flex: '1 1 0', minHeight: 0 }}>
       <ResponsiveContainer width="100%" height="100%">
-        {/* right:120 (not 60) — MeteoChart reserves an extra 60px for its
-            second (right-side) Y-axis that this chart doesn't have; matching
-            the total reserved width, not just the margin, keeps both plot
-            areas — and their day gridlines — aligned when stacked. */}
-        <ComposedChart data={chartData} margin={{ top: 8, right: 120, left: 0, bottom: 0 }}>
+        {/* right:48 — matches MeteoChart's total reserved right-side width
+            (margin.right:8 + right-axis width:40) even though this chart
+            has no right axis of its own; keeps both plot areas — and their
+            day gridlines — aligned when stacked. */}
+        <ComposedChart data={chartData} margin={{ top: 8, right: 48, left: 0, bottom: 0 }}>
           <defs>
             {/* Fills stay faint (max 0.18, was 0.35) — these now overlap
                 instead of stacking, so several fills can sit on top of each
@@ -131,7 +131,7 @@ export function HistoryChart({ data, region, loading = false }) {
 
           <CartesianGrid strokeDasharray="3 3" stroke="#888" strokeOpacity={0.2} />
           <XAxis dataKey="timestamp" tick={{ fill: '#9a9a9e', fontSize: 10 }} interval="preserveStartEnd" />
-          <YAxis tick={{ fill: '#9a9a9e', fontSize: 11 }} unit=" MW" width={50} />
+          <YAxis tick={{ fill: '#9a9a9e', fontSize: 11 }} unit=" MW" width={44} />
           <Tooltip {...tooltipStyle} />
           <Legend
             // Recharts' auto-generated legend order ignores both children

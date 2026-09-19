@@ -23,6 +23,7 @@ from api.db import get_db_connection
 from api.error_handlers import bad_request, not_found, server_error
 from api.export_service import export_to_csv
 from api.maintenance_service import query_maintenance
+from api.market_price_service import query_market_price
 from api.meteo_service import query_meteo
 from api.models import parse_export_request, parse_production_request
 from api.national_mix_service import query_national_mix
@@ -215,6 +216,30 @@ def curtailment_calendar(request: Request):
         return JSONResponse(result, headers={"X-Request-Id": request_id})
     except Exception:
         logger.exception("curtailment calendar endpoint error [%s]", request_id)
+        return JSONResponse(server_error(request_id=request_id), status_code=500)
+    finally:
+        if conn:
+            conn.close()
+
+
+@app.get("/v1/prices/regional")
+def prices_regional(request: Request):
+    """Day-ahead spot price (EUR/MWh) over time — national, single-zone."""
+    request_id = str(uuid.uuid4())
+    params = request.query_params
+    conn = None
+    try:
+        conn = get_db_connection()
+        result = query_market_price(
+            conn,
+            start_date=params.get("start_date") or None,
+            end_date=params.get("end_date") or None,
+            limit=min(int(params.get("limit", 5000)), 20000),
+            request_id=request_id,
+        )
+        return JSONResponse(result, headers={"X-Request-Id": request_id})
+    except Exception:
+        logger.exception("prices endpoint error [%s]", request_id)
         return JSONResponse(server_error(request_id=request_id), status_code=500)
     finally:
         if conn:

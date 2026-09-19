@@ -189,10 +189,13 @@ body {
 }
 
 /* Sitting above the map instead of the chart grid — kept short so the map
-   still gets most of the column's height. */
+   still gets most of the column's height, but tall enough that MixBar's
+   legend (up to 8 items with gaz/charbon now always shown) has room for 3
+   wrapped rows without the card's overflow:hidden clipping it — that
+   clipping, not the layout itself, was what read as "text overlapping". */
 .pbi-layout__kpi-row--compact {
   flex: 0 0 auto;
-  max-height: 110px;
+  max-height: 150px;
 }
 .pbi-layout__kpi-row--compact > * { min-height: 0; }
 
@@ -297,8 +300,8 @@ body {
 .mix-bar__legend {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px 12px;
-  margin-top: 8px;
+  gap: 6px 14px;
+  margin-top: 10px;
   font-size: 0.68rem;
   color: var(--color-text-muted);
 }

@@ -75,7 +75,11 @@ export function MeteoChart({ data = [], region, loading = false }) {
 
       <div style={{ flex: '1 1 0', minHeight: 0 }}>
       <ResponsiveContainer width="100%" height="100%">
-        <ComposedChart data={chartData} margin={{ top: 8, right: 60, left: 0, bottom: 0 }}>
+        {/* right:8 + right-axis width:40 = 48px reserved — was 60+60=120,
+            most of it empty space the chart never drew into. Kept in sync
+            with HistoryChart's margin.right + YAxis width below so the two
+            charts' plot areas (and day gridlines) still line up. */}
+        <ComposedChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#888" strokeOpacity={0.15} />
           <XAxis
             dataKey="timestamp"
@@ -87,14 +91,14 @@ export function MeteoChart({ data = [], region, loading = false }) {
             yAxisId="temp"
             tick={{ fill: 'var(--color-text-muted)', fontSize: 11 }}
             unit="°C"
-            width={50}
+            width={44}
           />
           {/* Right Y-axis: wind speed + cloudcover (0–100) */}
           <YAxis
             yAxisId="right"
             orientation="right"
             tick={{ fill: 'var(--color-text-muted)', fontSize: 11 }}
-            width={60}
+            width={40}
             domain={[0, 100]}
           />
           <Tooltip {...tooltipStyle} />

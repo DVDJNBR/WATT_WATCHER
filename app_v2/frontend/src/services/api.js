@@ -229,6 +229,19 @@ export async function fetchCurtailmentCalendar() {
 }
 
 /**
+ * Fetch day-ahead spot price (EUR/MWh) over time — national, single-zone,
+ * no region filter (matches how ENTSO-E publishes it).
+ * @param {Object} params
+ * @param {string} [params.startDate]
+ * @param {string} [params.endDate]
+ * @param {number} [params.limit]
+ * @returns {Promise<{data: Array, total_records: number}>}
+ */
+export async function fetchMarketPrice({ startDate, endDate, limit = 20000 } = {}) {
+  return apiGet('/v1/prices/regional', { start_date: startDate, end_date: endDate, limit })
+}
+
+/**
  * Fetch net cross-border physical flow (France <-> GB/CH/IT/ES) from
  * fact_cross_border_flow. Positive flow_mw = France exporting.
  * @param {Object} params

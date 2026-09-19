@@ -21,10 +21,10 @@ import { MaintenanceMap, normalize as normalizeUnitName } from '../components/Ma
 import { RenewableTrendChart } from '../components/RenewableTrendChart.jsx'
 import { MixCategoryChart } from '../components/MixCategoryChart.jsx'
 import { MixBar } from '../components/MixBar.jsx'
-import { NegativePriceTrend } from '../components/NegativePriceTrend.jsx'
+import { PriceTrendChart } from '../components/PriceTrendChart.jsx'
 import {
   fetchAllProduction, fetchRegions, fetchMeteo, fetchCapacity, fetchCurtailmentCalendar,
-  fetchMaintenance, fetchCrossBorder, fetchProductionUnits, fetchNationalMix,
+  fetchMaintenance, fetchCrossBorder, fetchProductionUnits, fetchNationalMix, fetchMarketPrice,
 } from '../services/api.js'
 import { ProdConsChart } from '../components/ProdConsChart.jsx'
 import { RegionSelector } from '../components/RegionSelector.jsx'
@@ -211,6 +211,11 @@ export default function DashboardPage() {
   const [calendarStats, setCalendarStats] = useState(null)
   const [calendarLoading, setCalendarLoading] = useState(true)
 
+  // Day-ahead spot price over time — Consommation tab. National (no region
+  // filter), follows the shared date range like production/météo.
+  const [marketPriceData, setMarketPriceData] = useState([])
+  const [priceLoading, setPriceLoading] = useState(true)
+
   // Maintenance events — Capacité tab
   const [maintenanceEvents, setMaintenanceEvents] = useState([])
   const [maintenanceLoading, setMaintenanceLoading] = useState(true)
@@ -336,6 +341,19 @@ export default function DashboardPage() {
       .catch(() => {})
     return () => { cancelled = true }
   }, [])
+
+  // Day-ahead spot price — national, refetched when the shared date range
+  // changes (same range as production/météo; independent of region since
+  // price has no region dimension).
+  useEffect(() => {
+    let cancelled = false
+    setPriceLoading(true)
+    fetchMarketPrice({ startDate, endDate })
+      .then(result => { if (!cancelled) setMarketPriceData(result.data || []) })
+      .catch(() => { if (!cancelled) setMarketPriceData([]) })
+      .finally(() => { if (!cancelled) setPriceLoading(false) })
+    return () => { cancelled = true }
+  }, [startDate, endDate])
 
   // Cross-border flow — refetched when the Export tab's period selector changes
   useEffect(() => {
@@ -518,9 +536,6 @@ export default function DashboardPage() {
     [capacityBySource]
   )
 
-  // Prix négatifs tab: 3rd/4th chiffres
-  const avgHoursPerDay = calendarStats?.total_hours && calendarStats?.total_days
-    ? (calendarStats.total_hours / calendarStats.total_days).toFixed(1) : null
 
   // Écologie tab: 3rd/4th chiffres — greenest / most-loaded region
   const { greenestRegion, dirtiestRegion } = useMemo(() => {
@@ -584,7 +599,7 @@ export default function DashboardPage() {
   }
   const TABS = [
     { id: 'production',    label: 'Production' },
-    { id: 'prixnegatifs',  label: 'Conso & prix nég.' },
+    { id: 'prixnegatifs',  label: 'Consommation' },
     { id: 'capacite',      label: 'Capacité' },
     { id: 'ecologie',      label: 'Écologie' },
     { id: 'export',        label: 'Export' },
@@ -608,7 +623,11 @@ export default function DashboardPage() {
               value={endDate} min={startDate} max={isoDate(0)} aria-label="Date de fin" data-testid="date-end"
               onChange={e => { setEndDate(e.target.value); handleDateChange(startDate, e.target.value) }} />
             <div className="date-bar__presets">
-              {[{ label: '24h', days: -1 }, { label: '7j', days: -7 }, { label: '30j', days: -30 }].map(({ label, days }) => (
+              {/* 6m mostly matters for the Consommation tab's price chart
+                  (real ~5.5 month retention there) — other tabs' sources
+                  retain less, so it just returns whatever they actually
+                  have instead of the full 6 months. */}
+              {[{ label: '24h', days: -1 }, { label: '7j', days: -7 }, { label: '30j', days: -30 }, { label: '6m', days: -182 }].map(({ label, days }) => (
                 <button key={label} onClick={() => {
                   const s = isoDate(days); const e = isoDate(0)
                   setStartDate(s); setEndDate(e); handleDateChange(s, e)
@@ -693,52 +712,38 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* ── Prix négatifs : calendrier + tendance mensuelle | sélecteur + carte EnR + 2 chiffres ── */}
+        {/* ── Consommation : prix spot + calendrier | sélecteur + carte export/import + 2 chiffres ── */}
         {activeTab === 'prixnegatifs' && !error && (
           <div className="pbi-layout">
-            <div className="pbi-layout__left">
-              <div className="pbi-layout__kpi-row" style={{ gridTemplateColumns: '1fr 1fr 1fr 1fr' }}>
-                <KPICard
-                  title="Consommation"
-                  explain="Consommation électrique actuelle sur la période sélectionnée."
-                  value={latestConsommation != null ? Math.round(latestConsommation).toLocaleString('fr-FR') : '—'} unit="MW"
-                  loading={loading || refreshing}
-                />
-                <KPICard
-                  title="Heures à prix négatif"
-                  explain="Total d'heures cumulées à prix négatif sur tout l'historique disponible."
-                  value={calendarStats?.total_hours ?? '—'} unit="h"
-                  sublabel={calendarRange?.start ? `Depuis le ${calendarRange.start} (${calendarStats?.total_days ?? '—'} jours)` : undefined}
-                  loading={calendarLoading || !calendarStats}
-                />
-                <KPICard
-                  title="Record négatif"
-                  explain="Le prix le plus bas jamais observé — un vrai décrochage, pas un arrondi : surplus massif d'énergie renouvelable un jour de faible demande."
-                  value={calendarStats?.record_price != null ? calendarStats.record_price.toFixed(2).replace('.', ',') : '—'}
-                  unit="€/MWh"
-                  sublabel={calendarStats?.record_date ? `Le ${calendarStats.record_date}` : undefined}
-                  loading={calendarLoading || !calendarStats}
-                />
-                <KPICard
-                  title="Meilleur prix"
-                  explain="Le prix le plus haut jamais observé sur la même période — pic de demande, faible production."
-                  value={calendarStats?.best_price != null ? calendarStats.best_price.toFixed(2).replace('.', ',') : '—'}
-                  unit="€/MWh"
-                  sublabel={calendarStats?.best_date ? `Le ${calendarStats.best_date}` : undefined}
-                  loading={calendarLoading || !calendarStats}
-                />
-              </div>
+            <div className="pbi-layout__left pbi-layout__left--no-kpi">
+              <PriceTrendChart data={marketPriceData} loading={priceLoading} />
+              {/* hideStats=false — its own built-in stats (heures à prix
+                  négatif + record) are literally "fréquence et intensité",
+                  no need to duplicate them in a KPI row above too. */}
               <CurtailmentCalendar
                 days={calendarDays}
                 range={calendarRange}
                 stats={calendarStats}
                 loading={calendarLoading || !calendarStats}
-                hideStats
                 compact
               />
-              <NegativePriceTrend days={calendarDays} loading={calendarLoading} />
             </div>
             <div className="pbi-layout__right">
+              <div className="pbi-layout__kpi-row pbi-layout__kpi-row--compact">
+                <TrendKpiCard
+                  title={selectedRegionName ? `Consommation — ${selectedRegionName}` : 'Consommation'}
+                  explain="Consommation électrique actuelle, avec sa courbe sur la période sélectionnée."
+                  value={latestConsommation != null ? Math.round(latestConsommation).toLocaleString('fr-FR') : '—'} unit="MW"
+                  color="#f59e0b" sparkData={consommationSparkData} loading={loading || refreshing}
+                />
+                <KPICard
+                  title="Heures à prix négatif"
+                  explain="Total d'heures cumulées à prix négatif sur tout l'historique disponible."
+                  value={calendarStats?.total_hours ?? '—'} unit="h"
+                  sublabel={calendarRange?.start ? `Depuis le ${calendarRange.start}` : undefined}
+                  loading={calendarLoading || !calendarStats}
+                />
+              </div>
               <div className="pbi-layout__map-wrap">
                 <FranceMap
                   regions={regions}
@@ -748,38 +753,19 @@ export default function DashboardPage() {
                   selectedCode={selectedRegion}
                   onSelect={handleRegionChange}
                   loading={loading}
-                  mode="carbon"
-                  availableModes={['carbon']}
+                  mode="balance"
+                  availableModes={['balance']}
                 />
               </div>
               {buildControlsColumn()}
             </div>
           </div>
         )}
-        {activeTab === 'prixnegatifs' && !error && (
-          <p style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', marginTop: 8 }}>
-            Carte : intensité carbone comme proxy de la "raison" (surplus renouvelable) — en attendant une vraie
-            feature de prédiction, elle pourrait afficher une probabilité de prix négatif par région.
-          </p>
-        )}
 
         {/* ── Capacité : taux d'utilisation + événements | sélecteur + carte maintenance + 2 chiffres ── */}
         {activeTab === 'capacite' && !error && (
           <div className="pbi-layout">
-            <div className="pbi-layout__left">
-              <div className="pbi-layout__kpi-row">
-                <KPICard
-                  title="Événements en cours"
-                  explain="Nombre total d'événements de maintenance publiés par ENTSO-E."
-                  value={maintenanceEventCount} loading={maintenanceLoading}
-                />
-                <KPICard
-                  title="MW indisponibles"
-                  explain="Somme des puissances concernées par un événement de maintenance."
-                  value={Math.round(maintenanceTotalMw).toLocaleString('fr-FR')} unit="MW"
-                  loading={maintenanceLoading}
-                />
-              </div>
+            <div className="pbi-layout__left pbi-layout__left--no-kpi">
               <CapacityFactorChart
                 capacityBySource={capacityBySource}
                 productionBySource={avgProductionBySource}
@@ -813,6 +799,19 @@ export default function DashboardPage() {
               </section>
             </div>
             <div className="pbi-layout__right">
+              <div className="pbi-layout__kpi-row pbi-layout__kpi-row--compact">
+                <KPICard
+                  title="Événements en cours"
+                  explain="Nombre total d'événements de maintenance publiés par ENTSO-E."
+                  value={maintenanceEventCount} loading={maintenanceLoading}
+                />
+                <KPICard
+                  title="MW indisponibles"
+                  explain="Somme des puissances concernées par un événement de maintenance."
+                  value={Math.round(maintenanceTotalMw).toLocaleString('fr-FR')} unit="MW"
+                  loading={maintenanceLoading}
+                />
+              </div>
               <div className="pbi-layout__map-wrap">
                 <MaintenanceMap maintenanceEvents={maintenanceEvents} loading={maintenanceLoading} />
               </div>

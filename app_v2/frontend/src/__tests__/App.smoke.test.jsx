@@ -20,6 +20,7 @@ vi.mock('../services/api.js', () => ({
   fetchNationalMix:       vi.fn().mockResolvedValue({ data: [] }),
   fetchMaintenance:       vi.fn().mockResolvedValue({ data: [] }),
   fetchCurtailmentCalendar: vi.fn().mockResolvedValue({ days: [], range: null, stats: null }),
+  fetchMarketPrice:       vi.fn().mockResolvedValue({ data: [] }),
   fetchCrossBorder:       vi.fn().mockResolvedValue({ summary: [] }),
   fetchProductionUnits:   vi.fn().mockResolvedValue({ data: [] }),
 }))

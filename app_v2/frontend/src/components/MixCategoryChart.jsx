@@ -3,6 +3,13 @@
  * raw source list: renouvelable (EnR), nucléaire (bas carbone, pas
  * renouvelable), fossile (thermique — RTE's regional feed only publishes
  * fossil thermal as one combined figure, not split by gaz/charbon/fioul).
+ *
+ * Overlaid, not stacked — same fix as HistoryChart, same reason: stacking
+ * put Nucléaire (usually the dominant category, ~65-70%) in the *middle*
+ * of the stack (Renouvelable, then Nucléaire, then Fossile, plain object
+ * key order), so its cumulative line never read as dominant no matter how
+ * big it actually was. Overlaying means each line's height is that
+ * category's own value directly.
  */
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import { useMemo } from 'react'
@@ -10,6 +17,9 @@ import { useMemo } from 'react'
 const RENEWABLE = new Set(['eolien', 'solaire', 'hydraulique', 'bioenergies'])
 const FOSSIL = new Set(['thermique', 'gaz', 'charbon', 'fioul'])
 
+// Rendered in this order (largest typical share first) so smaller
+// categories' lines draw on top and stay visible.
+const CATEGORY_ORDER = ['nucleaire', 'renouvelable', 'fossile']
 const CATEGORY_COLORS = { renouvelable: '#10b981', nucleaire: '#7c3aed', fossile: '#ef4444' }
 const CATEGORY_LABELS = { renouvelable: 'Renouvelable', nucleaire: 'Nucléaire', fossile: 'Fossile' }
 
@@ -62,10 +72,10 @@ export function MixCategoryChart({ data = [], loading = false }) {
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={chartData} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
             <defs>
-              {Object.entries(CATEGORY_COLORS).map(([key, color]) => (
+              {CATEGORY_ORDER.map(key => (
                 <linearGradient key={key} id={`cat-grad-${key}`} x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor={color} stopOpacity={0.4} />
-                  <stop offset="95%" stopColor={color} stopOpacity={0.05} />
+                  <stop offset="5%" stopColor={CATEGORY_COLORS[key]} stopOpacity={0.18} />
+                  <stop offset="95%" stopColor={CATEGORY_COLORS[key]} stopOpacity={0.02} />
                 </linearGradient>
               ))}
             </defs>
@@ -77,8 +87,8 @@ export function MixCategoryChart({ data = [], loading = false }) {
               labelStyle={{ color: 'var(--color-text)', fontWeight: 600 }}
             />
             <Legend formatter={name => CATEGORY_LABELS[name] || name} />
-            {Object.keys(CATEGORY_COLORS).map(key => (
-              <Area key={key} type="monotone" dataKey={key} stackId="cat" stroke={CATEGORY_COLORS[key]} fill={`url(#cat-grad-${key})`} strokeWidth={1.5} />
+            {CATEGORY_ORDER.map(key => (
+              <Area key={key} type="monotone" dataKey={key} stroke={CATEGORY_COLORS[key]} fill={`url(#cat-grad-${key})`} strokeWidth={1.5} isAnimationActive={false} />
             ))}
           </AreaChart>
         </ResponsiveContainer>
