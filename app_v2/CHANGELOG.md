@@ -1,3 +1,5 @@
+## [1.33.8](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.33.7...v1.33.8) (2026-09-19)
+
 ## [1.33.7](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.33.6...v1.33.7) (2026-09-19)
 
 ## [1.33.6](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.33.5...v1.33.6) (2026-09-19)
