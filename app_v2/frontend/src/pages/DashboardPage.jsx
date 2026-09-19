@@ -3,9 +3,10 @@
  * Fetches production/météo/capacity data from the FastAPI backend.
  * Public, no auth — portfolio showroom.
  *
- * Four themed tabs: Production (live mix) / Capacité (installed vs used,
- * maintenance) / Écologie (carbon + renewable share) / Export (regional +
- * cross-border flows, on a shared period selector).
+ * Five themed tabs: Production (live mix) / Consommation (prix spot) /
+ * Capacité (installed vs used, maintenance) / Renouvelable (carbon +
+ * regional renewable ranking) / Export (regional + cross-border flows,
+ * on a shared period selector).
  */
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { KPICard } from '../components/KPICard.jsx'
@@ -18,7 +19,7 @@ import { CapacityFactorChart } from '../components/CapacityFactorChart.jsx'
 import { EnergySankey } from '../components/EnergySankey.jsx'
 import { TrendKpiCard } from '../components/TrendKpiCard.jsx'
 import { MaintenanceMap, normalize as normalizeUnitName } from '../components/MaintenanceMap.jsx'
-import { MixCategoryChart } from '../components/MixCategoryChart.jsx'
+import { RenewableRankingChart } from '../components/RenewableRankingChart.jsx'
 import { MixBar } from '../components/MixBar.jsx'
 import { PriceTrendChart } from '../components/PriceTrendChart.jsx'
 import {
@@ -29,6 +30,7 @@ import { ProdConsChart } from '../components/ProdConsChart.jsx'
 import { RegionSelector } from '../components/RegionSelector.jsx'
 import { MeteoChart } from '../components/MeteoChart.jsx'
 import { CapacityChart } from '../components/CapacityChart.jsx'
+import { renewablePct } from '../utils/mixCategories.js'
 
 // HistoryChart and CapacityChart are kept imported (even if not rendered) to preserve
 // recharts module evaluation order in the production bundle — removing them shifts
@@ -240,7 +242,7 @@ export default function DashboardPage() {
   const [crossBorderLoading, setCrossBorderLoading] = useState(true)
 
   // Écologie/Export map mode toggle
-  const [mapMode, setMapMode] = useState('carbon')
+  const [mapMode, setMapMode] = useState('renewable')
 
   /**
    * Load production data.
@@ -410,8 +412,8 @@ export default function DashboardPage() {
     return () => clearInterval(id)
   }, [selectedRegion, startDate, endDate, loadData])
 
-  // Compute per-region totals + carbon intensity for choropleth (latest point per region)
-  const { regionTotals, regionConsommation, regionCarbon } = useMemo(() => {
+  // Compute per-region totals + carbon intensity + renewable share for choropleth (latest point per region)
+  const { regionTotals, regionConsommation, regionCarbon, regionRenewable } = useMemo(() => {
     const latest = {}
     for (const r of globalData) {
       if (!latest[r.code_insee] || r.timestamp > latest[r.code_insee].timestamp) {
@@ -421,13 +423,24 @@ export default function DashboardPage() {
     const totals = {}
     const conso  = {}
     const carbon = {}
+    const renewable = {}
     for (const [code, rec] of Object.entries(latest)) {
       totals[code] = Object.values(rec.sources).reduce((s, v) => s + (v > 0 ? v : 0), 0)
       if (rec.consommation_mw != null) conso[code] = rec.consommation_mw
       carbon[code] = computeCarbonIntensity(rec.sources || {})
+      renewable[code] = renewablePct(rec.sources || {})
     }
-    return { regionTotals: totals, regionConsommation: conso, regionCarbon: carbon }
+    return { regionTotals: totals, regionConsommation: conso, regionCarbon: carbon, regionRenewable: renewable }
   }, [globalData])
+
+  // Per-region renewable-share ranking (Renouvelable tab's left chart) —
+  // same numbers as the map's "Renouvelable" mode, just as a sorted list.
+  const regionRenewableRanking = useMemo(
+    () => regions
+      .filter(r => regionRenewable[r.code_insee] != null)
+      .map(r => ({ code_insee: r.code_insee, region: r.region, pct: regionRenewable[r.code_insee] })),
+    [regions, regionRenewable]
+  )
 
   // Aggregated data for charts (sum/average across all regions when no region selected)
   const aggregatedProdData = useMemo(
@@ -592,7 +605,7 @@ export default function DashboardPage() {
     { id: 'production',    label: 'Production' },
     { id: 'prixnegatifs',  label: 'Consommation' },
     { id: 'capacite',      label: 'Capacité' },
-    { id: 'ecologie',      label: 'Écologie' },
+    { id: 'ecologie',      label: 'Renouvelable' },
     { id: 'export',        label: 'Export' },
   ]
 
@@ -811,11 +824,11 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* ── Écologie : mix par catégorie | sélecteur + carte carbone + CO2/ratio mix ── */}
+        {/* ── Renouvelable : classement régional | sélecteur + carte renouvelable/nucléaire + CO2/ratio mix ── */}
         {activeTab === 'ecologie' && !error && (
           <div className="pbi-layout">
             <div className="pbi-layout__left pbi-layout__left--no-kpi-single">
-              <MixCategoryChart data={aggregatedProdData} loading={loading || refreshing} />
+              <RenewableRankingChart data={regionRenewableRanking} loading={loading || refreshing} />
             </div>
             <div className="pbi-layout__right">
               <div className="pbi-layout__kpi-row pbi-layout__kpi-row--compact">
@@ -828,12 +841,14 @@ export default function DashboardPage() {
                   regionTotals={regionTotals}
                   regionConsommation={regionConsommation}
                   regionCarbon={regionCarbon}
+                  regionRenewable={regionRenewable}
                   selectedCode={selectedRegion}
                   onSelect={handleRegionChange}
                   loading={loading}
                   mode={mapMode}
                   onModeChange={setMapMode}
-                  availableModes={['carbon', 'volume']}
+                  availableModes={['renewable', 'volume']}
+                  showNuclearPlants={mapMode === 'renewable'}
                 />
               </div>
               {buildControlsColumn()}

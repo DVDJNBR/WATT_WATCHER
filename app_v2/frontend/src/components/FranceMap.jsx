@@ -9,9 +9,10 @@
  * moved out entirely: showing installations on every tab's map was noise,
  * they now only appear once, on the dedicated MaintenanceMap.
  */
-import { memo, useState, useMemo } from 'react'
+import { memo, useState, useMemo, useEffect } from 'react'
 import { ComposableMap, Geographies, Geography, Marker, ZoomableGroup } from 'react-simple-maps'
 import { geoCentroid } from 'd3-geo'
+import { fetchProductionUnits } from '../services/api.js'
 
 const GEO_URL = '/france-regions.geojson'
 
@@ -19,6 +20,8 @@ const PROJECTION_CONFIG = { center: [2.5, 46.5], scale: 2200 }
 
 const LOW_COLOR  = [24, 45, 44]     // dim, desaturated teal
 const HIGH_COLOR = [45, 212, 191]   // #2dd4bf — accent teal
+const RENEWABLE_LOW  = [30, 42, 34]  // dim, desaturated green
+const RENEWABLE_HIGH = [16, 185, 129] // #10b981 — renewable green (matches mix ratio gauge)
 
 function lerp(a, b, t) { return Math.round(a + (b - a) * t) }
 
@@ -26,6 +29,14 @@ function lerp(a, b, t) { return Math.round(a + (b - a) * t) }
 function volumeColor(prod, maxProd) {
   const t = maxProd > 0 ? Math.min(1, Math.max(0, prod / maxProd)) : 0
   const [r, g, b] = LOW_COLOR.map((c, i) => lerp(c, HIGH_COLOR[i], t))
+  return `rgb(${r}, ${g}, ${b})`
+}
+
+/** Interpolate a green intensity from a region's own renewable share (0-100%). */
+function renewableColor(pct) {
+  if (pct == null) return '#1c2538'
+  const t = Math.min(1, Math.max(0, pct / 100))
+  const [r, g, b] = RENEWABLE_LOW.map((c, i) => lerp(c, RENEWABLE_HIGH[i], t))
   return `rgb(${r}, ${g}, ${b})`
 }
 
@@ -54,10 +65,11 @@ function balanceColor(ratio) {
 }
 
 const MODE_LABELS = {
-  volume:  'Production par région',
-  carbon:  'Intensité carbone par région',
-  share:   'Part de la production nationale',
-  balance: 'Régions exportatrices / importatrices',
+  volume:     'Production par région',
+  carbon:     'Intensité carbone par région',
+  share:      'Part de la production nationale',
+  balance:    'Régions exportatrices / importatrices',
+  renewable:  'Part renouvelable par région',
 }
 
 /**
@@ -74,16 +86,28 @@ export const FranceMap = memo(function FranceMap({
   regions = [],
   regionTotals = {},
   regionConsommation = {},
-  regionCarbon = {},   // { [code_insee]: gCO2/kWh } — used when mode="carbon"
+  regionCarbon = {},     // { [code_insee]: gCO2/kWh } — used when mode="carbon"
+  regionRenewable = {},  // { [code_insee]: pct 0-100 } — used when mode="renewable"
   selectedCode,
   onSelect,
   loading = false,
-  mode = 'volume',       // 'volume' | 'carbon' | 'share' | 'balance'
+  mode = 'volume',       // 'volume' | 'carbon' | 'share' | 'balance' | 'renewable'
   onModeChange = null,   // (mode) => void — omit to hide the toggle
   availableModes = ['volume', 'carbon', 'share'],
+  showNuclearPlants = false,  // overlay geolocated nuclear plants as pins
 }) {
   const [hovered, setHovered] = useState(null)   // { name, prod, conso, x, y }
   const [position, setPosition] = useState({ coordinates: [2.5, 46.5], zoom: 1 })
+  const [nuclearPlants, setNuclearPlants] = useState([])
+
+  useEffect(() => {
+    if (!showNuclearPlants) return
+    let cancelled = false
+    fetchProductionUnits({})
+      .then(res => { if (!cancelled) setNuclearPlants((res.data || []).filter(u => u.psr_type === 'nuclear')) })
+      .catch(() => { if (!cancelled) setNuclearPlants([]) })
+    return () => { cancelled = true }
+  }, [showNuclearPlants])
 
   const availableCodes = useMemo(() => new Set(regions.map(r => r.code_insee)), [regions])
   const selectedRegionName = regions.find(r => r.code_insee === selectedCode)?.region
@@ -109,10 +133,11 @@ export const FranceMap = memo(function FranceMap({
           {onModeChange && (
             <div className="tab-bar" role="tablist" aria-label="Mode de la carte" style={{ padding: 0 }}>
               {[
-                { id: 'volume',  label: 'Volume' },
-                { id: 'carbon',  label: 'Carbone' },
-                { id: 'share',   label: 'Part nat.' },
-                { id: 'balance', label: 'Export/Import' },
+                { id: 'volume',     label: 'Volume' },
+                { id: 'carbon',     label: 'Carbone' },
+                { id: 'share',      label: 'Part nat.' },
+                { id: 'balance',    label: 'Export/Import' },
+                { id: 'renewable',  label: 'Renouvelable' },
               ].filter(m => availableModes.includes(m.id)).map(m => (
                 <button key={m.id} role="tab" aria-selected={mode === m.id}
                   className={`tab-bar__item${mode === m.id ? ' tab-bar__item--active' : ''}`}
@@ -162,6 +187,7 @@ export const FranceMap = memo(function FranceMap({
                   const prod       = regionTotals[code] ?? 0
                   const conso      = regionConsommation[code] ?? null
                   const carbon     = regionCarbon[code] ?? null
+                  const renewable  = regionRenewable[code] ?? null
                   const share      = nationalTotal > 0 ? (prod / nationalTotal) * 100 : 0
                   const balance    = conso != null && conso > 0 ? (prod - conso) / conso : null
                   const fill       = isSelected
@@ -172,6 +198,8 @@ export const FranceMap = memo(function FranceMap({
                     ? carbonColor(carbon)
                     : mode === 'balance'
                     ? balanceColor(balance)
+                    : mode === 'renewable'
+                    ? renewableColor(renewable)
                     : volumeColor(prod, maxProd)
 
                   return (
@@ -181,7 +209,7 @@ export const FranceMap = memo(function FranceMap({
                       onClick={() => hasData && onSelect(code)}
                       onMouseEnter={e => {
                         if (!hasData) return
-                        setHovered({ name: nom, prod, conso, carbon, share, balance, x: e.clientX, y: e.clientY })
+                        setHovered({ name: nom, prod, conso, carbon, renewable, share, balance, x: e.clientX, y: e.clientY })
                       }}
                       onMouseMove={e => {
                         if (hovered) setHovered(h => ({ ...h, x: e.clientX, y: e.clientY }))
@@ -236,11 +264,25 @@ export const FranceMap = memo(function FranceMap({
                 }
               </Geographies>
             )}
+            {showNuclearPlants && nuclearPlants.map(plant => (
+              <Marker key={plant.name} coordinates={[plant.lon, plant.lat]}
+                onMouseEnter={e => setHovered(h => ({ ...(h || {}), plant: plant.name, x: e.clientX, y: e.clientY }))}
+                onMouseMove={e => setHovered(h => (h && h.plant ? { ...h, x: e.clientX, y: e.clientY } : h))}
+                onMouseLeave={() => setHovered(h => (h && h.plant ? null : h))}>
+                <circle r={4} fill="#7c3aed" fillOpacity={0.85} stroke="#c4b5fd" strokeWidth={1} />
+              </Marker>
+            ))}
             </ZoomableGroup>
           </ComposableMap>
 
           {/* Floating tooltip */}
-          {hovered && (
+          {hovered && hovered.plant && (
+            <div className="map-tooltip" style={{ position: 'fixed', left: hovered.x + 14, top: hovered.y - 32 }}>
+              <strong>{hovered.plant}</strong>
+              <span className="map-tooltip__value" style={{ color: '#c4b5fd' }}>Centrale nucléaire</span>
+            </div>
+          )}
+          {hovered && !hovered.plant && (
             <div
               className="map-tooltip"
               style={{ position: 'fixed', left: hovered.x + 14, top: hovered.y - 52 }}
@@ -252,6 +294,11 @@ export const FranceMap = memo(function FranceMap({
               {mode === 'carbon' && hovered.carbon != null && (
                 <span style={{ color: carbonColor(hovered.carbon), fontSize: '0.75rem' }}>
                   {hovered.carbon} gCO₂/kWh
+                </span>
+              )}
+              {mode === 'renewable' && hovered.renewable != null && (
+                <span style={{ color: renewableColor(hovered.renewable), fontSize: '0.75rem' }}>
+                  {hovered.renewable} % renouvelable
                 </span>
               )}
               {mode === 'share' && (
@@ -301,6 +348,19 @@ export const FranceMap = memo(function FranceMap({
           />
           <span className="map-legend__item">faible → élevée</span>
           <span className="map-legend__item" style={{ color: '#4a5568' }}>● Pas de données</span>
+        </div>
+      )}
+      {!loading && mode === 'renewable' && (
+        <div className="map-legend">
+          <span className="map-legend__item">Part renouvelable</span>
+          <span
+            className="map-legend__gradient"
+            style={{ background: `linear-gradient(90deg, rgb(${RENEWABLE_LOW.join(',')}), rgb(${RENEWABLE_HIGH.join(',')}))` }}
+          />
+          <span className="map-legend__item">faible → élevée</span>
+          {showNuclearPlants && (
+            <span className="map-legend__item" style={{ color: '#c4b5fd' }}>● Centrale nucléaire</span>
+          )}
         </div>
       )}
 
