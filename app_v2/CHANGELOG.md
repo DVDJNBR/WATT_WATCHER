@@ -1,3 +1,9 @@
+## [1.33.5](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.33.4...v1.33.5) (2026-09-19)
+
+### Bug Fixes
+
+* **dashboard:** overlay HistoryChart/MixCategoryChart, widen charts, rebuild Consommation tab ([873d927](https://github.com/DVDJNBR/WATT_WATCHER/commit/873d927730e8659814c83f0ed4749eab83b643a1))
+
 ## [1.33.4](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.33.3...v1.33.4) (2026-09-18)
 
 ### Bug Fixes
