@@ -1,3 +1,9 @@
+## [1.33.11](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.33.10...v1.33.11) (2026-09-19)
+
+### Bug Fixes
+
+* **dashboard:** darker heatmap troughs, blue ranking bars, dual-line balance card ([a87f73a](https://github.com/DVDJNBR/WATT_WATCHER/commit/a87f73a14fdd8290a514b850fe30e03e007dd11d))
+
 ## [1.33.10](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.33.9...v1.33.10) (2026-09-19)
 
 ### Bug Fixes
