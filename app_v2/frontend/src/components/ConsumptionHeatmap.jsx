@@ -16,14 +16,23 @@ function isoWeekday(date) {
   return d === 0 ? 6 : d - 1 // 0=Mon..6=Sun
 }
 
+// Dark amber-tinted near-black -> full-saturation amber. A true RGB ramp
+// (not an opacity blend into the card background) so the low end actually
+// reads as dark instead of washed-out — opacity blending never gets dark
+// enough to give the range real amplitude.
+const DARK  = [32, 24, 12]
+const BRIGHT = [245, 158, 11] // #f59e0b
+
+function lerp(a, b, t) { return Math.round(a + (b - a) * t) }
+
 // Normalized against the observed min-max (not 0) — national consumption
 // never gets close to 0, so anchoring the ramp there would squeeze the
 // entire real day/night swing into a narrow, low-contrast top slice.
 function cellColor(v, min, max) {
   if (v == null) return 'var(--color-surface-2)'
   const t = max > min ? Math.min(1, Math.max(0, (v - min) / (max - min))) : 0.5
-  const alpha = 0.12 + t * 0.88
-  return `color-mix(in srgb, #f59e0b ${Math.round(alpha * 100)}%, var(--color-surface-2))`
+  const [r, g, b] = DARK.map((c, i) => lerp(c, BRIGHT[i], t))
+  return `rgb(${r}, ${g}, ${b})`
 }
 
 /** @param {{ data: Array<{timestamp:string, consommation_mw:number}>, loading?: boolean }} props */

@@ -476,6 +476,15 @@ export default function DashboardPage() {
     })),
     [aggregatedProdData]
   )
+  // Balance sparkline (prod - conso) — the small line chart the KPI card
+  // shows instead of a full chart taking up chart real estate.
+  const soldeSparkData = useMemo(() =>
+    aggregatedProdData.slice(-96).filter(r => r.consommation_mw != null).map(r => ({
+      t: r.timestamp,
+      v: Object.values(r.sources || {}).reduce((s, v) => s + (v > 0 ? v : 0), 0) - r.consommation_mw,
+    })),
+    [aggregatedProdData]
+  )
   // Capacity factor (bullet chart) — average production vs installed capacity, per source
   const avgProductionBySource = useMemo(() => averageBySource(aggregatedProdData), [aggregatedProdData])
   const capacityBySource = useMemo(() => latestCapacityBySource(capacityData), [capacityData])
@@ -723,11 +732,11 @@ export default function DashboardPage() {
                   value={latestConsommation != null ? Math.round(latestConsommation).toLocaleString('fr-FR') : '—'} unit="MW"
                   color="#f59e0b" sparkData={consommationSparkData} loading={loading || refreshing}
                 />
-                <KPICard
+                <TrendKpiCard
                   title="Équilibre prod/conso"
-                  explain="Écart entre la production et la consommation actuelles — positif quand la production dépasse la consommation."
+                  explain="Écart entre la production et la consommation, avec sa courbe sur la période sélectionnée — positif quand la production dépasse la consommation."
                   value={soldeMw != null ? `${soldeMw >= 0 ? '+' : ''}${Math.round(soldeMw).toLocaleString('fr-FR')}` : '—'} unit="MW"
-                  loading={loading || refreshing}
+                  color="#2dd4bf" sparkData={soldeSparkData} loading={loading || refreshing}
                 />
               </div>
               <div className="pbi-layout__map-wrap">
