@@ -173,6 +173,9 @@ body {
 /* Production tab: the 2 KPI cards live above the map instead (see
    .pbi-layout__kpi-row--compact), so the left column is just 2 chart rows. */
 .pbi-layout__left--no-kpi { grid-template-rows: 1fr 1fr; }
+/* Écologie tab: same "KPI cards moved to the map side" pattern, but only one
+   chart remains on the left (MixCategoryChart) — a single full-height row. */
+.pbi-layout__left--no-kpi-single { grid-template-rows: 1fr; }
 
 .pbi-layout__kpi-row {
   display: grid;
@@ -917,6 +920,42 @@ input[type="date"] {
   padding: 2px 8px;
   border-radius: 999px;
   letter-spacing: 0.04em;
+}
+
+/* ── Mix ratio gauge (half-donut renouvelable/nucléaire/fossile) ─────────── */
+.mix-ratio-gauge__arc {
+  height: 52px;
+  margin-top: 2px;
+}
+
+.mix-ratio-gauge__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+}
+
+.mix-ratio-gauge__legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.7rem;
+  color: var(--color-text-muted);
+}
+
+.mix-ratio-gauge__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.mix-ratio-gauge__empty {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  margin: 8px 0 0;
 }
 
 /* ── Auth pages ───────────────────────────────────────────────────────────── */

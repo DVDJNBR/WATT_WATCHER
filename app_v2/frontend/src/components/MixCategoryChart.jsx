@@ -18,10 +18,11 @@ const RENEWABLE = new Set(['eolien', 'solaire', 'hydraulique', 'bioenergies'])
 const FOSSIL = new Set(['thermique', 'gaz', 'charbon', 'fioul'])
 
 // Rendered in this order (largest typical share first) so smaller
-// categories' lines draw on top and stay visible.
-const CATEGORY_ORDER = ['nucleaire', 'renouvelable', 'fossile']
-const CATEGORY_COLORS = { renouvelable: '#10b981', nucleaire: '#7c3aed', fossile: '#ef4444' }
-const CATEGORY_LABELS = { renouvelable: 'Renouvelable', nucleaire: 'Nucléaire', fossile: 'Fossile' }
+// categories' lines draw on top and stay visible. Shared with MixRatioGauge
+// so both views of "renouvelable/nucléaire/fossile" stay in sync.
+export const CATEGORY_ORDER = ['nucleaire', 'renouvelable', 'fossile']
+export const CATEGORY_COLORS = { renouvelable: '#10b981', nucleaire: '#7c3aed', fossile: '#ef4444' }
+export const CATEGORY_LABELS = { renouvelable: 'Renouvelable', nucleaire: 'Nucléaire', fossile: 'Fossile' }
 
 function formatTs(ts) {
   const d = new Date(ts)
@@ -29,7 +30,7 @@ function formatTs(ts) {
   return d.toLocaleString('fr-FR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
 
-function categorize(sources) {
+export function categorize(sources) {
   let renouvelable = 0, nucleaire = 0, fossile = 0
   for (const [src, mw] of Object.entries(sources || {})) {
     if (typeof mw !== 'number' || mw <= 0) continue

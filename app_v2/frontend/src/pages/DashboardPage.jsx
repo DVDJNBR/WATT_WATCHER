@@ -13,12 +13,11 @@ import { FranceMap } from '../components/FranceMap.jsx'
 import { CurtailmentCalendar } from '../components/CurtailmentCalendar.jsx'
 import { HistoryChart } from '../components/HistoryChart.jsx'
 import { CarbonBadge, computeCarbonIntensity } from '../components/CarbonBadge.jsx'
-import { RenewableShare, computeRenewableShare } from '../components/RenewableShare.jsx'
+import { MixRatioGauge } from '../components/MixRatioGauge.jsx'
 import { CapacityFactorChart } from '../components/CapacityFactorChart.jsx'
 import { EnergySankey } from '../components/EnergySankey.jsx'
 import { TrendKpiCard } from '../components/TrendKpiCard.jsx'
 import { MaintenanceMap, normalize as normalizeUnitName } from '../components/MaintenanceMap.jsx'
-import { RenewableTrendChart } from '../components/RenewableTrendChart.jsx'
 import { MixCategoryChart } from '../components/MixCategoryChart.jsx'
 import { MixBar } from '../components/MixBar.jsx'
 import { PriceTrendChart } from '../components/PriceTrendChart.jsx'
@@ -450,7 +449,6 @@ export default function DashboardPage() {
     : {}
   const totalMw = computeTotalMw(displayData)
   const carbonIntensity = computeCarbonIntensity(lastSources)
-  const renewableShare = computeRenewableShare(lastSources)
   // Only valid for the France-wide view — RTE never splits gaz/charbon/fioul per region.
   const latestNationalMix = !selectedRegion && nationalMixData.length
     ? nationalMixData[nationalMixData.length - 1].sources
@@ -461,13 +459,6 @@ export default function DashboardPage() {
     displayData.slice(-96).map(r => ({
       t: r.timestamp,
       v: computeCarbonIntensity(r.sources || {}),
-    })),
-    [displayData]
-  )
-  const enrSparkData = useMemo(() =>
-    displayData.slice(-96).map(r => ({
-      t: r.timestamp,
-      v: computeRenewableShare(r.sources || {}),
     })),
     [displayData]
   )
@@ -820,18 +811,17 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* ── Écologie : part EnR + mix par catégorie | sélecteur + carte carbone + CO2/EnR ── */}
+        {/* ── Écologie : mix par catégorie | sélecteur + carte carbone + CO2/ratio mix ── */}
         {activeTab === 'ecologie' && !error && (
           <div className="pbi-layout">
-            <div className="pbi-layout__left">
-              <div className="pbi-layout__kpi-row">
-                <CarbonBadge intensity={carbonIntensity} sparkData={sparkData} loading={loading} />
-                <RenewableShare share={renewableShare} sparkData={enrSparkData} loading={loading} />
-              </div>
-              <RenewableTrendChart data={displayData} loading={loading || refreshing} />
+            <div className="pbi-layout__left pbi-layout__left--no-kpi-single">
               <MixCategoryChart data={aggregatedProdData} loading={loading || refreshing} />
             </div>
             <div className="pbi-layout__right">
+              <div className="pbi-layout__kpi-row pbi-layout__kpi-row--compact">
+                <CarbonBadge intensity={carbonIntensity} sparkData={sparkData} loading={loading} />
+                <MixRatioGauge sources={lastSources} loading={loading} />
+              </div>
               <div className="pbi-layout__map-wrap">
                 <FranceMap
                   regions={regions}
