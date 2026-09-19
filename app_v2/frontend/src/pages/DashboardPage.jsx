@@ -25,7 +25,7 @@ import {
   fetchAllProduction, fetchRegions, fetchMeteo, fetchCapacity, fetchCurtailmentCalendar,
   fetchMaintenance, fetchCrossBorder, fetchProductionUnits, fetchNationalMix, fetchMarketPrice,
 } from '../services/api.js'
-import { ProdConsChart } from '../components/ProdConsChart.jsx'
+import { ConsumptionHeatmap } from '../components/ConsumptionHeatmap.jsx'
 import { RegionSelector } from '../components/RegionSelector.jsx'
 import { MeteoChart } from '../components/MeteoChart.jsx'
 import { CapacityChart } from '../components/CapacityChart.jsx'
@@ -701,15 +701,11 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* ── Consommation : prod vs conso + classement régional | sélecteur + carte export/import + 2 chiffres ── */}
+        {/* ── Consommation : profil jour × heure + classement régional | sélecteur + carte export/import + 2 chiffres ── */}
         {activeTab === 'consommation' && !error && (
           <div className="pbi-layout">
             <div className="pbi-layout__left pbi-layout__left--no-kpi">
-              <ProdConsChart
-                data={aggregatedProdData}
-                region={selectedRegionName}
-                loading={loading || refreshing}
-              />
+              <ConsumptionHeatmap data={aggregatedProdData} loading={loading || refreshing} />
               <RegionRankingChart
                 data={regionConsumptionRanking}
                 title="Consommation par région"
@@ -728,7 +724,7 @@ export default function DashboardPage() {
                   color="#f59e0b" sparkData={consommationSparkData} loading={loading || refreshing}
                 />
                 <KPICard
-                  title="Solde production/consommation"
+                  title="Équilibre prod/conso"
                   explain="Écart entre la production et la consommation actuelles — positif quand la production dépasse la consommation."
                   value={soldeMw != null ? `${soldeMw >= 0 ? '+' : ''}${Math.round(soldeMw).toLocaleString('fr-FR')}` : '—'} unit="MW"
                   loading={loading || refreshing}
