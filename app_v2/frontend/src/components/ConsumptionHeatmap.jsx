@@ -20,7 +20,7 @@ function isoWeekday(date) {
 // (not an opacity blend into the card background) so the low end actually
 // reads as dark instead of washed-out — opacity blending never gets dark
 // enough to give the range real amplitude.
-const DARK  = [32, 24, 12]
+const DARK  = [12, 9, 5]
 const BRIGHT = [245, 158, 11] // #f59e0b
 
 function lerp(a, b, t) { return Math.round(a + (b - a) * t) }

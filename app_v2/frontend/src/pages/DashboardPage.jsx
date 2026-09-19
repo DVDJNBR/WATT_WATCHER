@@ -476,12 +476,14 @@ export default function DashboardPage() {
     })),
     [aggregatedProdData]
   )
-  // Balance sparkline (prod - conso) — the small line chart the KPI card
-  // shows instead of a full chart taking up chart real estate.
+  // Équilibre prod/conso sparkline — both raw lines (not the delta), the
+  // small line chart the KPI card shows instead of a full chart taking up
+  // chart real estate; the headline number stays the delta.
   const soldeSparkData = useMemo(() =>
     aggregatedProdData.slice(-96).filter(r => r.consommation_mw != null).map(r => ({
       t: r.timestamp,
-      v: Object.values(r.sources || {}).reduce((s, v) => s + (v > 0 ? v : 0), 0) - r.consommation_mw,
+      v: Object.values(r.sources || {}).reduce((s, v) => s + (v > 0 ? v : 0), 0),
+      v2: r.consommation_mw,
     })),
     [aggregatedProdData]
   )
@@ -720,7 +722,7 @@ export default function DashboardPage() {
                 title="Consommation par région"
                 explain="Consommation électrique actuelle de chaque région, triée de la plus forte à la plus faible."
                 unit=" MW"
-                color="#f59e0b"
+                color="#3b82f6"
                 loading={loading || refreshing}
               />
             </div>
@@ -736,7 +738,8 @@ export default function DashboardPage() {
                   title="Équilibre prod/conso"
                   explain="Écart entre la production et la consommation, avec sa courbe sur la période sélectionnée — positif quand la production dépasse la consommation."
                   value={soldeMw != null ? `${soldeMw >= 0 ? '+' : ''}${Math.round(soldeMw).toLocaleString('fr-FR')}` : '—'} unit="MW"
-                  color="#2dd4bf" sparkData={soldeSparkData} loading={loading || refreshing}
+                  color="#2dd4bf" primaryName="Production" secondaryColor="#f59e0b" secondaryName="Consommation"
+                  sparkData={soldeSparkData} loading={loading || refreshing}
                 />
               </div>
               <div className="pbi-layout__map-wrap">
