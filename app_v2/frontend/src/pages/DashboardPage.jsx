@@ -722,7 +722,7 @@ export default function DashboardPage() {
                 title="Consommation par région"
                 explain="Consommation électrique actuelle de chaque région, triée de la plus forte à la plus faible."
                 unit=" MW"
-                color="#3b82f6"
+                color="#2dd4bf"
                 loading={loading || refreshing}
               />
             </div>
