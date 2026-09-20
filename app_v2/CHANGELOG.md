@@ -1,3 +1,10 @@
+## [1.36.1](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.36.0...v1.36.1) (2026-09-20)
+
+### Bug Fixes
+
+* **dashboard:** 6m preset to 3m, matches actual production data retention ([f8fd229](https://github.com/DVDJNBR/WATT_WATCHER/commit/f8fd229b7c53e4fbc52a2a7aa0ff0f88606dc83e))
+* **dashboard:** guard against stale date-range fetch races ([6c1fcac](https://github.com/DVDJNBR/WATT_WATCHER/commit/6c1fcac7f3f7a18f40433e08ca8e47d74bce3234))
+
 ## [1.36.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.35.0...v1.36.0) (2026-09-20)
 
 ### Features
