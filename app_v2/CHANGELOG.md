@@ -1,3 +1,9 @@
+## [1.34.1](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.34.0...v1.34.1) (2026-09-20)
+
+### Bug Fixes
+
+* **dashboard:** calmer load map color, bullet-chart regional consumption ([fd7fbcb](https://github.com/DVDJNBR/WATT_WATCHER/commit/fd7fbcb27819b7c988f495ca184afcbb046abfde))
+
 ## [1.34.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.33.12...v1.34.0) (2026-09-20)
 
 ### Features
