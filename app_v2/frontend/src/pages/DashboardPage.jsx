@@ -557,11 +557,9 @@ export default function DashboardPage() {
               value={endDate} min={startDate} max={isoDate(0)} aria-label="Date de fin" data-testid="date-end"
               onChange={e => { setEndDate(e.target.value); handleDateChange(startDate, e.target.value) }} />
             <div className="date-bar__presets">
-              {/* 6m mostly matters for the Consommation tab's price chart
-                  (real ~5.5 month retention there) — other tabs' sources
-                  retain less, so it just returns whatever they actually
-                  have instead of the full 6 months. */}
-              {[{ label: '24h', days: -1 }, { label: '7j', days: -7 }, { label: '30j', days: -30 }, { label: '6m', days: -182 }].map(({ label, days }) => (
+              {/* 3m matches actual production data retention (~3 months) —
+                  6m used to return a range the backend couldn't fill. */}
+              {[{ label: '24h', days: -1 }, { label: '7j', days: -7 }, { label: '30j', days: -30 }, { label: '3m', days: -91 }].map(({ label, days }) => (
                 <button key={label} onClick={() => {
                   const s = isoDate(days); const e = isoDate(0)
                   setStartDate(s); setEndDate(e); handleDateChange(s, e)
