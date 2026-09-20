@@ -181,6 +181,22 @@ function latestCapacityBySource(capacityData) {
   return totals
 }
 
+/** Latest total installed MW per region (all sources summed) — same de-dup rule as latestCapacityBySource. */
+function latestCapacityByRegion(capacityData) {
+  const bySourceRegion = {}
+  for (const row of capacityData) {
+    if (!row.code_insee || row.code_insee.includes('.') || row.code_insee === 'nan') continue
+    const key = `${row.code_insee}_${row.source}`
+    if (!bySourceRegion[key] || (row.annee && row.annee > bySourceRegion[key].annee)) bySourceRegion[key] = row
+  }
+  const totals = {}
+  for (const row of Object.values(bySourceRegion)) {
+    if (row.puissance_installee_mw == null) continue
+    totals[row.code_insee] = (totals[row.code_insee] || 0) + row.puissance_installee_mw
+  }
+  return totals
+}
+
 export default function DashboardPage() {
   const [selectedRegion, setSelectedRegion] = useState('')
   const [regions, setRegions] = useState([])
@@ -340,6 +356,17 @@ export default function DashboardPage() {
     return () => { cancelled = true }
   }, [])
 
+  // All-region installed capacity — fetched once, independent of drill-down
+  // (capacityData above gets replaced with a single region's rows once one
+  // is selected; the Consommation tab's map needs every region's total at
+  // once for its choropleth, same shape as regionTotals/regionConsommation).
+  const [allRegionCapacityData, setAllRegionCapacityData] = useState([])
+  useEffect(() => {
+    let cancelled = false
+    fetchCapacity({}).then(res => { if (!cancelled) setAllRegionCapacityData(res.data || []) }).catch(() => {})
+    return () => { cancelled = true }
+  }, [])
+
   // Day-ahead spot price — national, refetched when the shared date range
   // changes (same range as production/météo; independent of region since
   // price has no region dimension).
@@ -437,6 +464,19 @@ export default function DashboardPage() {
       .map(r => ({ code_insee: r.code_insee, region: r.region, value: regionConsommation[r.code_insee] })),
     [regions, regionConsommation]
   )
+
+  // Consumption load vs each region's own installed capacity (Consommation
+  // tab's map) — replaces the export/import "balance" map there, which was
+  // really an Export-tab concept reused verbatim across tabs.
+  const regionCapacityTotals = useMemo(() => latestCapacityByRegion(allRegionCapacityData), [allRegionCapacityData])
+  const regionLoadPct = useMemo(() => {
+    const out = {}
+    for (const [code, conso] of Object.entries(regionConsommation)) {
+      const cap = regionCapacityTotals[code]
+      if (cap > 0) out[code] = Math.round((conso / cap) * 1000) / 10
+    }
+    return out
+  }, [regionConsommation, regionCapacityTotals])
 
   // Aggregated data for charts (sum/average across all regions when no region selected)
   const aggregatedProdData = useMemo(
@@ -712,7 +752,7 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* ── Consommation : profil jour × heure + classement régional | sélecteur + carte export/import + 2 chiffres ── */}
+        {/* ── Consommation : profil jour × heure + classement régional | sélecteur + carte charge/capacité + 2 chiffres ── */}
         {activeTab === 'consommation' && !error && (
           <div className="pbi-layout">
             <div className="pbi-layout__left pbi-layout__left--no-kpi">
@@ -748,11 +788,13 @@ export default function DashboardPage() {
                   regionTotals={regionTotals}
                   regionConsommation={regionConsommation}
                   regionCarbon={regionCarbon}
+                  regionLoad={regionLoadPct}
                   selectedCode={selectedRegion}
                   onSelect={handleRegionChange}
                   loading={loading}
-                  mode="balance"
-                  availableModes={['balance']}
+                  mode="load"
+                  availableModes={['load']}
+                  showNuclearPlants
                 />
               </div>
               {buildControlsColumn()}
