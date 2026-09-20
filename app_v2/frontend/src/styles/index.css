@@ -1254,7 +1254,7 @@ input[type="date"] {
    instead of overlapping it — the map itself renders narrower (and so
    reads as shifted left) rather than the ribbon floating on top of it. */
 .map-wrapper--ribbon {
-  padding-right: 118px;
+  padding-right: 140px;
   box-sizing: border-box;
 }
 
@@ -1354,7 +1354,7 @@ input[type="date"] {
 /* ── Mix ribbon — thin quarter-donut, radial dividers, muted by default ──── */
 .mix-ribbon {
   position: absolute;
-  right: -4px;
+  right: 12px;
   top: 50%;
   transform: translateY(-50%);
   width: 120px;
