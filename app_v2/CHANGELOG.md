@@ -1,3 +1,9 @@
+## [1.36.2](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.36.1...v1.36.2) (2026-09-20)
+
+### Bug Fixes
+
+* **dashboard:** ribbon label collision/overflow, drop Corse from map ([af65124](https://github.com/DVDJNBR/WATT_WATCHER/commit/af651245f58011c40bff6cb4ffb014b9f7df21ec))
+
 ## [1.36.1](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.36.0...v1.36.1) (2026-09-20)
 
 ### Bug Fixes
