@@ -1,3 +1,9 @@
+## [1.34.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.33.12...v1.34.0) (2026-09-20)
+
+### Features
+
+* **dashboard:** replace Consommation tab's map with load vs capacity ([13b6234](https://github.com/DVDJNBR/WATT_WATCHER/commit/13b62346356843155724413825f591d7080c985f))
+
 ## [1.33.12](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.33.11...v1.33.12) (2026-09-19)
 
 ### Bug Fixes
