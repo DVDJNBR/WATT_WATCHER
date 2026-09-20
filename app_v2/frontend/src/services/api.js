@@ -130,7 +130,11 @@ async function fetchAllPages(fetchFn, params, pageSize) {
  * @returns {Promise<{data: Array, total_records: number}>}
  */
 export async function fetchAllProduction(params = {}) {
-  return fetchAllPages(fetchProduction, params, 1000)
+  // pageSize matches SINGLE_SHOT_LIMIT in fetchAllPages — the fallback path
+  // (only reached above 50000 rows, e.g. a 6-month range) must stay within
+  // MAX_PAGES=45 pages. 1000 used to cap a 6-month fetch at ~45k of ~210k
+  // rows (missing the older portion, since data returns newest-first).
+  return fetchAllPages(fetchProduction, params, 50000)
 }
 
 /**
