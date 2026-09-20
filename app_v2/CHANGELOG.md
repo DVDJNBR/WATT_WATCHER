@@ -1,3 +1,9 @@
+## [1.33.12](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.33.11...v1.33.12) (2026-09-19)
+
+### Bug Fixes
+
+* **dashboard:** teal region ranking bars, per-line normalized dual sparkline ([7c9a91c](https://github.com/DVDJNBR/WATT_WATCHER/commit/7c9a91c96464ea2b2d290d4648bc87da6745b97b))
+
 ## [1.33.11](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.33.10...v1.33.11) (2026-09-19)
 
 ### Bug Fixes
