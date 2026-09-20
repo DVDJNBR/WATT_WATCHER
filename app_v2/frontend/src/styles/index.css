@@ -276,48 +276,6 @@ body {
 .trend-kpi-card .kpi-value { margin-bottom: 6px; }
 .trend-kpi-card .trend-kpi-card__chart { flex: 1 1 0; min-height: 30px; }
 
-/* ── Mix bar card : barre fine de répartition + légende classique ───────── */
-.mix-bar-card {
-  display: flex;
-  flex-direction: column;
-  padding: 14px 18px;
-  min-height: 0;
-  overflow: hidden;
-}
-.mix-bar__track {
-  display: flex;
-  height: 8px;
-  border-radius: 4px;
-  overflow: hidden;
-  gap: 2px;
-  flex: 0 0 auto;
-  margin-top: 10px;
-}
-.mix-bar__seg {
-  min-width: 2px;
-  transition: flex-basis var(--transition);
-}
-.mix-bar__legend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px 14px;
-  margin-top: 10px;
-  font-size: 0.68rem;
-  color: var(--color-text-muted);
-}
-.mix-bar__legend-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  white-space: nowrap;
-}
-.mix-bar__legend-dot {
-  flex: 0 0 auto;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-}
-
 /* ── Date bar ─────────────────────────────────────────────────────────────── */
 .date-bar {
   display: flex;
@@ -660,6 +618,20 @@ body {
   background: var(--color-surface-2);
   color: var(--color-text);
 }
+.btn-ghost--active {
+  background: var(--color-surface-2);
+  color: var(--color-text);
+  border-color: var(--color-accent);
+}
+
+.chart-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+.chart-title-row .chart-title { margin-bottom: 0; }
 
 [data-testid="theme-toggle"] svg { width: 18px; height: 18px; }
 
@@ -1275,6 +1247,15 @@ input[type="date"] {
   flex: 1 1 0;
   min-height: 0;
   overflow: hidden;
+  position: relative;
+}
+
+/* Reserves a right-hand gutter so the mix ribbon sits clear of the map
+   instead of overlapping it — the map itself renders narrower (and so
+   reads as shifted left) rather than the ribbon floating on top of it. */
+.map-wrapper--ribbon {
+  padding-right: 118px;
+  box-sizing: border-box;
 }
 
 .curtailment-stats {
@@ -1361,54 +1342,6 @@ input[type="date"] {
   border-radius: 2px;
 }
 
-/* ── Consumption heatmap (hour-of-day × day-of-week) ──────────────────────── */
-.consumption-heatmap {
-  display: flex;
-  flex-direction: column;
-  flex: 1 1 0;
-  min-height: 0;
-  gap: 3px;
-}
-
-.consumption-heatmap__hours {
-  display: grid;
-  grid-template-columns: 34px repeat(24, 1fr);
-  gap: 3px;
-}
-
-.consumption-heatmap__hours span {
-  font-size: 0.62rem;
-  color: var(--color-text-muted);
-  text-align: left;
-}
-
-.consumption-heatmap__row {
-  display: grid;
-  grid-template-columns: 34px 1fr;
-  gap: 3px;
-  flex: 1 1 0;
-  min-height: 0;
-}
-
-.consumption-heatmap__dow {
-  font-size: 0.7rem;
-  color: var(--color-text-muted);
-  display: flex;
-  align-items: center;
-}
-
-.consumption-heatmap__cells {
-  display: grid;
-  grid-template-columns: repeat(24, 1fr);
-  gap: 3px;
-}
-
-.consumption-heatmap__cell {
-  border-radius: 2px;
-  min-height: 0;
-  height: 100%;
-}
-
 .map-hint {
   font-size: 0.78rem;
   color: var(--color-text-muted);
@@ -1417,6 +1350,43 @@ input[type="date"] {
   padding-top: 8px;
   border-top: 1px solid var(--color-border);
 }
+
+/* ── Mix ribbon — thin quarter-donut, radial dividers, muted by default ──── */
+.mix-ribbon {
+  position: absolute;
+  right: -4px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 120px;
+  height: 192px;
+  pointer-events: none;
+}
+
+.mix-ribbon__svg { position: absolute; inset: 0; }
+
+.mix-ribbon__labels {
+  position: absolute;
+  inset: 0;
+}
+
+.mix-ribbon__label {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  font-size: 0.66rem;
+  font-weight: 600;
+  white-space: nowrap;
+  background: color-mix(in srgb, var(--color-surface-1) 78%, transparent);
+  padding: 1px 5px;
+  border-radius: 4px;
+  cursor: pointer;
+  pointer-events: auto;
+  transition: background var(--transition);
+}
+.mix-ribbon__label:hover,
+.mix-ribbon__label--active {
+  background: var(--color-surface-2);
+}
+.mix-ribbon__label strong { font-weight: 700; }
 
 .map-tooltip {
   background: var(--color-surface-2);

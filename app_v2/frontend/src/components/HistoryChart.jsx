@@ -1,19 +1,19 @@
 /**
- * HistoryChart — production history for a selected region.
+ * HistoryChart — the app's actual point: production vs. consumption over
+ * time, bold in the foreground. The gap between them (production surplus)
+ * is what drives curtailment — this chart is meant to make that gap
+ * visible at a glance, not to catalog every source. Individual sources
+ * still render, but muted in the background by default; a toggle brings
+ * them forward for anyone who wants the breakdown.
  *
- * Overlaid (not stacked) areas per source — each line's height is that
- * source's own value, directly comparable to the others. A stacked chart
- * was tried first, but it has an unavoidable readability problem: the
- * *bottom* series in a stack only ever shows its own value (nothing added
- * below it), while every series above it shows a cumulative sum that's
- * always higher — so the single dominant source (Nucléaire, ~70% of the
- * mix) structurally ends up with the *lowest* line on the chart, no matter
- * what order the stack is in. Overlaying instead of stacking removes that
- * cumulative-sum confusion entirely: line height = actual value, period.
- * Displayed below the France map when a region is selected.
+ * Areas are overlaid, not stacked, for the same reason established
+ * earlier: a stacked bottom series only shows its own value while
+ * everything above it shows a cumulative sum, so the dominant source
+ * (Nucléaire, ~70%) would structurally read as the smallest line.
  */
+import { useMemo, useState } from 'react'
 import {
-  ComposedChart, Area,
+  ComposedChart, Area, Line,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from 'recharts'
 
@@ -25,7 +25,6 @@ const SOURCE_COLORS = {
   bioenergies: '#84cc16',
   thermique:   '#ef4444',
 }
-
 const SOURCE_LABELS = {
   nucleaire:   'Nucléaire',
   eolien:      'Éolien',
@@ -34,6 +33,8 @@ const SOURCE_LABELS = {
   bioenergies: 'Bioénergies',
   thermique:   'Thermique fossile',
 }
+const PROD_COLOR  = '#2dd4bf'
+const CONSO_COLOR = '#f59e0b'
 
 function formatTs(ts) {
   const d = new Date(ts)
@@ -45,15 +46,20 @@ function formatTs(ts) {
 }
 
 function transformData(data) {
-  return data.map(r => ({ timestamp: formatTs(r.timestamp), ...r.sources }))
+  return data.map(r => ({
+    timestamp: formatTs(r.timestamp),
+    total: Object.values(r.sources || {}).reduce((s, v) => s + (v > 0 ? v : 0), 0),
+    conso: r.consommation_mw ?? null,
+    ...r.sources,
+  }))
 }
 
 /** Sources ordered by total magnitude, largest first — drives the legend's reading order. */
 function deriveAllSources(chartData) {
   const totals = new Map()
   for (const row of chartData) {
-    for (const [key, val] of Object.entries(row)) {
-      if (key === 'timestamp') continue
+    for (const key of Object.keys(SOURCE_COLORS)) {
+      const val = row[key]
       if (typeof val === 'number') totals.set(key, (totals.get(key) || 0) + val)
     }
   }
@@ -71,6 +77,8 @@ const tooltipStyle = {
 
 /** @param {{ data: Array, region: string, loading?: boolean }} props */
 export function HistoryChart({ data, region, loading = false }) {
+  const [showSources, setShowSources] = useState(false)
+
   if (loading) {
     return (
       <div className="glass-card chart-card" data-testid="history-chart-loading">
@@ -84,7 +92,7 @@ export function HistoryChart({ data, region, loading = false }) {
   if (!data.length) {
     return (
       <section className="glass-card chart-card chart-empty" data-testid="history-chart-empty">
-        <h2 className="chart-title">Historique de production — {region}</h2>
+        <h2 className="chart-title">Production &amp; consommation — {region}</h2>
         <div className="empty-state">
           <span className="empty-state__icon" aria-hidden="true">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
@@ -103,28 +111,30 @@ export function HistoryChart({ data, region, loading = false }) {
 
   const chartData = transformData(data)
   const sources   = deriveAllSources(chartData)
+  const sourceOpacity = showSources ? { fill: 0.18, stroke: 1 } : { fill: 0.04, stroke: 0.22 }
 
   return (
     <section className="glass-card chart-card" data-testid="history-chart">
-      <h2 className="chart-title">Historique de production — {region}</h2>
+      <div className="chart-title-row">
+        <h2 className="chart-title">Production &amp; consommation — {region}</h2>
+        <button
+          type="button"
+          className={`btn btn-ghost btn-xs${showSources ? ' btn-ghost--active' : ''}`}
+          onClick={() => setShowSources(v => !v)}
+          title="Afficher le détail par source de production, en fond"
+        >
+          {showSources ? 'Masquer le détail' : 'Détail par source'}
+        </button>
+      </div>
 
       <div style={{ flex: '1 1 0', minHeight: 0 }}>
       <ResponsiveContainer width="100%" height="100%">
-        {/* right:48 — matches MeteoChart's total reserved right-side width
-            (margin.right:8 + right-axis width:40) even though this chart
-            has no right axis of its own; keeps both plot areas — and their
-            day gridlines — aligned when stacked. */}
         <ComposedChart data={chartData} margin={{ top: 8, right: 48, left: 0, bottom: 0 }}>
           <defs>
-            {/* Fills stay faint (max 0.18, was 0.35) — these now overlap
-                instead of stacking, so several fills can sit on top of each
-                other at once; a subtler fill keeps the overlap legible
-                instead of turning into a muddy blend. The stroke lines
-                (fully opaque) carry the actual comparison. */}
             {sources.map(src => (
               <linearGradient key={src} id={`hgrad-${src}`} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%"  stopColor={SOURCE_COLORS[src] || '#888'} stopOpacity={0.18} />
-                <stop offset="95%" stopColor={SOURCE_COLORS[src] || '#888'} stopOpacity={0.02} />
+                <stop offset="5%"  stopColor={SOURCE_COLORS[src] || '#888'} stopOpacity={sourceOpacity.fill} />
+                <stop offset="95%" stopColor={SOURCE_COLORS[src] || '#888'} stopOpacity={sourceOpacity.fill * 0.15} />
               </linearGradient>
             ))}
           </defs>
@@ -134,15 +144,18 @@ export function HistoryChart({ data, region, loading = false }) {
           <YAxis tick={{ fill: '#9a9a9e', fontSize: 11 }} unit=" MW" width={44} />
           <Tooltip {...tooltipStyle} />
           <Legend
-            // Recharts' auto-generated legend order ignores both children
-            // declaration order and an explicit `payload` override here —
-            // observed alphabetical by raw dataKey regardless. A custom
-            // content renderer is the only way to actually guarantee the
-            // legend reads largest-first, matching the sources array.
             content={() => (
               <ul className="history-legend">
-                {sources.map(src => (
-                  <li key={src} className="history-legend__item">
+                <li className="history-legend__item">
+                  <span className="history-legend__dot" style={{ background: PROD_COLOR }} />
+                  Production totale
+                </li>
+                <li className="history-legend__item">
+                  <span className="history-legend__dot" style={{ background: CONSO_COLOR }} />
+                  Consommation
+                </li>
+                {showSources && sources.map(src => (
+                  <li key={src} className="history-legend__item history-legend__item--muted">
                     <span className="history-legend__dot" style={{ background: SOURCE_COLORS[src] || '#888' }} />
                     {SOURCE_LABELS[src] || src}
                   </li>
@@ -151,22 +164,25 @@ export function HistoryChart({ data, region, loading = false }) {
             )}
           />
 
-          {/* Overlaid (not stacked) — each drawn independently from 0, so a
-              line's height is that source's own value. Rendered largest
-              first (sources is sorted descending) so smaller series' lines
-              draw on top and stay visible instead of hiding under
-              Nucléaire's much taller fill. */}
+          {/* Individual sources — muted background by default, in fixed
+              largest-first order so smaller lines still draw on top. */}
           {sources.map(src => (
             <Area
               key={src}
               type="monotone"
               dataKey={src}
               stroke={SOURCE_COLORS[src] || '#888'}
+              strokeOpacity={sourceOpacity.stroke}
+              strokeWidth={1}
               fill={`url(#hgrad-${src})`}
-              strokeWidth={1.5}
               isAnimationActive={false}
             />
           ))}
+
+          {/* Production totale + Consommation — bold foreground lines, the
+              actual point of the chart: the gap between them is surplus. */}
+          <Line type="monotone" dataKey="total" stroke={PROD_COLOR} strokeWidth={2.5} dot={false} isAnimationActive={false} name="Production totale" />
+          <Line type="monotone" dataKey="conso" stroke={CONSO_COLOR} strokeWidth={2.5} strokeDasharray="6 3" dot={false} isAnimationActive={false} name="Consommation" />
         </ComposedChart>
       </ResponsiveContainer>
       </div>

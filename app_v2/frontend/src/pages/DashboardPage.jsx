@@ -3,10 +3,11 @@
  * Fetches production/météo/capacity data from the FastAPI backend.
  * Public, no auth — portfolio showroom.
  *
- * Five themed tabs: Production (live mix) / Consommation (prod vs conso,
- * regional ranking) / Prix (spot price, négatifs) / Capacité (installed vs
- * used, maintenance) / Export (regional + cross-border flows, on a shared
- * period selector).
+ * Focused on the app's actual story — anticipating curtailment (negative
+ * prices forcing wind/solar offline) driven by low consumption + favorable
+ * weather — not a feature showcase. Tabs: Production & consommation (the
+ * surplus story) / Prix (négatifs, business framing) / Capacité (installed
+ * vs used, maintenance).
  */
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { KPICard } from '../components/KPICard.jsx'
@@ -15,17 +16,13 @@ import { CurtailmentCalendar } from '../components/CurtailmentCalendar.jsx'
 import { HistoryChart } from '../components/HistoryChart.jsx'
 import { computeCarbonIntensity } from '../components/CarbonGauge.jsx'
 import { CapacityFactorChart } from '../components/CapacityFactorChart.jsx'
-import { EnergySankey } from '../components/EnergySankey.jsx'
 import { TrendKpiCard } from '../components/TrendKpiCard.jsx'
 import { MaintenanceMap, normalize as normalizeUnitName } from '../components/MaintenanceMap.jsx'
-import { RegionLoadChart } from '../components/RegionLoadChart.jsx'
-import { MixBar } from '../components/MixBar.jsx'
 import { PriceTrendChart } from '../components/PriceTrendChart.jsx'
 import {
-  fetchAllProduction, fetchRegions, fetchMeteo, fetchCapacity, fetchCurtailmentCalendar,
-  fetchMaintenance, fetchCrossBorder, fetchProductionUnits, fetchNationalMix, fetchMarketPrice,
+  fetchAllProduction, fetchRegions, fetchMeteo, fetchCapacity, fetchCurtailmentCalendar, fetchCurtailmentRisk,
+  fetchMaintenance, fetchProductionUnits, fetchMarketPrice,
 } from '../services/api.js'
-import { ConsumptionHeatmap } from '../components/ConsumptionHeatmap.jsx'
 import { RegionSelector } from '../components/RegionSelector.jsx'
 import { MeteoChart } from '../components/MeteoChart.jsx'
 import { CapacityChart } from '../components/CapacityChart.jsx'
@@ -181,22 +178,6 @@ function latestCapacityBySource(capacityData) {
   return totals
 }
 
-/** Latest total installed MW per region (all sources summed) — same de-dup rule as latestCapacityBySource. */
-function latestCapacityByRegion(capacityData) {
-  const bySourceRegion = {}
-  for (const row of capacityData) {
-    if (!row.code_insee || row.code_insee.includes('.') || row.code_insee === 'nan') continue
-    const key = `${row.code_insee}_${row.source}`
-    if (!bySourceRegion[key] || (row.annee && row.annee > bySourceRegion[key].annee)) bySourceRegion[key] = row
-  }
-  const totals = {}
-  for (const row of Object.values(bySourceRegion)) {
-    if (row.puissance_installee_mw == null) continue
-    totals[row.code_insee] = (totals[row.code_insee] || 0) + row.puissance_installee_mw
-  }
-  return totals
-}
-
 export default function DashboardPage() {
   const [selectedRegion, setSelectedRegion] = useState('')
   const [regions, setRegions] = useState([])
@@ -226,6 +207,11 @@ export default function DashboardPage() {
   const [calendarStats, setCalendarStats] = useState(null)
   const [calendarLoading, setCalendarLoading] = useState(true)
 
+  // Curtailment risk by region: whole-history, drives the map's default mode —
+  // which regions actually drive curtailment (wind+solar surplus during
+  // negative-price windows), not just who produces the most.
+  const [curtailmentRiskData, setCurtailmentRiskData] = useState([])
+
   // Day-ahead spot price over time — Consommation tab. National (no region
   // filter), follows the shared date range like production/météo.
   const [marketPriceData, setMarketPriceData] = useState([])
@@ -234,11 +220,6 @@ export default function DashboardPage() {
   // Maintenance events — Capacité tab
   const [maintenanceEvents, setMaintenanceEvents] = useState([])
   const [maintenanceLoading, setMaintenanceLoading] = useState(true)
-
-  // National gaz/charbon/fioul split (France-wide only — RTE doesn't publish
-  // this per region) — refines the mix bar's "thermique" bucket when no
-  // region is selected.
-  const [nationalMixData, setNationalMixData] = useState([])
 
   // All production units — fetched once, used to enrich maintenance events with a region
   // (fact_maintenance.id_region isn't populated at ingestion) via the same fuzzy name match
@@ -249,13 +230,6 @@ export default function DashboardPage() {
     fetchProductionUnits({}).then(res => { if (!cancelled) setAllUnits(res.data || []) }).catch(() => {})
     return () => { cancelled = true }
   }, [])
-
-  // Export tab: shared period selector + cross-border flow data
-  const [exportPeriod, setExportPeriod] = useState('week')  // 'day' | 'week' | 'month'
-  const [crossBorderSummary, setCrossBorderSummary] = useState([])
-  const [crossBorderLoading, setCrossBorderLoading] = useState(true)
-
-  // Écologie/Export map mode toggle
 
   /**
    * Load production data.
@@ -336,6 +310,14 @@ export default function DashboardPage() {
     return () => { cancelled = true }
   }, [])
 
+  useEffect(() => {
+    let cancelled = false
+    fetchCurtailmentRisk()
+      .then(result => { if (!cancelled) setCurtailmentRiskData(result.data || []) })
+      .catch(() => { if (!cancelled) setCurtailmentRiskData([]) })
+    return () => { cancelled = true }
+  }, [])
+
   // Maintenance events — fetched once, whole history (Capacité tab)
   useEffect(() => {
     let cancelled = false
@@ -343,27 +325,6 @@ export default function DashboardPage() {
       .then(result => { if (!cancelled) setMaintenanceEvents(result.data || []) })
       .catch(() => {})
       .finally(() => { if (!cancelled) setMaintenanceLoading(false) })
-    return () => { cancelled = true }
-  }, [])
-
-  // National gaz/charbon/fioul split — fetched once, whole history isn't
-  // needed, just enough recent points to have a current value on load.
-  useEffect(() => {
-    let cancelled = false
-    fetchNationalMix({ limit: 50 })
-      .then(result => { if (!cancelled) setNationalMixData(result.data || []) })
-      .catch(() => {})
-    return () => { cancelled = true }
-  }, [])
-
-  // All-region installed capacity — fetched once, independent of drill-down
-  // (capacityData above gets replaced with a single region's rows once one
-  // is selected; the Consommation tab's map needs every region's total at
-  // once for its choropleth, same shape as regionTotals/regionConsommation).
-  const [allRegionCapacityData, setAllRegionCapacityData] = useState([])
-  useEffect(() => {
-    let cancelled = false
-    fetchCapacity({}).then(res => { if (!cancelled) setAllRegionCapacityData(res.data || []) }).catch(() => {})
     return () => { cancelled = true }
   }, [])
 
@@ -379,18 +340,6 @@ export default function DashboardPage() {
       .finally(() => { if (!cancelled) setPriceLoading(false) })
     return () => { cancelled = true }
   }, [startDate, endDate])
-
-  // Cross-border flow — refetched when the Export tab's period selector changes
-  useEffect(() => {
-    let cancelled = false
-    setCrossBorderLoading(true)
-    const days = exportPeriod === 'day' ? 1 : exportPeriod === 'week' ? 7 : 30
-    fetchCrossBorder({ startDate: isoDate(-days), endDate: isoDate(0) })
-      .then(result => { if (!cancelled) setCrossBorderSummary(result.summary || []) })
-      .catch(() => { if (!cancelled) setCrossBorderSummary([]) })
-      .finally(() => { if (!cancelled) setCrossBorderLoading(false) })
-    return () => { cancelled = true }
-  }, [exportPeriod])
 
   // Region change: drill down into a specific region (or reset to global view)
   const handleRegionChange = useCallback(async (code) => {
@@ -437,7 +386,7 @@ export default function DashboardPage() {
   }, [selectedRegion, startDate, endDate, loadData])
 
   // Compute per-region totals + carbon intensity for choropleth (latest point per region)
-  const { regionTotals, regionConsommation, regionCarbon } = useMemo(() => {
+  const { regionTotals, regionConsommation, regionCarbon, regionSources } = useMemo(() => {
     const latest = {}
     for (const r of globalData) {
       if (!latest[r.code_insee] || r.timestamp > latest[r.code_insee].timestamp) {
@@ -447,43 +396,23 @@ export default function DashboardPage() {
     const totals = {}
     const conso  = {}
     const carbon = {}
+    const sources = {}
     for (const [code, rec] of Object.entries(latest)) {
       totals[code] = Object.values(rec.sources).reduce((s, v) => s + (v > 0 ? v : 0), 0)
       if (rec.consommation_mw != null) conso[code] = rec.consommation_mw
       carbon[code] = computeCarbonIntensity(rec.sources || {})
+      sources[code] = rec.sources || {}
     }
-    return { regionTotals: totals, regionConsommation: conso, regionCarbon: carbon }
+    return { regionTotals: totals, regionConsommation: conso, regionCarbon: carbon, regionSources: sources }
   }, [globalData])
 
-  // Consumption load vs each region's own installed capacity (Consommation
-  // tab's map + bullet chart) — replaces the export/import "balance" map
-  // there, which was really an Export-tab concept reused verbatim across tabs.
-  const regionCapacityTotals = useMemo(() => latestCapacityByRegion(allRegionCapacityData), [allRegionCapacityData])
-  const regionLoadPct = useMemo(() => {
+  // Curtailment risk by region (%) — the map's default mode, the app's
+  // actual point: which regions drive curtailment.
+  const regionCurtailmentRisk = useMemo(() => {
     const out = {}
-    for (const [code, conso] of Object.entries(regionConsommation)) {
-      const cap = regionCapacityTotals[code]
-      if (cap > 0) out[code] = Math.round((conso / cap) * 1000) / 10
-    }
+    for (const row of curtailmentRiskData) out[row.code_insee] = row.share_pct
     return out
-  }, [regionConsommation, regionCapacityTotals])
-
-  // Per-region consumption vs capacity (Consommation tab's left chart).
-  // Unlike a per-region *production* share, consumption is a genuinely
-  // regional number — tied to where power is actually drawn, not to plant
-  // siting — capacity, sorted by load %, is what makes the map's outlier
-  // (e.g. Île-de-France) jump out here too.
-  const regionConsumptionRanking = useMemo(
-    () => regions
-      .filter(r => regionConsommation[r.code_insee] != null && regionCapacityTotals[r.code_insee] > 0)
-      .map(r => ({
-        code_insee: r.code_insee,
-        region: r.region,
-        value: regionConsommation[r.code_insee],
-        capacity: regionCapacityTotals[r.code_insee],
-      })),
-    [regions, regionConsommation, regionCapacityTotals]
-  )
+  }, [curtailmentRiskData])
 
   // Aggregated data for charts (sum/average across all regions when no region selected)
   const aggregatedProdData = useMemo(
@@ -504,11 +433,6 @@ export default function DashboardPage() {
     ? (displayData[displayData.length - 1].sources || {})
     : {}
   const totalMw = computeTotalMw(displayData)
-  // Only valid for the France-wide view — RTE never splits gaz/charbon/fioul per region.
-  const latestNationalMix = !selectedRegion && nationalMixData.length
-    ? nationalMixData[nationalMixData.length - 1].sources
-    : null
-
   const productionSparkData = useMemo(() =>
     aggregatedProdData.slice(-96).map(r => ({
       t: r.timestamp,
@@ -537,21 +461,6 @@ export default function DashboardPage() {
   // Capacity factor (bullet chart) — average production vs installed capacity, per source
   const avgProductionBySource = useMemo(() => averageBySource(aggregatedProdData), [aggregatedProdData])
   const capacityBySource = useMemo(() => latestCapacityBySource(capacityData), [capacityData])
-
-  // Sankey totals over the aggregated (national or regional) series
-  const sankeySourceTotals = useMemo(() => avgProductionBySource, [avgProductionBySource])
-  const sankeyConsoTotal = useMemo(() => {
-    const rows = aggregatedProdData.filter(r => r.consommation_mw != null)
-    if (!rows.length) return 0
-    return rows.reduce((s, r) => s + r.consommation_mw, 0) / rows.length
-  }, [aggregatedProdData])
-  // crossBorderSummary.net_mwh is cumulative energy over exportPeriod — divide back to an
-  // average MW figure so it's on the same scale as the average-power source/conso totals above.
-  const periodHours = exportPeriod === 'day' ? 24 : exportPeriod === 'week' ? 168 : 720
-  const sankeyBorderTotals = useMemo(
-    () => crossBorderSummary.map(b => ({ ...b, net_mwh: b.net_mwh / periodHours })),
-    [crossBorderSummary, periodHours]
-  )
 
   // Enrich maintenance events with a region, matched against the units registry by name.
   const maintenanceEventsWithRegion = useMemo(() => {
@@ -593,16 +502,6 @@ export default function DashboardPage() {
     return Math.round((vals.reduce((s, v) => s + v, 0) / vals.length) * 100) / 100
   }, [marketPriceData])
 
-  // Export tab: chiffres — total net export, top partner
-  const exportNetTotalMw = useMemo(
-    () => sankeyBorderTotals.reduce((s, b) => s + (b.net_mwh || 0), 0),
-    [sankeyBorderTotals]
-  )
-  const topExportPartner = useMemo(() => {
-    const sorted = [...sankeyBorderTotals].sort((a, b) => (b.net_mwh || 0) - (a.net_mwh || 0))
-    return sorted[0] || null
-  }, [sankeyBorderTotals])
-
   const [activeTab, setActiveTab] = useState('production')
 
   // recharts' ResponsiveContainer measures its parent once on mount, before the
@@ -620,11 +519,6 @@ export default function DashboardPage() {
         <path d="M13 2 4 14h6l-1 8 9-12h-6l1-8Z" />
       </svg>
     ),
-    consommation: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M8 3v4M16 3v4M6 8h12l-1 6a5 5 0 0 1-10 0L6 8Z" /><path d="M12 18v3" />
-      </svg>
-    ),
     prixnegatifs: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
         <rect x="3" y="3" width="4.5" height="4.5" rx="1" /><rect x="9.75" y="3" width="4.5" height="4.5" rx="1" />
@@ -638,23 +532,16 @@ export default function DashboardPage() {
         <rect x="3" y="7" width="16" height="10" rx="1.5" /><path d="M19 10v4M6.5 10v4M11 10v4" />
       </svg>
     ),
-    export: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M5 12h14M13 6l6 6-6 6" />
-      </svg>
-    ),
   }
   const TABS = [
     { id: 'production',    label: 'Production' },
-    { id: 'consommation',  label: 'Consommation' },
     { id: 'prixnegatifs',  label: 'Prix' },
     { id: 'capacite',      label: 'Capacité' },
-    { id: 'export',        label: 'Export' },
   ]
 
-  // Période / région / màj — colonne centrale, empilée verticalement, identique sur les 5 onglets.
+  // Période / région / màj — colonne centrale, empilée verticalement, identique sur tous les onglets.
   // buildControlsColumn(extra) accepts extra tab-specific content to render above the shared
-  // controls (Export's own Sankey period toggle) — never nest two .pbi-layout__controls-col.
+  // controls — never nest two .pbi-layout__controls-col.
   const buildControlsColumn = (extra = null) => (
     <div className="pbi-layout__controls-col">
       {extra}
@@ -718,7 +605,7 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* ── Production : mix historique + météo | sélecteur + carte + 2 chiffres ── */}
+        {/* ── Production & consommation : le surplus (curtailment) | sélecteur + carte risque + 2 chiffres ── */}
         {activeTab === 'production' && !error && (
           <div className="pbi-layout">
             <div className="pbi-layout__left pbi-layout__left--no-kpi">
@@ -735,48 +622,15 @@ export default function DashboardPage() {
             </div>
             <div className="pbi-layout__right">
               <div className="pbi-layout__kpi-row pbi-layout__kpi-row--compact">
-                <MixBar sources={lastSources} nationalDetail={latestNationalMix} loading={loading || refreshing} />
                 <TrendKpiCard
                   title={selectedRegionName ? `Production — ${selectedRegionName}` : 'Production totale'}
                   explain="Production totale actuelle, toutes sources confondues, avec sa courbe sur la période sélectionnée."
                   value={totalMw.toLocaleString('fr-FR')} unit="MW"
                   color="#2dd4bf" sparkData={productionSparkData} loading={loading || refreshing}
                 />
-              </div>
-              <div className="pbi-layout__map-wrap">
-                <FranceMap
-                  regions={regions}
-                  regionTotals={regionTotals}
-                  regionConsommation={regionConsommation}
-                  selectedCode={selectedRegion}
-                  onSelect={handleRegionChange}
-                  loading={loading}
-                  mode="volume"
-                />
-              </div>
-              {buildControlsColumn()}
-            </div>
-          </div>
-        )}
-
-        {/* ── Consommation : profil jour × heure + classement régional | sélecteur + carte charge/capacité + 2 chiffres ── */}
-        {activeTab === 'consommation' && !error && (
-          <div className="pbi-layout">
-            <div className="pbi-layout__left pbi-layout__left--no-kpi">
-              <ConsumptionHeatmap data={aggregatedProdData} loading={loading || refreshing} />
-              <RegionLoadChart data={regionConsumptionRanking} loading={loading || refreshing} />
-            </div>
-            <div className="pbi-layout__right">
-              <div className="pbi-layout__kpi-row pbi-layout__kpi-row--compact">
-                <TrendKpiCard
-                  title={selectedRegionName ? `Consommation — ${selectedRegionName}` : 'Consommation'}
-                  explain="Consommation électrique actuelle, avec sa courbe sur la période sélectionnée."
-                  value={latestConsommation != null ? Math.round(latestConsommation).toLocaleString('fr-FR') : '—'} unit="MW"
-                  color="#f59e0b" sparkData={consommationSparkData} loading={loading || refreshing}
-                />
                 <TrendKpiCard
                   title="Équilibre prod/conso"
-                  explain="Écart entre la production et la consommation, avec sa courbe sur la période sélectionnée — positif quand la production dépasse la consommation."
+                  explain="Écart entre la production et la consommation, avec sa courbe sur la période sélectionnée — positif quand la production dépasse la consommation (risque de curtailment)."
                   value={soldeMw != null ? `${soldeMw >= 0 ? '+' : ''}${Math.round(soldeMw).toLocaleString('fr-FR')}` : '—'} unit="MW"
                   color="#2dd4bf" primaryName="Production" secondaryColor="#f59e0b" secondaryName="Consommation"
                   sparkData={soldeSparkData} loading={loading || refreshing}
@@ -787,14 +641,15 @@ export default function DashboardPage() {
                   regions={regions}
                   regionTotals={regionTotals}
                   regionConsommation={regionConsommation}
-                  regionCarbon={regionCarbon}
-                  regionLoad={regionLoadPct}
+                  regionSources={regionSources}
+                  regionCurtailmentRisk={regionCurtailmentRisk}
+                  mixSources={lastSources}
+                  showMixRibbon
                   selectedCode={selectedRegion}
                   onSelect={handleRegionChange}
                   loading={loading}
-                  mode="load"
-                  availableModes={['load']}
-                  showNuclearPlants
+                  mode="curtailment"
+                  availableModes={['curtailment']}
                 />
               </div>
               {buildControlsColumn()}
@@ -910,62 +765,6 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* ── Export : Sankey (2 étages) | sélecteur + carte export/import + période ── */}
-        {activeTab === 'export' && !error && (
-          <div className="pbi-layout">
-            <div className="pbi-layout__left pbi-layout__left--single">
-              <div className="pbi-layout__kpi-row">
-                <KPICard
-                  title="Consommation France"
-                  explain="Consommation moyenne sur la période sélectionnée."
-                  value={Math.round(sankeyConsoTotal).toLocaleString('fr-FR')} unit="MW"
-                  loading={crossBorderLoading || loading}
-                />
-                <KPICard
-                  title="Export net total"
-                  explain="Somme des flux nets sur les 4 frontières suivies, moyenne sur la période."
-                  value={Math.round(exportNetTotalMw).toLocaleString('fr-FR')} unit="MW"
-                  loading={crossBorderLoading || loading}
-                />
-              </div>
-              <EnergySankey
-                sourceTotals={sankeySourceTotals}
-                consommationTotal={sankeyConsoTotal}
-                borderTotals={sankeyBorderTotals}
-                loading={crossBorderLoading || loading}
-              />
-            </div>
-            <div className="pbi-layout__right">
-              <div className="pbi-layout__map-wrap">
-                <FranceMap
-                  regions={regions}
-                  regionTotals={regionTotals}
-                  regionConsommation={regionConsommation}
-                  regionCarbon={regionCarbon}
-                  selectedCode={selectedRegion}
-                  onSelect={handleRegionChange}
-                  loading={loading}
-                  mode="balance"
-                  availableModes={['balance']}
-                />
-              </div>
-              {buildControlsColumn(
-                <div className="controls-block">
-                  <span className="selector-label">Période du Sankey</span>
-                  <div className="tab-bar" role="tablist" aria-label="Période Export" style={{ marginBottom: 0 }}>
-                    {[{ id: 'day', label: 'Jour' }, { id: 'week', label: 'Semaine' }, { id: 'month', label: 'Mois' }].map(p => (
-                      <button key={p.id} role="tab" aria-selected={exportPeriod === p.id}
-                        className={`tab-bar__item${exportPeriod === p.id ? ' tab-bar__item--active' : ''}`}
-                        onClick={() => setExportPeriod(p.id)}>
-                        {p.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
       </div>
 
       {/* ── Onglets thématiques — footer, style Power BI ── */}

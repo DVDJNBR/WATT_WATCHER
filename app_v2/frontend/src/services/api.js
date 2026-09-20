@@ -229,6 +229,18 @@ export async function fetchCurtailmentCalendar() {
 }
 
 /**
+ * Fetch per-region share of national wind+solar surplus during negative-price
+ * windows — which regions actually drive curtailment, not just who produces
+ * the most (nuclear/hydro deliberately excluded, see api/curtailment_service.py).
+ * Whole-history by default, same reasoning as fetchCurtailmentCalendar: events
+ * are sparse, a short date range would starve most regions of any data.
+ * @returns {Promise<{data: Array, national_surplus_mwh_15min: number}>}
+ */
+export async function fetchCurtailmentRisk() {
+  return apiGet('/v1/curtailment/regional')
+}
+
+/**
  * Fetch day-ahead spot price (EUR/MWh) over time — national, single-zone,
  * no region filter (matches how ENTSO-E publishes it).
  * @param {Object} params

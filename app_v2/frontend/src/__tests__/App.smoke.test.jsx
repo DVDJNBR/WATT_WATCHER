@@ -17,11 +17,10 @@ vi.mock('../services/api.js', () => ({
   fetchRegions:           vi.fn(),
   fetchMeteo:             vi.fn().mockResolvedValue({ data: [] }),
   fetchCapacity:          vi.fn().mockResolvedValue({ data: [] }),
-  fetchNationalMix:       vi.fn().mockResolvedValue({ data: [] }),
   fetchMaintenance:       vi.fn().mockResolvedValue({ data: [] }),
   fetchCurtailmentCalendar: vi.fn().mockResolvedValue({ days: [], range: null, stats: null }),
+  fetchCurtailmentRisk:   vi.fn().mockResolvedValue({ data: [] }),
   fetchMarketPrice:       vi.fn().mockResolvedValue({ data: [] }),
-  fetchCrossBorder:       vi.fn().mockResolvedValue({ summary: [] }),
   fetchProductionUnits:   vi.fn().mockResolvedValue({ data: [] }),
 }))
 
@@ -89,10 +88,10 @@ describe('App smoke test (Task 6.3)', () => {
     expect(screen.getByTestId('theme-toggle')).toBeInTheDocument()
   })
 
-  it('renders the Production tab KPI row (mix bar + trend card)', () => {
+  it('renders the Production tab KPI row (2 trend cards) and map', () => {
     render(<App />)
-    expect(screen.getByTestId('mix-bar')).toBeInTheDocument()
-    expect(screen.getByTestId('trend-kpi-card')).toBeInTheDocument()
+    expect(screen.getAllByTestId('trend-kpi-card').length).toBeGreaterThan(0)
+    expect(screen.getByTestId('france-map')).toBeInTheDocument()
   })
 
   it('shows last-updated timestamp after data loads (AC #1)', async () => {
