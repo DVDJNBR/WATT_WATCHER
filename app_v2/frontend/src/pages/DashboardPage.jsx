@@ -18,7 +18,7 @@ import { CapacityFactorChart } from '../components/CapacityFactorChart.jsx'
 import { EnergySankey } from '../components/EnergySankey.jsx'
 import { TrendKpiCard } from '../components/TrendKpiCard.jsx'
 import { MaintenanceMap, normalize as normalizeUnitName } from '../components/MaintenanceMap.jsx'
-import { RegionRankingChart } from '../components/RegionRankingChart.jsx'
+import { RegionLoadChart } from '../components/RegionLoadChart.jsx'
 import { MixBar } from '../components/MixBar.jsx'
 import { PriceTrendChart } from '../components/PriceTrendChart.jsx'
 import {
@@ -455,19 +455,9 @@ export default function DashboardPage() {
     return { regionTotals: totals, regionConsommation: conso, regionCarbon: carbon }
   }, [globalData])
 
-  // Per-region consumption ranking (Consommation tab's left chart). Unlike a
-  // per-region *production* share, consumption is a genuinely regional
-  // number — tied to where power is actually drawn, not to plant siting.
-  const regionConsumptionRanking = useMemo(
-    () => regions
-      .filter(r => regionConsommation[r.code_insee] != null)
-      .map(r => ({ code_insee: r.code_insee, region: r.region, value: regionConsommation[r.code_insee] })),
-    [regions, regionConsommation]
-  )
-
   // Consumption load vs each region's own installed capacity (Consommation
-  // tab's map) — replaces the export/import "balance" map there, which was
-  // really an Export-tab concept reused verbatim across tabs.
+  // tab's map + bullet chart) — replaces the export/import "balance" map
+  // there, which was really an Export-tab concept reused verbatim across tabs.
   const regionCapacityTotals = useMemo(() => latestCapacityByRegion(allRegionCapacityData), [allRegionCapacityData])
   const regionLoadPct = useMemo(() => {
     const out = {}
@@ -477,6 +467,23 @@ export default function DashboardPage() {
     }
     return out
   }, [regionConsommation, regionCapacityTotals])
+
+  // Per-region consumption vs capacity (Consommation tab's left chart).
+  // Unlike a per-region *production* share, consumption is a genuinely
+  // regional number — tied to where power is actually drawn, not to plant
+  // siting — capacity, sorted by load %, is what makes the map's outlier
+  // (e.g. Île-de-France) jump out here too.
+  const regionConsumptionRanking = useMemo(
+    () => regions
+      .filter(r => regionConsommation[r.code_insee] != null && regionCapacityTotals[r.code_insee] > 0)
+      .map(r => ({
+        code_insee: r.code_insee,
+        region: r.region,
+        value: regionConsommation[r.code_insee],
+        capacity: regionCapacityTotals[r.code_insee],
+      })),
+    [regions, regionConsommation, regionCapacityTotals]
+  )
 
   // Aggregated data for charts (sum/average across all regions when no region selected)
   const aggregatedProdData = useMemo(
@@ -757,14 +764,7 @@ export default function DashboardPage() {
           <div className="pbi-layout">
             <div className="pbi-layout__left pbi-layout__left--no-kpi">
               <ConsumptionHeatmap data={aggregatedProdData} loading={loading || refreshing} />
-              <RegionRankingChart
-                data={regionConsumptionRanking}
-                title="Consommation par région"
-                explain="Consommation électrique actuelle de chaque région, triée de la plus forte à la plus faible."
-                unit=" MW"
-                color="#2dd4bf"
-                loading={loading || refreshing}
-              />
+              <RegionLoadChart data={regionConsumptionRanking} loading={loading || refreshing} />
             </div>
             <div className="pbi-layout__right">
               <div className="pbi-layout__kpi-row pbi-layout__kpi-row--compact">

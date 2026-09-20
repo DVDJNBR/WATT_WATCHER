@@ -32,8 +32,8 @@ const PROJECTION_CONFIG = { center: [2.5, 46.5], scale: 2200 }
 
 const LOW_COLOR  = [24, 45, 44]     // dim, desaturated teal
 const HIGH_COLOR = [45, 212, 191]   // #2dd4bf — accent teal
-const LOAD_LOW   = [40, 22, 20]     // dim, desaturated red
-const LOAD_HIGH  = [239, 68, 68]    // #ef4444
+const LOAD_LOW   = [20, 26, 40]     // dim, desaturated blue — calm, not alarmist
+const LOAD_HIGH  = [59, 130, 246]   // #3b82f6
 
 function lerp(a, b, t) { return Math.round(a + (b - a) * t) }
 
@@ -44,7 +44,7 @@ function volumeColor(prod, maxProd) {
   return `rgb(${r}, ${g}, ${b})`
 }
 
-/** Interpolate a red intensity from consumption-vs-capacity load relative to the region max. */
+/** Interpolate a blue intensity from consumption-vs-capacity load relative to the region max. */
 function loadColor(pct, maxPct) {
   if (pct == null) return '#1c2538'
   const t = maxPct > 0 ? Math.min(1, Math.max(0, pct / maxPct)) : 0
