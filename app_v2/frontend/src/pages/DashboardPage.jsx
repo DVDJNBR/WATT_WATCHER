@@ -9,7 +9,7 @@
  * surplus story) / Prix (négatifs, business framing) / Capacité (installed
  * vs used, maintenance).
  */
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { KPICard } from '../components/KPICard.jsx'
 import { FranceMap } from '../components/FranceMap.jsx'
 import { CurtailmentCalendar } from '../components/CurtailmentCalendar.jsx'
@@ -195,6 +195,10 @@ export default function DashboardPage() {
   // Date range filter (default: last 7 days)
   const [startDate, setStartDate] = useState(isoDate(-7))
   const [endDate, setEndDate] = useState(isoDate(0))
+  // Tracks the most recently requested range so a slow, superseded fetch
+  // (fired by an earlier preset click) can't overwrite the chart after a
+  // faster later click already landed — see loadData/loadDrillData.
+  const latestRangeRef = useRef({ start: startDate, end: endDate })
 
   // Meteo + capacity data for drill-down
   const [meteoData, setMeteoData] = useState([])
@@ -243,6 +247,10 @@ export default function DashboardPage() {
       const params = { startDate: start, endDate: end }
       if (regionCode) params.regionCode = regionCode
       const result = await fetchAllProduction(params)
+      // A later preset click may have already moved the requested range on
+      // while this fetch was still in flight — drop it rather than clobber
+      // the chart with an older range's data.
+      if (start !== latestRangeRef.current.start || end !== latestRangeRef.current.end) return
       // API returns newest-first (DESC) per page; consumers (KPI "latest point"
       // logic, charts) assume ascending chronological order.
       const data = (result.data || []).sort((a, b) => (a.timestamp < b.timestamp ? -1 : 1))
@@ -250,7 +258,9 @@ export default function DashboardPage() {
       if (updateGlobal || !regionCode) setGlobalData(data)
       setLastUpdated(new Date())
     } catch (err) {
-      setError(err.message || 'Erreur de chargement des données')
+      if (start === latestRangeRef.current.start && end === latestRangeRef.current.end) {
+        setError(err.message || 'Erreur de chargement des données')
+      }
     }
   }, [])
 
@@ -265,6 +275,9 @@ export default function DashboardPage() {
         fetchMeteo(meteoParams),
         fetchCapacity(code ? { regionCode: code } : {}),
       ])
+      // Same stale-response guard as loadData — capacity has no date range
+      // of its own, but météo does, so check against it here too.
+      if (start !== latestRangeRef.current.start || end !== latestRangeRef.current.end) return
       setMeteoData(meteoRes.status === 'fulfilled' ? (meteoRes.value?.data || []) : [])
       setCapacityData(capacityRes.status === 'fulfilled' ? (capacityRes.value?.data || []) : [])
     } finally {
@@ -357,6 +370,7 @@ export default function DashboardPage() {
 
   // Date range change: reload data (preserve region selection)
   const handleDateChange = useCallback(async (newStart, newEnd) => {
+    latestRangeRef.current = { start: newStart, end: newEnd }
     setRefreshing(true)
     if (selectedRegion) {
       // Keep choropleth up to date too
