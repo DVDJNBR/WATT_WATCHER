@@ -1,3 +1,9 @@
+## [1.35.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.34.1...v1.35.0) (2026-09-20)
+
+### Features
+
+* **dashboard:** Phase 4 — merge tabs, curtailment map, history chart rewrite ([268f79b](https://github.com/DVDJNBR/WATT_WATCHER/commit/268f79bfcfa37236a04a3bea7660f093d75f91c8))
+
 ## [1.34.1](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.34.0...v1.34.1) (2026-09-20)
 
 ### Bug Fixes
