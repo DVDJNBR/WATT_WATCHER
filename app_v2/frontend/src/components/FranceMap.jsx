@@ -28,6 +28,11 @@
  * reason "load" mode's nuclear pins exist — raw production share would
  * just re-rank the same nuclear-heavy regions regardless of curtailment.
  *
+ * "dominant" mode — factual, not risk: each region filled by whichever
+ * source produces the most there right now, plus a thin per-region mix
+ * ring (all sources, muted) at its centroid so the full breakdown is one
+ * hover away instead of flattened into a single winner-takes-all color.
+ *
  * showMixRibbon adds a thin, muted mix ribbon beside the map — independent
  * of `mode`, since it's a secondary/background read (current selection's
  * source breakdown), not another choropleth. Clicking a wedge highlights
@@ -65,8 +70,12 @@ const PROJECTION_CONFIG = { center: [2.5, 46.5], scale: 2200 }
 // ── Mix ribbon (thin quarter-donut, radial dividers by construction) ──────
 const ARC_START = 270  // 9 o'clock
 const ARC_END   = 360  // 12 o'clock
-const RIBBON_R_OUTER = 92
-const RIBBON_R_INNER = 78
+const RIBBON_R_OUTER = 90
+const RIBBON_R_INNER = 82
+
+// Per-region mini mix ring — drawn at each region's centroid in "dominant" mode.
+const MINI_R_OUTER = 9
+const MINI_R_INNER = 6.5
 
 /** Muted version of a source color — mixed toward the card background so
  * the ribbon reads as a background element, not competing with whatever
@@ -102,8 +111,16 @@ function annularSegmentPath(cx, cy, rInner, rOuter, startAngle, endAngle) {
 
 /** Outline of the whole combined ring (outer arc + one end + inner arc +
  * other end) as a single stroked path — one border around the shape, not
- * one per wedge, so the radial cuts between sources don't read as seams. */
+ * one per wedge, so the radial cuts between sources don't read as seams.
+ * A full circle (span >= 360) has no ends to close, so it's two separate
+ * concentric circles instead of one closed loop. */
 function ringOutlinePath(cx, cy, rInner, rOuter, startAngle, endAngle) {
+  if (endAngle - startAngle >= 359.999) {
+    return [
+      `M ${cx - rOuter} ${cy} A ${rOuter} ${rOuter} 0 1 1 ${cx + rOuter} ${cy} A ${rOuter} ${rOuter} 0 1 1 ${cx - rOuter} ${cy} Z`,
+      `M ${cx - rInner} ${cy} A ${rInner} ${rInner} 0 1 1 ${cx + rInner} ${cy} A ${rInner} ${rInner} 0 1 1 ${cx - rInner} ${cy} Z`,
+    ].join(' ')
+  }
   const oStart = polarToCartesian(cx, cy, rOuter, startAngle)
   const oEnd   = polarToCartesian(cx, cy, rOuter, endAngle)
   const iEnd   = polarToCartesian(cx, cy, rInner, endAngle)
@@ -116,6 +133,37 @@ function ringOutlinePath(cx, cy, rInner, rOuter, startAngle, endAngle) {
     `A ${rInner} ${rInner} 0 ${largeArc} 0 ${iStart.x} ${iStart.y}`,
     'Z',
   ].join(' ')
+}
+
+/** Thin ring of source-mix wedges — no rounded end caps, one shared
+ * outline. Used both for the small per-region marker (full 360° circle)
+ * and the national/selected-region ribbon (a partial arc). Returns plain
+ * SVG children — caller supplies its own <svg>. */
+function MixRing({ cx, cy, rInner, rOuter, spans, startAngle, endAngle, colorFor, outlineWidth = 1, outlineColor = 'var(--color-surface-2)', onWedgeClick }) {
+  const span = endAngle - startAngle
+  return (
+    <>
+      {spans.map(s => (
+        <path
+          key={s.key}
+          d={annularSegmentPath(
+            cx, cy, rInner, rOuter,
+            startAngle + s.start * span,
+            startAngle + s.end * span
+          )}
+          fill={colorFor(s.key)}
+          style={onWedgeClick ? { cursor: 'pointer', pointerEvents: 'auto' } : undefined}
+          onClick={onWedgeClick ? () => onWedgeClick(s.key) : undefined}
+        />
+      ))}
+      <path
+        d={ringOutlinePath(cx, cy, rInner, rOuter, startAngle, endAngle)}
+        fill="none"
+        stroke={outlineColor}
+        strokeWidth={outlineWidth}
+      />
+    </>
+  )
 }
 
 const LOW_COLOR  = [24, 45, 44]     // dim, desaturated teal
@@ -151,6 +199,18 @@ function curtailmentColor(pct) {
   return `rgb(${r}, ${g}, ${b})`
 }
 
+/** Region fill for "dominant" mode — color of whichever source produces the
+ * most MW in that region right now. Ties keep SOURCE_ORDER's first match. */
+function dominantSource(sources) {
+  if (!sources) return null
+  let best = null, bestMw = 0
+  for (const key of SOURCE_ORDER) {
+    const mw = sources[key] || 0
+    if (mw > bestMw) { bestMw = mw; best = key }
+  }
+  return best
+}
+
 /** Same 4 thresholds as the national carbon badge — green<100, lime<250, amber<400, red>=400. */
 function carbonColor(intensity) {
   if (intensity == null) return '#1c2538'
@@ -182,6 +242,7 @@ const MODE_LABELS = {
   balance: 'Régions exportatrices / importatrices',
   load:    'Consommation vs capacité installée',
   curtailment: 'Risque de curtailment par région',
+  dominant: 'Source dominante par région',
 }
 
 /** Per-source spans (start/end cumulative fraction + %) in fixed order —
@@ -259,6 +320,12 @@ export const FranceMap = memo(function FranceMap({
     [regionLoad]
   )
   const ribbonSpans = useMemo(() => mixSpans(mixSources || {}), [mixSources])
+  const regionMixSpans = useMemo(() => {
+    if (mode !== 'dominant') return {}
+    const out = {}
+    for (const code of Object.keys(regionSources)) out[code] = mixSpans(regionSources[code])
+    return out
+  }, [mode, regionSources])
   const maxHighlightedMw = useMemo(() => {
     if (!highlightedSource) return 1
     return Math.max(1, ...Object.values(regionSources).map(s => s?.[highlightedSource] || 0))
@@ -348,6 +415,8 @@ export const FranceMap = memo(function FranceMap({
                     ? loadColor(load, maxLoad)
                     : mode === 'curtailment'
                     ? curtailmentColor(curtailment)
+                    : mode === 'dominant'
+                    ? (SOURCE_COLORS[dominantSource(regionSources[code])] || '#1c2538')
                     : volumeColor(prod, maxProd)
 
                   return (
@@ -357,7 +426,7 @@ export const FranceMap = memo(function FranceMap({
                       onClick={() => hasData && onSelect(code)}
                       onMouseEnter={e => {
                         if (!hasData) return
-                        setHovered({ name: nom, prod, conso, carbon, load, curtailment, share, balance, x: e.clientX, y: e.clientY })
+                        setHovered({ name: nom, prod, conso, carbon, load, curtailment, share, balance, sources: regionSources[code], x: e.clientX, y: e.clientY })
                       }}
                       onMouseMove={e => {
                         if (hovered) setHovered(h => ({ ...h, x: e.clientX, y: e.clientY }))
@@ -417,43 +486,54 @@ export const FranceMap = memo(function FranceMap({
                 <circle r={4} fill="#7c3aed" fillOpacity={0.85} stroke="#c4b5fd" strokeWidth={1} />
               </Marker>
             ))}
+            {mode === 'dominant' && (
+              <Geographies geography={GEO_URL}>
+                {({ geographies }) =>
+                  geographies
+                    .filter(geo => availableCodes.has(geo.properties.code) && regionMixSpans[geo.properties.code]?.length > 0)
+                    .map(geo => {
+                      const code = geo.properties.code
+                      const spans = regionMixSpans[code]
+                      const centroid = geoCentroid(geo)
+                      return (
+                        <Marker key={geo.rsmKey} coordinates={centroid}
+                          onMouseEnter={e => setHovered({ name: geo.properties.nom, prod: regionTotals[code] ?? 0, sources: regionSources[code], x: e.clientX, y: e.clientY })}
+                          onMouseMove={e => setHovered(h => (h && h.sources ? { ...h, x: e.clientX, y: e.clientY } : h))}
+                          onMouseLeave={() => setHovered(h => (h && h.sources ? null : h))}>
+                          <MixRing
+                            cx={0} cy={0}
+                            rInner={MINI_R_INNER} rOuter={MINI_R_OUTER}
+                            spans={spans}
+                            startAngle={0} endAngle={360}
+                            colorFor={key => SOURCE_COLORS[key]}
+                            outlineWidth={1}
+                            outlineColor="rgba(0,0,0,0.55)"
+                          />
+                        </Marker>
+                      )
+                    })
+                }
+              </Geographies>
+            )}
             </ZoomableGroup>
           </ComposableMap>
 
           {showMixRibbon && ribbonSpans.length > 0 && (() => {
             const cx = 96, cy = 148
-            const capR = (RIBBON_R_OUTER - RIBBON_R_INNER) / 2
-            const capMidR = (RIBBON_R_OUTER + RIBBON_R_INNER) / 2
-            const startCap = polarToCartesian(cx, cy, capMidR, ARC_START)
-            const endCap   = polarToCartesian(cx, cy, capMidR, ARC_END)
             const colorFor = key => highlightedSource === key ? SOURCE_COLORS[key] : mutedSourceColor(SOURCE_COLORS[key])
             return (
               <div className="mix-ribbon">
                 <svg width={120} height={192} viewBox="0 0 120 192" className="mix-ribbon__svg">
-                  {/* Rounded end caps — the arc's own start/end, not each wedge's */}
-                  <circle cx={startCap.x} cy={startCap.y} r={capR} fill={colorFor(ribbonSpans[0].key)} />
-                  <circle cx={endCap.x} cy={endCap.y} r={capR} fill={colorFor(ribbonSpans[ribbonSpans.length - 1].key)} />
-                  {/* Wedges — each edge is a straight radius of the same circle, by construction.
-                      Clicking one highlights that source's regional production on the map. */}
-                  {ribbonSpans.map(s => (
-                    <path
-                      key={s.key}
-                      d={annularSegmentPath(
-                        cx, cy, RIBBON_R_INNER, RIBBON_R_OUTER,
-                        ARC_START + s.start * (ARC_END - ARC_START),
-                        ARC_START + s.end * (ARC_END - ARC_START)
-                      )}
-                      fill={colorFor(s.key)}
-                      style={{ cursor: 'pointer', pointerEvents: 'auto' }}
-                      onClick={() => setHighlightedSource(h => (h === s.key ? null : s.key))}
-                    />
-                  ))}
-                  {/* One outline around the whole ring, not one per wedge */}
-                  <path
-                    d={ringOutlinePath(cx, cy, RIBBON_R_INNER, RIBBON_R_OUTER, ARC_START, ARC_END)}
-                    fill="none"
-                    stroke="var(--color-surface-2)"
-                    strokeWidth={1}
+                  {/* Thin arc, flat ends (no rounded caps), one shared outline.
+                      Clicking a wedge highlights that source's regional production on the map. */}
+                  <MixRing
+                    cx={cx} cy={cy}
+                    rInner={RIBBON_R_INNER} rOuter={RIBBON_R_OUTER}
+                    spans={ribbonSpans}
+                    startAngle={ARC_START} endAngle={ARC_END}
+                    colorFor={colorFor}
+                    outlineWidth={1.25}
+                    onWedgeClick={key => setHighlightedSource(h => (h === key ? null : key))}
                   />
                 </svg>
                 <div className="mix-ribbon__labels">
@@ -530,6 +610,15 @@ export const FranceMap = memo(function FranceMap({
                   {Math.round(hovered.conso).toLocaleString('fr-FR')} MW conso.
                 </span>
               )}
+              {mode === 'dominant' && hovered.sources && (
+                <div className="map-tooltip__mix">
+                  {mixSpans(hovered.sources).map(s => (
+                    <span key={s.key} className="map-tooltip__mix-row" style={{ color: mutedSourceColor(SOURCE_COLORS[s.key]) }}>
+                      {SOURCE_LABELS[s.key]} <strong>{s.pct.toFixed(0)}%</strong>
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -585,6 +674,13 @@ export const FranceMap = memo(function FranceMap({
             style={{ background: `linear-gradient(90deg, rgb(${CURTAIL_LOW.join(',')}), rgb(${CURTAIL_HIGH.join(',')}))` }}
           />
           <span className="map-legend__item">faible → élevée</span>
+        </div>
+      )}
+      {!loading && mode === 'dominant' && (
+        <div className="map-legend">
+          {SOURCE_ORDER.map(key => (
+            <span key={key} className="map-legend__item" style={{ color: SOURCE_COLORS[key] }}>● {SOURCE_LABELS[key]}</span>
+          ))}
         </div>
       )}
 

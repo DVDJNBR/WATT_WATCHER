@@ -648,8 +648,8 @@ export default function DashboardPage() {
                   selectedCode={selectedRegion}
                   onSelect={handleRegionChange}
                   loading={loading}
-                  mode="curtailment"
-                  availableModes={['curtailment']}
+                  mode="dominant"
+                  availableModes={['dominant']}
                 />
               </div>
               {buildControlsColumn()}

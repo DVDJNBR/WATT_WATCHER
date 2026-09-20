@@ -1408,6 +1408,24 @@ input[type="date"] {
   font-weight: 600;
 }
 
+.map-tooltip__mix {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin-top: 2px;
+  padding-top: 4px;
+  border-top: 1px solid var(--color-border);
+}
+
+.map-tooltip__mix-row {
+  font-size: 0.72rem;
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.map-tooltip__mix-row strong { font-weight: 700; }
+
 .map-header {
   display: flex;
   align-items: center;
