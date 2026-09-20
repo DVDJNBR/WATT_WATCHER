@@ -320,6 +320,24 @@ export const FranceMap = memo(function FranceMap({
     [regionLoad]
   )
   const ribbonSpans = useMemo(() => mixSpans(mixSources || {}), [mixSources])
+  // Small shares (e.g. Éolien 7%, Hydraulique 9%) land only a few degrees
+  // apart near the arc's end, so their un-adjusted label points nearly
+  // coincide and the text overlaps. Sort top-to-bottom and push down any
+  // label that lands closer than one line-height to the one above it.
+  const ribbonLabelPositions = useMemo(() => {
+    const cx = 96, cy = 148
+    const pts = ribbonSpans.filter(s => s.pct >= 6).map(s => {
+      const midAngle = ARC_START + ((s.start + s.end) / 2) * (ARC_END - ARC_START)
+      const { x, y } = polarToCartesian(cx, cy, RIBBON_R_OUTER + 12, midAngle)
+      return { key: s.key, pct: s.pct, x, y }
+    })
+    pts.sort((a, b) => a.y - b.y)
+    const MIN_GAP = 16
+    for (let i = 1; i < pts.length; i++) {
+      if (pts[i].y - pts[i - 1].y < MIN_GAP) pts[i].y = pts[i - 1].y + MIN_GAP
+    }
+    return pts
+  }, [ribbonSpans])
   const regionMixSpans = useMemo(() => {
     if (mode !== 'dominant') return {}
     const out = {}
@@ -391,7 +409,9 @@ export const FranceMap = memo(function FranceMap({
             >
             <Geographies geography={GEO_URL}>
               {({ geographies }) =>
-                geographies.map(geo => {
+                geographies
+                  .filter(geo => geo.properties.code !== '94') // Corse: RTE never reports it, always "no data"
+                  .map(geo => {
                   const code     = geo.properties.code
                   const nom      = geo.properties.nom
                   const isSelected = code === selectedCode
@@ -537,20 +557,16 @@ export const FranceMap = memo(function FranceMap({
                   />
                 </svg>
                 <div className="mix-ribbon__labels">
-                  {ribbonSpans.filter(s => s.pct >= 6).map(s => {
-                    const midAngle = ARC_START + ((s.start + s.end) / 2) * (ARC_END - ARC_START)
-                    const labelPt = polarToCartesian(cx, cy, RIBBON_R_OUTER + 12, midAngle)
-                    return (
-                      <span
-                        key={s.key}
-                        className={`mix-ribbon__label${highlightedSource === s.key ? ' mix-ribbon__label--active' : ''}`}
-                        style={{ left: `${labelPt.x}px`, top: `${labelPt.y}px`, color: colorFor(s.key) }}
-                        onClick={() => setHighlightedSource(h => (h === s.key ? null : s.key))}
-                      >
-                        {SOURCE_LABELS[s.key]} <strong>{s.pct.toFixed(0)}%</strong>
-                      </span>
-                    )
-                  })}
+                  {ribbonLabelPositions.map(s => (
+                    <span
+                      key={s.key}
+                      className={`mix-ribbon__label${highlightedSource === s.key ? ' mix-ribbon__label--active' : ''}`}
+                      style={{ left: `${s.x}px`, top: `${s.y}px`, color: colorFor(s.key) }}
+                      onClick={() => setHighlightedSource(h => (h === s.key ? null : s.key))}
+                    >
+                      {SOURCE_LABELS[s.key]} <strong>{s.pct.toFixed(0)}%</strong>
+                    </span>
+                  ))}
                 </div>
               </div>
             )
