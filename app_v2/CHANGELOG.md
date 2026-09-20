@@ -1,3 +1,13 @@
+## [1.36.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.35.0...v1.36.0) (2026-09-20)
+
+### Features
+
+* **dashboard:** dominant-source map mode + redesigned mix ribbon ([07ded60](https://github.com/DVDJNBR/WATT_WATCHER/commit/07ded602b8f632808c23ca9202d6ad7d4a1c102e))
+
+### Bug Fixes
+
+* **dashboard:** 6-month range fetch — pageSize 1000 to 50000 ([60bc6e3](https://github.com/DVDJNBR/WATT_WATCHER/commit/60bc6e3a96ec3807cd88d305a8758c41cf2a4dfc))
+
 ## [1.35.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.34.1...v1.35.0) (2026-09-20)
 
 ### Features
