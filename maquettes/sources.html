@@ -211,35 +211,21 @@ function draw(){
 
   if(!heroPts.length){ctx.restore();return;}
 
-  // 3. GLOW PASS — halo circle, low opacity, batched by filière
-  FILIERES.forEach(function(f){
-    var pts=heroPts.filter(function(p){return p.f===f;});
-    if(!pts.length) return;
-    ctx.beginPath();
-    pts.forEach(function(p){
-      var glowR=3+Math.pow(p.h,0.55)*8;
-      ctx.moveTo(p.x+glowR,p.y);
-      ctx.arc(p.x,p.y,glowR,0,Math.PI*2);
-    });
-    ctx.fillStyle=rgba(colors[f],0.10);
-    ctx.fill();
-  });
-
-  // 4. CORE DOT PASS — crisp saturated dot, batched by filière
-  var groups={};
-  FILIERES.forEach(function(f){groups[f]=[];});
-  heroPts.forEach(function(p){groups[p.f].push(p);});
-  FILIERES.forEach(function(f){
-    var pts=groups[f];
-    if(!pts.length) return;
-    ctx.beginPath();
-    pts.forEach(function(p){
-      var r=0.8+Math.pow(p.h,0.6)*2.2;
-      ctx.moveTo(p.x+r,p.y);
-      ctx.arc(p.x,p.y,r,0,Math.PI*2);
-    });
-    ctx.fillStyle=rgba(colors[f],1.0);
-    ctx.fill();
+  // 3+4. PER-SITE: glow halo + crisp core — alpha scales with heroT so small
+  // plants stay near-invisible, only true giants (h→1) pop
+  heroPts.forEach(function(p){
+    var h=p.h;
+    var coreR=0.5+Math.pow(h,0.65)*1.8;          // 0.5px → 2.3px max
+    var glowR=coreR*2.5;
+    var coreA=0.25+0.75*Math.pow(h,0.5);          // 0.25 → 1.0
+    var glowA=0.04+0.08*Math.pow(h,0.5);          // 0.04 → 0.12
+    var col=colors[p.f];
+    // halo
+    ctx.beginPath();ctx.arc(p.x,p.y,glowR,0,Math.PI*2);
+    ctx.fillStyle=rgba(col,glowA);ctx.fill();
+    // core
+    ctx.beginPath();ctx.arc(p.x,p.y,coreR,0,Math.PI*2);
+    ctx.fillStyle=rgba(col,coreA);ctx.fill();
   });
 
   // 6. Hover highlight
