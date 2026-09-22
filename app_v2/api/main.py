@@ -24,7 +24,7 @@ from api.error_handlers import bad_request, not_found, server_error
 from api.export_service import export_to_csv
 from api.maintenance_service import query_maintenance
 from api.market_price_service import query_market_price
-from api.meteo_service import query_meteo
+from api.meteo_service import query_meteo, query_meteo_grid
 from api.models import parse_export_request, parse_production_request
 from api.national_mix_service import query_national_mix
 from api.production_service import query_production
@@ -132,6 +132,23 @@ def meteo_regional(request: Request):
         return JSONResponse(result, headers={"X-Request-Id": request_id})
     except Exception:
         logger.exception("meteo endpoint error [%s]", request_id)
+        return JSONResponse(server_error(request_id=request_id), status_code=500)
+    finally:
+        if conn:
+            conn.close()
+
+
+@app.get("/v1/meteo/grid")
+def meteo_grid(request: Request):
+    """Current 22×16 weather grid (cloud cover + wind) for map overlay."""
+    request_id = str(uuid.uuid4())
+    conn = None
+    try:
+        conn = get_db_connection()
+        result = query_meteo_grid(conn, request_id=request_id)
+        return JSONResponse(result, headers={"X-Request-Id": request_id})
+    except Exception:
+        logger.exception("meteo/grid endpoint error [%s]", request_id)
         return JSONResponse(server_error(request_id=request_id), status_code=500)
     finally:
         if conn:
