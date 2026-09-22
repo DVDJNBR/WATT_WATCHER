@@ -111,10 +111,15 @@ var HERO_MAX = 1500; // MW (big nuclear ~1500 MW)
 
 function heroT(mw){ return Math.max(0,Math.min(1,(mw-HERO_MIN)/(HERO_MAX-HERO_MIN))); }
 
-// Live mix: capacity factor per filière (0→1), updated from ODRE eco2mix
-// Default 1.0 so map renders immediately before first fetch
-var _capFactor = {nucleaire:1,hydraulique:1,eolien:1,solaire:1,thermique:1,autre:1};
-var _installedMW = {};  // sum of installed MW per filière (filled by buildPoints)
+// Live mix state — updated from ODRE eco2mix
+var _capFactor  = {nucleaire:1,hydraulique:1,eolien:1,solaire:1,thermique:1,autre:1};
+var _filierePct = {nucleaire:0.6,hydraulique:0.1,eolien:0.08,solaire:0.06,thermique:0.08,autre:0.02}; // % mix
+var _installedMW = {};  // sum installed MW per filière (filled by buildPoints)
+
+// Sizing: coreR = R_MIN + sqrt(vShare) * R_SCALE
+// vShare = filierePct × (cap_mw / sum_installed[filiere])
+// Calibrated so Chooz 1500 MW at 70% mix → ~4.5px
+var R_MIN = 0.8, R_SCALE = 28;
 
 // ODRE eco2mix fields → our filière keys
 var ODRE_TO_F = {nucleaire:"nucleaire",hydraulique:"hydraulique",eolien:"eolien",solaire:"solaire",
@@ -133,10 +138,12 @@ function loadMix(){
       var f=ODRE_TO_F[k]; var v=rec[k]||0;
       actual[f]=(actual[f]||0)+(v>0?v:0);
     });
-    // Compute capacity factors
+    // Compute capacity factors + mix shares
+    var totalMW=Object.values(actual).reduce(function(a,b){return a+b;},0)||1;
     FILIERES.forEach(function(f){
       var inst=_installedMW[f]||1;
       _capFactor[f]=Math.min(1.2, actual[f]/inst);
+      _filierePct[f]=actual[f]/totalMW;
     });
     // Update UI
     var ts=rec.date_heure?new Date(rec.date_heure).toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"}):"";
@@ -251,16 +258,16 @@ function draw(){
   if(!heroPts.length){ctx.restore();return;}
 
   // 3+4. PER-SITE: glow halo + crisp core
-  // base alpha scales with heroT (size), then multiplied by filière capacity factor
-  // → zero production = invisible; full production = full brightness
+  // Size ∝ sqrt(filierePct × cap_mw/installed[filiere]) — production-proportional
+  // Alpha ∝ capacity factor → zero prod = invisible
   heroPts.forEach(function(p){
-    var h=p.h;
     var cf=Math.max(0,_capFactor[p.f]||0);
-    if(cf<0.01) return;  // filière producing nothing → skip
-    var coreR=0.8+Math.pow(h,0.65)*2.4;
-    var glowR=coreR*2.8;
-    var coreA=(0.55+0.45*Math.pow(h,0.4))*Math.min(1,cf*1.2);
-    var glowA=(0.05+0.10*Math.pow(h,0.5))*Math.min(1,cf*1.2);
+    if(cf<0.01) return;
+    var vShare=(_filierePct[p.f]||0.05)*(p.mw/(_installedMW[p.f]||1));
+    var coreR=R_MIN+Math.sqrt(Math.max(vShare,0.00005))*R_SCALE;
+    var glowR=coreR*3.0;
+    var coreA=Math.min(0.95, 0.5*cf+0.3);
+    var glowA=Math.min(0.18, 0.08*cf+0.04);
     var col=colors[p.f];
     ctx.beginPath();ctx.arc(p.x,p.y,glowR,0,Math.PI*2);
     ctx.fillStyle=rgba(col,glowA);ctx.fill();
@@ -271,8 +278,8 @@ function draw(){
   // 6. Hover highlight
   if(hoveredHero>=0 && hoveredHero<heroPts.length){
     var p=heroPts[hoveredHero];
-    var mixK=Math.pow(p.h,0.55);
-    var r=0.4+Math.pow(p.h,1.5)*0.6+Math.pow(p.h,0.6)*3.0+2;
+    var vShare=(_filierePct[p.f]||0.05)*(p.mw/(_installedMW[p.f]||1));
+    var r=R_MIN+Math.sqrt(Math.max(vShare,0.00005))*R_SCALE+2;
     ctx.beginPath(); ctx.arc(p.x,p.y,r,0,Math.PI*2);
     ctx.strokeStyle=rgba(colors[p.f],0.9); ctx.lineWidth=1.5; ctx.stroke();
   }
@@ -286,8 +293,8 @@ canvas.addEventListener("mousemove",function(e){
   var mx=e.clientX-rect.left,my=e.clientY-rect.top;
   var found=-1,bestD=Infinity;
   heroPts.forEach(function(p,i){
-    var mixK=Math.pow(p.h,0.6);
-    var r=0.4+Math.pow(p.h,1.5)*0.6+mixK*3.0+4;
+    var vShare=(_filierePct[p.f]||0.05)*(p.mw/(_installedMW[p.f]||1));
+    var r=R_MIN+Math.sqrt(Math.max(vShare,0.00005))*R_SCALE+4;
     var dx=mx-p.x,dy=my-p.y,d=Math.sqrt(dx*dx+dy*dy);
     if(d<=r&&d<bestD){bestD=d;found=i;}
   });
