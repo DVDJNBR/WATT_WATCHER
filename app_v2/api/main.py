@@ -16,6 +16,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
 
+from api.cache import cache, make_key
 from api.capacity_service import query_capacity
 from api.cross_border_service import query_cross_border
 from api.curtailment_service import query_curtailment_calendar, query_curtailment_risk
@@ -46,7 +47,7 @@ app.add_middleware(
 
 @app.get("/health")
 def health():
-    return {"status": "healthy", "version": app.version}
+    return {"status": "healthy", "version": app.version, "cache_entries": cache.size()}
 
 
 @app.get("/v1/production/regional")
@@ -55,6 +56,11 @@ def production_regional(request: Request):
     prod_req, validation_error = parse_production_request(dict(request.query_params))
     if validation_error:
         return JSONResponse(bad_request(validation_error, request_id), status_code=400)
+
+    key = make_key("production_regional", dict(request.query_params))
+    cached = cache.get(key)
+    if cached is not None:
+        return JSONResponse(cached, headers={"X-Request-Id": request_id, "X-Cache": "HIT"})
 
     conn = None
     try:
@@ -71,7 +77,8 @@ def production_regional(request: Request):
         )
         if not result["data"]:
             return JSONResponse(not_found(request_id=request_id), status_code=404)
-        return JSONResponse(result, headers={"X-Request-Id": request_id})
+        cache.set(key, result)
+        return JSONResponse(result, headers={"X-Request-Id": request_id, "X-Cache": "MISS"})
     except Exception:
         logger.exception("production endpoint error [%s]", request_id)
         return JSONResponse(server_error(request_id=request_id), status_code=500)
@@ -118,6 +125,12 @@ def export_csv(request: Request):
 def meteo_regional(request: Request):
     request_id = str(uuid.uuid4())
     params = request.query_params
+
+    key = make_key("meteo_regional", dict(params))
+    cached = cache.get(key)
+    if cached is not None:
+        return JSONResponse(cached, headers={"X-Request-Id": request_id, "X-Cache": "HIT"})
+
     conn = None
     try:
         conn = get_db_connection()
@@ -129,7 +142,8 @@ def meteo_regional(request: Request):
             limit=min(int(params.get("limit", 500)), 5000),
             request_id=request_id,
         )
-        return JSONResponse(result, headers={"X-Request-Id": request_id})
+        cache.set(key, result)
+        return JSONResponse(result, headers={"X-Request-Id": request_id, "X-Cache": "MISS"})
     except Exception:
         logger.exception("meteo endpoint error [%s]", request_id)
         return JSONResponse(server_error(request_id=request_id), status_code=500)
@@ -142,11 +156,17 @@ def meteo_regional(request: Request):
 def meteo_grid(request: Request):
     """Current 22×16 weather grid (cloud cover + wind) for map overlay."""
     request_id = str(uuid.uuid4())
+
+    cached = cache.get("meteo_grid")
+    if cached is not None:
+        return JSONResponse(cached, headers={"X-Request-Id": request_id, "X-Cache": "HIT"})
+
     conn = None
     try:
         conn = get_db_connection()
         result = query_meteo_grid(conn, request_id=request_id)
-        return JSONResponse(result, headers={"X-Request-Id": request_id})
+        cache.set("meteo_grid", result)
+        return JSONResponse(result, headers={"X-Request-Id": request_id, "X-Cache": "MISS"})
     except Exception:
         logger.exception("meteo/grid endpoint error [%s]", request_id)
         return JSONResponse(server_error(request_id=request_id), status_code=500)
@@ -160,6 +180,12 @@ def production_national_mix(request: Request):
     """Gaz/charbon/fioul fossil-thermal split — France-wide only, no region filter."""
     request_id = str(uuid.uuid4())
     params = request.query_params
+
+    key = make_key("national_mix", dict(params))
+    cached = cache.get(key)
+    if cached is not None:
+        return JSONResponse(cached, headers={"X-Request-Id": request_id, "X-Cache": "HIT"})
+
     conn = None
     try:
         conn = get_db_connection()
@@ -170,7 +196,8 @@ def production_national_mix(request: Request):
             limit=min(int(params.get("limit", 500)), 5000),
             request_id=request_id,
         )
-        return JSONResponse(result, headers={"X-Request-Id": request_id})
+        cache.set(key, result)
+        return JSONResponse(result, headers={"X-Request-Id": request_id, "X-Cache": "MISS"})
     except Exception:
         logger.exception("national-mix endpoint error [%s]", request_id)
         return JSONResponse(server_error(request_id=request_id), status_code=500)
@@ -183,6 +210,12 @@ def production_national_mix(request: Request):
 def capacity_regional(request: Request):
     request_id = str(uuid.uuid4())
     params = request.query_params
+
+    key = make_key("capacity_regional", dict(params))
+    cached = cache.get(key)
+    if cached is not None:
+        return JSONResponse(cached, headers={"X-Request-Id": request_id, "X-Cache": "HIT"})
+
     conn = None
     try:
         conn = get_db_connection()
@@ -192,7 +225,8 @@ def capacity_regional(request: Request):
             annee=params.get("annee") or None,
             request_id=request_id,
         )
-        return JSONResponse(result, headers={"X-Request-Id": request_id})
+        cache.set(key, result)
+        return JSONResponse(result, headers={"X-Request-Id": request_id, "X-Cache": "MISS"})
     except Exception:
         logger.exception("capacity endpoint error [%s]", request_id)
         return JSONResponse(server_error(request_id=request_id), status_code=500)
@@ -205,6 +239,12 @@ def capacity_regional(request: Request):
 def curtailment_regional(request: Request):
     request_id = str(uuid.uuid4())
     params = request.query_params
+
+    key = make_key("curtailment_regional", dict(params))
+    cached = cache.get(key)
+    if cached is not None:
+        return JSONResponse(cached, headers={"X-Request-Id": request_id, "X-Cache": "HIT"})
+
     conn = None
     try:
         conn = get_db_connection()
@@ -214,7 +254,8 @@ def curtailment_regional(request: Request):
             end_date=params.get("end_date") or None,
             request_id=request_id,
         )
-        return JSONResponse(result, headers={"X-Request-Id": request_id})
+        cache.set(key, result)
+        return JSONResponse(result, headers={"X-Request-Id": request_id, "X-Cache": "MISS"})
     except Exception:
         logger.exception("curtailment endpoint error [%s]", request_id)
         return JSONResponse(server_error(request_id=request_id), status_code=500)
@@ -226,11 +267,17 @@ def curtailment_regional(request: Request):
 @app.get("/v1/curtailment/calendar")
 def curtailment_calendar(request: Request):
     request_id = str(uuid.uuid4())
+
+    cached = cache.get("curtailment_calendar")
+    if cached is not None:
+        return JSONResponse(cached, headers={"X-Request-Id": request_id, "X-Cache": "HIT"})
+
     conn = None
     try:
         conn = get_db_connection()
         result = query_curtailment_calendar(conn, request_id=request_id)
-        return JSONResponse(result, headers={"X-Request-Id": request_id})
+        cache.set("curtailment_calendar", result)
+        return JSONResponse(result, headers={"X-Request-Id": request_id, "X-Cache": "MISS"})
     except Exception:
         logger.exception("curtailment calendar endpoint error [%s]", request_id)
         return JSONResponse(server_error(request_id=request_id), status_code=500)
@@ -244,6 +291,12 @@ def prices_regional(request: Request):
     """Day-ahead spot price (EUR/MWh) over time — national, single-zone."""
     request_id = str(uuid.uuid4())
     params = request.query_params
+
+    key = make_key("prices_regional", dict(params))
+    cached = cache.get(key)
+    if cached is not None:
+        return JSONResponse(cached, headers={"X-Request-Id": request_id, "X-Cache": "HIT"})
+
     conn = None
     try:
         conn = get_db_connection()
@@ -254,7 +307,8 @@ def prices_regional(request: Request):
             limit=min(int(params.get("limit", 5000)), 20000),
             request_id=request_id,
         )
-        return JSONResponse(result, headers={"X-Request-Id": request_id})
+        cache.set(key, result)
+        return JSONResponse(result, headers={"X-Request-Id": request_id, "X-Cache": "MISS"})
     except Exception:
         logger.exception("prices endpoint error [%s]", request_id)
         return JSONResponse(server_error(request_id=request_id), status_code=500)
@@ -278,6 +332,12 @@ def production_units(request: Request):
 def export_cross_border(request: Request):
     request_id = str(uuid.uuid4())
     params = request.query_params
+
+    key = make_key("cross_border", dict(params))
+    cached = cache.get(key)
+    if cached is not None:
+        return JSONResponse(cached, headers={"X-Request-Id": request_id, "X-Cache": "HIT"})
+
     conn = None
     try:
         conn = get_db_connection()
@@ -287,7 +347,8 @@ def export_cross_border(request: Request):
             end_date=params.get("end_date") or None,
             request_id=request_id,
         )
-        return JSONResponse(result, headers={"X-Request-Id": request_id})
+        cache.set(key, result)
+        return JSONResponse(result, headers={"X-Request-Id": request_id, "X-Cache": "MISS"})
     except Exception:
         logger.exception("cross-border endpoint error [%s]", request_id)
         return JSONResponse(server_error(request_id=request_id), status_code=500)
@@ -300,6 +361,12 @@ def export_cross_border(request: Request):
 def maintenance(request: Request):
     request_id = str(uuid.uuid4())
     params = request.query_params
+
+    key = make_key("maintenance", dict(params))
+    cached = cache.get(key)
+    if cached is not None:
+        return JSONResponse(cached, headers={"X-Request-Id": request_id, "X-Cache": "HIT"})
+
     conn = None
     try:
         conn = get_db_connection()
@@ -309,7 +376,8 @@ def maintenance(request: Request):
             limit=min(int(params.get("limit", 100)), 500),
             request_id=request_id,
         )
-        return JSONResponse(result, headers={"X-Request-Id": request_id})
+        cache.set(key, result)
+        return JSONResponse(result, headers={"X-Request-Id": request_id, "X-Cache": "MISS"})
     except Exception:
         logger.exception("maintenance endpoint error [%s]", request_id)
         return JSONResponse(server_error(request_id=request_id), status_code=500)
