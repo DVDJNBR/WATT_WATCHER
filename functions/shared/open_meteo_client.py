@@ -30,6 +30,56 @@ REGION_CENTROIDS = {
 
 BASE_URL = "https://api.open-meteo.com/v1/forecast"
 
+# Grille 22×16 couvrant la France (même params que maquette JS)
+GRID_LON0, GRID_LAT0 = -5.0, 41.0
+GRID_DLON, GRID_DLAT = 0.75, 0.75
+GRID_NCOL, GRID_NROW = 22, 16
+
+
+def fetch_meteo_grid() -> list[dict]:
+    """
+    Fetch current cloud_cover, wind_speed_10m, wind_direction_10m
+    for the 22×16 = 352-point grid covering France.
+
+    Single batch request to open-meteo multi-location API.
+    Returns list[{lat, lon, cloud_cover, wind_speed, wind_direction}].
+    """
+    lats, lons = [], []
+    for ri in range(GRID_NROW):
+        for ci in range(GRID_NCOL):
+            lats.append(round(GRID_LAT0 + ri * GRID_DLAT, 2))
+            lons.append(round(GRID_LON0 + ci * GRID_DLON, 2))
+
+    resp = requests.get(
+        BASE_URL,
+        params={
+            "latitude":  ",".join(str(v) for v in lats),
+            "longitude": ",".join(str(v) for v in lons),
+            "current":   "cloud_cover,wind_speed_10m,wind_direction_10m",
+            "timezone":  "UTC",
+            "forecast_days": 1,
+        },
+        timeout=30,
+    )
+    resp.raise_for_status()
+    results = resp.json()
+    if not isinstance(results, list):
+        results = [results]
+
+    records = []
+    for i, pt in enumerate(results):
+        cur = pt.get("current") or {}
+        records.append({
+            "lat":           lats[i],
+            "lon":           lons[i],
+            "cloud_cover":   int(cur.get("cloud_cover") or 0),
+            "wind_speed":    float(cur.get("wind_speed_10m") or 0.0),
+            "wind_direction": int(cur.get("wind_direction_10m") or 0),
+        })
+
+    logger.info("fetch_meteo_grid: %d points fetched", len(records))
+    return records
+
 
 def fetch_meteo_all_regions(past_days: int = 3) -> list[dict]:
     """

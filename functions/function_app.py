@@ -58,6 +58,8 @@ from shared.api.email_service import EmailService
 from shared.api.subscription_service import get_subscriptions, update_subscriptions
 from shared.alerting.alert_dispatcher import dispatch_alerts
 from shared.alerting.rgpd_service import run_rgpd_cleanup
+from shared.open_meteo_client import fetch_meteo_grid
+from shared.supabase_client import upsert as supabase_upsert
 
 logger = logging.getLogger(__name__)
 
@@ -106,6 +108,22 @@ def _get_db_connection() -> Any:
 
 if AZURE_FUNCTIONS_AVAILABLE:
     app = func.FunctionApp()
+
+    # ── Météo grid timer — open-meteo 22×16 → Supabase meteo_grid ───────────
+
+    @app.timer_trigger(
+        schedule="0 */15 * * * *",  # every 15 minutes, aligned with RTE ingestion
+        arg_name="timer",
+        run_on_startup=False,
+    )
+    def meteo_grid_refresh(timer: func.TimerRequest) -> None:
+        """Fetch 352-point weather grid from open-meteo and upsert to Supabase."""
+        try:
+            rows = fetch_meteo_grid()
+            supabase_upsert("meteo_grid", rows, on_conflict="lat,lon")
+            logger.info("meteo_grid_refresh: %d points written to Supabase", len(rows))
+        except Exception as exc:
+            logger.error("meteo_grid_refresh failed: %s", exc, exc_info=True)
 
     # ── Story 1.1: RTE ingestion timer ──────────────────────────────────────
 

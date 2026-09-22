@@ -64,3 +64,31 @@ def query_meteo(
         for row in rows
     ]
     return {"data": data, "total_records": len(data), "request_id": request_id}
+
+
+def query_meteo_grid(conn: Any, request_id: Optional[str] = None) -> dict:
+    """
+    Return current 22×16 weather grid from meteo_grid table.
+    Each row: {lat, lon, cloud_cover, wind_speed, wind_direction, updated_at}.
+    """
+    sqlite_ = is_sqlite(conn)
+    tbl = "METEO_GRID" if sqlite_ else "meteo_grid"
+
+    cursor = conn.cursor()
+    cursor.execute(
+        f"SELECT lat, lon, cloud_cover, wind_speed, wind_direction, updated_at FROM {tbl}"
+        f" ORDER BY lat, lon"
+    )
+    rows = cursor.fetchall()
+    data = [
+        {
+            "lat":           float(r[0]),
+            "lon":           float(r[1]),
+            "cloud_cover":   int(r[2])   if r[2] is not None else 0,
+            "wind_speed":    float(r[3]) if r[3] is not None else 0.0,
+            "wind_direction": int(r[4])  if r[4] is not None else 0,
+            "updated_at":    str(r[5])   if r[5] is not None else None,
+        }
+        for r in rows
+    ]
+    return {"data": data, "total_records": len(data), "request_id": request_id}
