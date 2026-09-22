@@ -62,7 +62,7 @@ canvas{display:block;width:100%;height:100%;cursor:default}
     <div>
       <p class="eyebrow">Watt Watcher — Concept</p>
       <h1>Centrales électriques de France</h1>
-      <p class="subtitle" id="subtitle">248 sites — nucl/hydro/therm : unités RTE individuelles · éolien/solaire : parcs agrégés ODRE. Taille proportionnelle à la capacité installée, éclat modulé par la production en cours. <span id="mixTs" style="opacity:.55"></span></p>
+      <p class="subtitle" id="subtitle">687 sites — nucl/hydro/therm RTE individuels · éolien/solaire parcs ODRE ≥ 20 MW. Taille normalisée par filière, éclat = taux de charge live, éclat modulé par la production en cours. <span id="mixTs" style="opacity:.55"></span></p>
     </div>
     <button class="btn-theme" id="themeBtn">Clair</button>
   </header>
@@ -105,21 +105,15 @@ var SRC_COLORS_LIGHT = {nucleaire:"#7c3aed",hydraulique:"#3b82f6",solaire:"#d977
 var FILIERES = ["nucleaire","hydraulique","solaire","eolien","thermique","autre"];
 var F_LABEL = {nucleaire:"Nucléaire",hydraulique:"Hydraulique",solaire:"Solaire",eolien:"Éolien",thermique:"Thermique",autre:"Autre"};
 
-// Log scale constants — input in MW
-var HERO_MIN = 40;   // MW
-var HERO_MAX = 1500; // MW (big nuclear ~1500 MW)
-
-function heroT(mw){ return Math.max(0,Math.min(1,(mw-HERO_MIN)/(HERO_MAX-HERO_MIN))); }
 
 // Live mix state — updated from ODRE eco2mix
-var _capFactor  = {nucleaire:1,hydraulique:1,eolien:1,solaire:1,thermique:1,autre:1};
-var _filierePct = {nucleaire:0.6,hydraulique:0.1,eolien:0.08,solaire:0.06,thermique:0.08,autre:0.02}; // % mix
-var _installedMW = {};  // sum installed MW per filière (filled by buildPoints)
+var _capFactor   = {nucleaire:1,hydraulique:1,eolien:1,solaire:1,thermique:1,autre:1};
+var _installedMW = {};  // sum installed MW per filière
+var _filiereMax  = {};  // max cap_mw per filière — for within-filière normalization
 
-// Sizing: coreR = R_MIN + sqrt(vShare) * R_SCALE
-// vShare = filierePct × (cap_mw / sum_installed[filiere])
-// Calibrated so Chooz 1500 MW at 70% mix → ~4.5px
-var R_MIN = 0.8, R_SCALE = 28;
+// Sizing: norm = cap_mw / max_in_filiere → [0,1]
+// coreR = R_MIN + sqrt(norm) * (R_MAX - R_MIN)
+var R_MIN = 0.9, R_MAX = 4.2;
 
 // ODRE eco2mix fields → our filière keys
 var ODRE_TO_F = {nucleaire:"nucleaire",hydraulique:"hydraulique",eolien:"eolien",solaire:"solaire",
@@ -143,7 +137,6 @@ function loadMix(){
     FILIERES.forEach(function(f){
       var inst=_installedMW[f]||1;
       _capFactor[f]=Math.min(1.2, actual[f]/inst);
-      _filierePct[f]=actual[f]/totalMW;
     });
     // Update UI
     var ts=rec.date_heure?new Date(rec.date_heure).toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"}):"";
@@ -217,13 +210,14 @@ var heroPts=[];
 function buildPoints(units){
   heroPts=[];
   _installedMW={};
+  _filiereMax={};
   units.forEach(function(u){
     var f=u.filiere||"autre";
     var mw=u.cap_mw||0;
     _installedMW[f]=(_installedMW[f]||0)+mw;
-    var h=heroT(mw);
+    _filiereMax[f]=Math.max(_filiereMax[f]||0, mw);
     var xy=proj(u.lon,u.lat);
-    heroPts.push({x:xy[0],y:xy[1],f:f,mw:mw,h:h,name:u.name,region:u.region||""});
+    heroPts.push({x:xy[0],y:xy[1],f:f,mw:mw,name:u.name,region:u.region||""});
   });
   heroPts.sort(function(a,b){return a.mw-b.mw;});
 }
@@ -263,8 +257,8 @@ function draw(){
   heroPts.forEach(function(p){
     var cf=Math.max(0,_capFactor[p.f]||0);
     if(cf<0.01) return;
-    var vShare=(_filierePct[p.f]||0.05)*(p.mw/(_installedMW[p.f]||1));
-    var coreR=R_MIN+Math.sqrt(Math.max(vShare,0.00005))*R_SCALE;
+    var norm=p.mw/(_filiereMax[p.f]||p.mw||1);
+    var coreR=R_MIN+Math.sqrt(norm)*(R_MAX-R_MIN);
     var glowR=coreR*3.0;
     var coreA=Math.min(0.95, 0.5*cf+0.3);
     var glowA=Math.min(0.18, 0.08*cf+0.04);
@@ -278,8 +272,8 @@ function draw(){
   // 6. Hover highlight
   if(hoveredHero>=0 && hoveredHero<heroPts.length){
     var p=heroPts[hoveredHero];
-    var vShare=(_filierePct[p.f]||0.05)*(p.mw/(_installedMW[p.f]||1));
-    var r=R_MIN+Math.sqrt(Math.max(vShare,0.00005))*R_SCALE+2;
+    var norm=p.mw/(_filiereMax[p.f]||p.mw||1);
+    var r=R_MIN+Math.sqrt(norm)*(R_MAX-R_MIN)+2;
     ctx.beginPath(); ctx.arc(p.x,p.y,r,0,Math.PI*2);
     ctx.strokeStyle=rgba(colors[p.f],0.9); ctx.lineWidth=1.5; ctx.stroke();
   }
@@ -293,8 +287,8 @@ canvas.addEventListener("mousemove",function(e){
   var mx=e.clientX-rect.left,my=e.clientY-rect.top;
   var found=-1,bestD=Infinity;
   heroPts.forEach(function(p,i){
-    var vShare=(_filierePct[p.f]||0.05)*(p.mw/(_installedMW[p.f]||1));
-    var r=R_MIN+Math.sqrt(Math.max(vShare,0.00005))*R_SCALE+4;
+    var norm=p.mw/(_filiereMax[p.f]||p.mw||1);
+    var r=R_MIN+Math.sqrt(norm)*(R_MAX-R_MIN)+4;
     var dx=mx-p.x,dy=my-p.y,d=Math.sqrt(dx*dx+dy*dy);
     if(d<=r&&d<bestD){bestD=d;found=i;}
   });
