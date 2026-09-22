@@ -67,6 +67,10 @@ def _get_pg_pool():
                     user=unquote(p.username or ""),
                     password=unquote(p.password or ""),
                     sslmode="require",
+                    keepalives=1,
+                    keepalives_idle=30,
+                    keepalives_interval=10,
+                    keepalives_count=5,
                 )
     return _pg_pool
 
@@ -77,16 +81,21 @@ def get_db_connection():
     - DB_TYPE=sqlite (or SQLITE_PATH set) → sqlite3 (tests / local dev).
     - Otherwise → a pooled psycopg2 connection to Supabase.
 
-    Callers close() the connection when done, same as before — that call is
-    transparently rewired below to return the connection to the pool rather
-    than tearing down the socket, so no call site needs to change.
+    Validates each connection before returning — stale connections (closed by
+    Supabase idle timeout) are evicted from the pool and a fresh one is used.
     """
     db_type = os.environ.get("DB_TYPE", "").lower()
     if db_type == "sqlite":
         return sqlite3.connect(os.environ.get("SQLITE_PATH", ":memory:"))
 
     pool = _get_pg_pool()
-    return _PooledConnection(pool.getconn(), pool)
+    for _attempt in range(3):
+        raw = pool.getconn()
+        if raw.closed:
+            pool.putconn(raw, close=True)
+            continue
+        return _PooledConnection(raw, pool)
+    raise RuntimeError("Could not obtain a live database connection after 3 attempts")
 
 
 def is_sqlite(conn) -> bool:
