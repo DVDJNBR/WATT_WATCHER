@@ -62,7 +62,7 @@ canvas{display:block;width:100%;height:100%;cursor:default}
     <div>
       <p class="eyebrow">Watt Watcher — Concept</p>
       <h1>Centrales électriques de France</h1>
-      <p class="subtitle">~11&thinsp;000 sites du registre ODRE — taille et éclat proportionnels à la puissance installée.</p>
+      <p class="subtitle" id="subtitle">120 unités RTE — taille proportionnelle à la capacité installée, éclat modulé par la production en cours. <span id="mixTs" style="opacity:.55"></span></p>
     </div>
     <button class="btn-theme" id="themeBtn">Clair</button>
   </header>
@@ -73,7 +73,9 @@ canvas{display:block;width:100%;height:100%;cursor:default}
       <div class="tooltip" id="tooltip">
         <p class="t-name" id="t-name"></p>
         <p class="t-row" id="t-type"></p>
+        <p class="t-row" id="t-region" style="font-size:11px"></p>
         <p class="t-mw" id="t-mw"></p>
+        <p class="t-row" id="t-live" style="font-size:11px;margin-top:2px"></p>
       </div>
     </div>
     <div class="legend-bar">
@@ -85,7 +87,7 @@ canvas{display:block;width:100%;height:100%;cursor:default}
       <div class="l-item"><span class="l-dot" style="background:#f87171"></span>Thermique</div>
       <div class="l-item"><span class="l-dot" style="background:#9a9a9e"></span>Autre</div>
       <div class="l-sep"></div>
-      <span class="l-note">points brillants ≥ 40 MW · poussière teal = petits sites</span>
+      <span class="l-note" id="mixNote">Chargement mix…</span>
     </div>
   </div>
 </div>
@@ -103,14 +105,52 @@ var SRC_COLORS_LIGHT = {nucleaire:"#7c3aed",hydraulique:"#3b82f6",solaire:"#d977
 var FILIERES = ["nucleaire","hydraulique","solaire","eolien","thermique","autre"];
 var F_LABEL = {nucleaire:"Nucléaire",hydraulique:"Hydraulique",solaire:"Solaire",eolien:"Éolien",thermique:"Thermique",autre:"Autre"};
 
-// Log scale constants — match relief-energetique.html
-var DUST_LOG_MIN = Math.log(100);   // 100 kW min (our filtered floor)
-var DUST_LOG_MAX = Math.log(6000000); // ~6 GW max (Gravelines)
-var HERO_MIN = 40000;  // kW = 40 MW
-var HERO_MAX = 600000; // kW = 600 MW
+// Log scale constants — input in MW
+var HERO_MIN = 40;   // MW
+var HERO_MAX = 1500; // MW (big nuclear ~1500 MW)
 
-function logT(kw){ return Math.max(0,Math.min(1,(Math.log(Math.max(kw,1))-DUST_LOG_MIN)/(DUST_LOG_MAX-DUST_LOG_MIN))); }
-function heroT(kw){ return Math.max(0,Math.min(1,(kw-HERO_MIN)/(HERO_MAX-HERO_MIN))); }
+function heroT(mw){ return Math.max(0,Math.min(1,(mw-HERO_MIN)/(HERO_MAX-HERO_MIN))); }
+
+// Live mix: capacity factor per filière (0→1), updated from ODRE eco2mix
+// Default 1.0 so map renders immediately before first fetch
+var _capFactor = {nucleaire:1,hydraulique:1,eolien:1,solaire:1,thermique:1,autre:1};
+var _installedMW = {};  // sum of installed MW per filière (filled by buildPoints)
+
+// ODRE eco2mix fields → our filière keys
+var ODRE_TO_F = {nucleaire:"nucleaire",hydraulique:"hydraulique",eolien:"eolien",solaire:"solaire",
+  gaz:"thermique",fioul:"thermique",charbon:"thermique",bioenergies:"autre"};
+
+function loadMix(){
+  var url="https://odre.opendatasoft.com/api/explore/v2.1/catalog/datasets/eco2mix-national-tr/records"+
+    "?limit=1&select=date_heure,nucleaire,hydraulique,eolien,solaire,fioul,charbon,gaz,bioenergies"+
+    "&order_by=date_heure+desc&where=nucleaire+is+not+null";
+  fetch(url).then(function(r){return r.json();}).then(function(d){
+    var rec=d.results&&d.results[0];
+    if(!rec) return;
+    // Aggregate ODRE fields per our filière
+    var actual={nucleaire:0,hydraulique:0,eolien:0,solaire:0,thermique:0,autre:0};
+    Object.keys(ODRE_TO_F).forEach(function(k){
+      var f=ODRE_TO_F[k]; var v=rec[k]||0;
+      actual[f]=(actual[f]||0)+(v>0?v:0);
+    });
+    // Compute capacity factors
+    FILIERES.forEach(function(f){
+      var inst=_installedMW[f]||1;
+      _capFactor[f]=Math.min(1.2, actual[f]/inst);
+    });
+    // Update UI
+    var ts=rec.date_heure?new Date(rec.date_heure).toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"}):"";
+    document.getElementById("mixTs").textContent="Mix J-1 "+ts;
+    var total=Object.values(actual).reduce(function(a,b){return a+b;},0);
+    var parts=["nucl. "+Math.round(actual.nucleaire/1000)+"GW",
+      "hydro "+Math.round(actual.hydraulique/1000)+"GW",
+      "éol. "+Math.round(actual.eolien/1000)+"GW",
+      "sol. "+Math.round(actual.solaire/1000)+"GW",
+      "therm. "+Math.round(actual.thermique/1000)+"GW"];
+    document.getElementById("mixNote").textContent=parts.join(" · ");
+    draw();
+  }).catch(function(){document.getElementById("mixNote").textContent="Mix indisponible";});
+}
 
 var canvas=document.getElementById("map");
 var ctx=canvas.getContext("2d");
@@ -165,21 +205,20 @@ function buildPaths(){
   });
 }
 
-// Projected point cache — hero sites only (>=40 MW)
+// Projected point cache — all RTE units (all ≥ 40 MW by construction)
 var heroPts=[];
-function buildPoints(spr){
+function buildPoints(units){
   heroPts=[];
-  Object.keys(spr).forEach(function(code){
-    spr[code].forEach(function(e){
-      var lon=e[0],lat=e[1],f=e[2]||"autre",kw=e[3]||0;
-      var h=heroT(kw);
-      if(h>0){
-        var xy=proj(lon,lat);
-        heroPts.push({x:xy[0],y:xy[1],f:f,kw:kw,t:logT(kw),h:h});
-      }
-    });
+  _installedMW={};
+  units.forEach(function(u){
+    var f=u.filiere||"autre";
+    var mw=u.cap_mw||0;
+    _installedMW[f]=(_installedMW[f]||0)+mw;
+    var h=heroT(mw);
+    var xy=proj(u.lon,u.lat);
+    heroPts.push({x:xy[0],y:xy[1],f:f,mw:mw,h:h,name:u.name,region:u.region||""});
   });
-  heroPts.sort(function(a,b){return a.kw-b.kw;});
+  heroPts.sort(function(a,b){return a.mw-b.mw;});
 }
 
 var hoveredHero=-1;
@@ -211,19 +250,20 @@ function draw(){
 
   if(!heroPts.length){ctx.restore();return;}
 
-  // 3+4. PER-SITE: glow halo + crisp core — alpha scales with heroT so small
-  // plants stay near-invisible, only true giants (h→1) pop
+  // 3+4. PER-SITE: glow halo + crisp core
+  // base alpha scales with heroT (size), then multiplied by filière capacity factor
+  // → zero production = invisible; full production = full brightness
   heroPts.forEach(function(p){
     var h=p.h;
-    var coreR=0.7+Math.pow(h,0.65)*2.6;          // 0.7px → 3.3px max
+    var cf=Math.max(0,_capFactor[p.f]||0);
+    if(cf<0.01) return;  // filière producing nothing → skip
+    var coreR=0.8+Math.pow(h,0.65)*2.4;
     var glowR=coreR*2.8;
-    var coreA=0.55+0.45*Math.pow(h,0.4);          // 0.55 → 1.0 (saturé même petit)
-    var glowA=0.05+0.10*Math.pow(h,0.5);          // 0.05 → 0.15
+    var coreA=(0.55+0.45*Math.pow(h,0.4))*Math.min(1,cf*1.2);
+    var glowA=(0.05+0.10*Math.pow(h,0.5))*Math.min(1,cf*1.2);
     var col=colors[p.f];
-    // halo
     ctx.beginPath();ctx.arc(p.x,p.y,glowR,0,Math.PI*2);
     ctx.fillStyle=rgba(col,glowA);ctx.fill();
-    // core
     ctx.beginPath();ctx.arc(p.x,p.y,coreR,0,Math.PI*2);
     ctx.fillStyle=rgba(col,coreA);ctx.fill();
   });
@@ -232,7 +272,7 @@ function draw(){
   if(hoveredHero>=0 && hoveredHero<heroPts.length){
     var p=heroPts[hoveredHero];
     var mixK=Math.pow(p.h,0.55);
-    var r=0.4+Math.pow(p.t,1.5)*0.6+Math.pow(p.h,0.6)*3.0+2;
+    var r=0.4+Math.pow(p.h,1.5)*0.6+Math.pow(p.h,0.6)*3.0+2;
     ctx.beginPath(); ctx.arc(p.x,p.y,r,0,Math.PI*2);
     ctx.strokeStyle=rgba(colors[p.f],0.9); ctx.lineWidth=1.5; ctx.stroke();
   }
@@ -247,16 +287,20 @@ canvas.addEventListener("mousemove",function(e){
   var found=-1,bestD=Infinity;
   heroPts.forEach(function(p,i){
     var mixK=Math.pow(p.h,0.6);
-    var r=0.4+Math.pow(p.t,1.5)*0.6+mixK*3.0+4;
+    var r=0.4+Math.pow(p.h,1.5)*0.6+mixK*3.0+4;
     var dx=mx-p.x,dy=my-p.y,d=Math.sqrt(dx*dx+dy*dy);
     if(d<=r&&d<bestD){bestD=d;found=i;}
   });
   if(found!==hoveredHero){hoveredHero=found;draw();}
   if(found>=0){
     var p=heroPts[found];
-    document.getElementById("t-name").textContent=p.f==="nucleaire"||p.f==="hydraulique"?"Site "+p.f:"Site "+p.f;
+    document.getElementById("t-name").textContent=p.name;
     document.getElementById("t-type").textContent=F_LABEL[p.f];
-    document.getElementById("t-mw").textContent=p.kw>=1000000?(p.kw/1000000).toFixed(1)+" GW installés":(p.kw>=1000?(p.kw/1000).toFixed(0)+" MW installés":p.kw+" kW installés");
+    document.getElementById("t-region").textContent=p.region;
+    document.getElementById("t-mw").textContent=(p.mw>=1000?(p.mw/1000).toFixed(2)+" GW":p.mw+" MW")+" installés";
+    var cf=Math.max(0,_capFactor[p.f]||0);
+    var liveMw=Math.round(p.mw*cf);
+    document.getElementById("t-live").textContent=cf>0.01?"≈ "+liveMw+" MW produits (filière "+Math.round(cf*100)+"%)":"filière à l'arrêt";
     tooltip.style.left=(e.clientX-rect.left)+"px";
     tooltip.style.top=(e.clientY-rect.top)+"px";
     tooltip.classList.add("show");
@@ -286,12 +330,14 @@ function resize(){
   draw();
 }
 
-fetch("sources-points.json").then(function(r){return r.json();}).then(function(spr){
-  _sprData=spr;
-  buildPoints(spr);
+fetch("units-enriched.json").then(function(r){return r.json();}).then(function(units){
+  _sprData=units;
+  buildPoints(units);
   buildSprites(isDark());
   loadingOverlay.classList.add("hidden");
   draw();
+  loadMix();
+  setInterval(loadMix, 5*60*1000);
 }).catch(function(e){console.error(e);loadingOverlay.textContent="Erreur de chargement.";});
 
 var rsTimer;
