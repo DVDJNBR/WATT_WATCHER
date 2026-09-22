@@ -1,3 +1,20 @@
+## [1.37.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.36.2...v1.37.0) (2026-09-22)
+
+### Features
+
+* **maquette:** 248 sites hybrides (RTE + ODRE éolien/solaire) ([e2e2801](https://github.com/DVDJNBR/WATT_WATCHER/commit/e2e280142ffbb7340298f824b00432de54c65fb4))
+* **maquette:** normalisation interne par filiere + 687 sites ([5d91d78](https://github.com/DVDJNBR/WATT_WATCHER/commit/5d91d78786d4ae7d7bedce699324aef2eb361ac4))
+* **maquette:** sources map — 323 hero sites, glow + core dot, flat Mercator ([f071852](https://github.com/DVDJNBR/WATT_WATCHER/commit/f07185216c22fd8ad0c5951a61dd96455ae187ed))
+* **maquette:** sources.html semi-live 120 unités RTE + mix ODRE ([870edfc](https://github.com/DVDJNBR/WATT_WATCHER/commit/870edfc2cb89484c50774b7acf13f8fffddc4abe))
+* **maquette:** taille cercles proportionnelle au mix de production ([c56b37a](https://github.com/DVDJNBR/WATT_WATCHER/commit/c56b37a586e37841fcc83258a6b1b5ebe0e5adc0))
+
+### Bug Fixes
+
+* **db:** evict stale pool connections + TCP keepalives ([acc43a6](https://github.com/DVDJNBR/WATT_WATCHER/commit/acc43a6ad37be79e644beb7d669947d952db36bd))
+* **maquette:** sources map — alpha scales with heroT, small sites near-invisible ([0e20848](https://github.com/DVDJNBR/WATT_WATCHER/commit/0e2084819259587fd02e83933e053111083bda54))
+* **maquette:** sources map — larger dots, more saturated core (min alpha 0.55) ([0399901](https://github.com/DVDJNBR/WATT_WATCHER/commit/0399901f19b48c06b5e027d02b7cd65f99cd9b29))
+* **maquette:** sources map — smaller dots, less opaque glow, full-alpha core ([d2858f7](https://github.com/DVDJNBR/WATT_WATCHER/commit/d2858f7653a8c6595687a79a80a9623bfbd96266))
+
 ## [1.36.2](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.36.1...v1.36.2) (2026-09-20)
 
 ### Bug Fixes
