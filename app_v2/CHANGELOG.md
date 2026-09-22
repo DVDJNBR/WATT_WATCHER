@@ -1,3 +1,15 @@
+## [1.38.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.37.0...v1.38.0) (2026-09-22)
+
+### Features
+
+* **maquettes:** sources-opacity + sources-arc semi-live maps ([b4cb2d6](https://github.com/DVDJNBR/WATT_WATCHER/commit/b4cb2d6cbac81b7fa8872185c40bc9bdce37fa41))
+* **meteo:** add populate script + fix maquette subtitle ([008847a](https://github.com/DVDJNBR/WATT_WATCHER/commit/008847ac1c543ee864bababba1d5adf93b4e75e3))
+* **meteo:** route weather grid through Supabase to fix open-meteo 429 ([33e4ef8](https://github.com/DVDJNBR/WATT_WATCHER/commit/33e4ef87f4985df400c51cb657084aff4b05c2a3))
+
+### Performance Improvements
+
+* **api:** add 15-min in-memory cache to cut Supabase egress ([901ce88](https://github.com/DVDJNBR/WATT_WATCHER/commit/901ce881d2334ac392727b6bcd7ee14ab869016d))
+
 ## [1.37.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.36.2...v1.37.0) (2026-09-22)
 
 ### Features
