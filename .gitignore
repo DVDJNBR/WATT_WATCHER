@@ -215,6 +215,7 @@ RESOURCES/
 .claude
 .gemini
 LIVRABLES/
+maquettes/
 
 # Terraform
 .cloud/.terraform/

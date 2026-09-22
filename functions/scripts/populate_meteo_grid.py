@@ -33,7 +33,7 @@ cur = conn.cursor()
 psycopg2.extras.execute_values(
     cur,
     """
-    INSERT INTO meteo_grid (lat, lon, cloud_cover, wind_speed, wind_direction, updated_at)
+    INSERT INTO meteo_grid (lat, lon, cloud_cover, wind_speed, wind_direction)
     VALUES %s
     ON CONFLICT (lat, lon) DO UPDATE SET
         cloud_cover    = EXCLUDED.cloud_cover,
