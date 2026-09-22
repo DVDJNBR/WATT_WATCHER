@@ -211,21 +211,21 @@ function draw(){
 
   if(!heroPts.length){ctx.restore();return;}
 
-  // 3. GLOW PASS — large circle, ~50% alpha, batched by filière
+  // 3. GLOW PASS — halo circle, low opacity, batched by filière
   FILIERES.forEach(function(f){
     var pts=heroPts.filter(function(p){return p.f===f;});
     if(!pts.length) return;
     ctx.beginPath();
     pts.forEach(function(p){
-      var glowR=6+Math.pow(p.h,0.55)*16;
+      var glowR=3+Math.pow(p.h,0.55)*8;
       ctx.moveTo(p.x+glowR,p.y);
       ctx.arc(p.x,p.y,glowR,0,Math.PI*2);
     });
-    ctx.fillStyle=rgba(colors[f],0.18);
+    ctx.fillStyle=rgba(colors[f],0.10);
     ctx.fill();
   });
 
-  // 4. CORE DOT PASS — crisp dot, batched by filière (6 fill calls)
+  // 4. CORE DOT PASS — crisp saturated dot, batched by filière
   var groups={};
   FILIERES.forEach(function(f){groups[f]=[];});
   heroPts.forEach(function(p){groups[p.f].push(p);});
@@ -234,11 +234,11 @@ function draw(){
     if(!pts.length) return;
     ctx.beginPath();
     pts.forEach(function(p){
-      var r=1.2+Math.pow(p.h,0.6)*3.2;
+      var r=0.8+Math.pow(p.h,0.6)*2.2;
       ctx.moveTo(p.x+r,p.y);
       ctx.arc(p.x,p.y,r,0,Math.PI*2);
     });
-    ctx.fillStyle=rgba(colors[f],0.92);
+    ctx.fillStyle=rgba(colors[f],1.0);
     ctx.fill();
   });
 
