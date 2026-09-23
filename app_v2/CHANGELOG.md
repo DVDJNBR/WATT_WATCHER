@@ -1,3 +1,9 @@
+## [1.42.1](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.42.0...v1.42.1) (2026-09-23)
+
+### Bug Fixes
+
+* **dashboard:** tabs, map projection, toolbar, meteo restored ([0b3582c](https://github.com/DVDJNBR/WATT_WATCHER/commit/0b3582cb8821a1d8ab59e4068b2331ea3aff2cb0))
+
 ## [1.42.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.41.0...v1.42.0) (2026-09-23)
 
 ### Features
