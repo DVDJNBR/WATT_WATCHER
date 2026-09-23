@@ -1,3 +1,9 @@
+## [1.42.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.41.0...v1.42.0) (2026-09-23)
+
+### Features
+
+* **dashboard:** UI polish — tabs, layout, chart, legend ([6f6fbbd](https://github.com/DVDJNBR/WATT_WATCHER/commit/6f6fbbda7f7540d0b227408c4c01b01b41886feb))
+
 ## [1.41.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.40.0...v1.41.0) (2026-09-23)
 
 ### Features
