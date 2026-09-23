@@ -44,6 +44,7 @@ import { memo, useState, useEffect, useMemo } from 'react'
 import { ComposableMap, Geographies, Geography, Marker, ZoomableGroup } from 'react-simple-maps'
 import { geoCentroid } from 'd3-geo'
 import { fetchProductionUnits } from '../services/api.js'
+import SourcesCanvasMap from './SourcesCanvasMap.jsx'
 
 const GEO_URL = '/france-regions.geojson'
 
@@ -242,7 +243,7 @@ const MODE_LABELS = {
   balance: 'Régions exportatrices / importatrices',
   load:    'Consommation vs capacité installée',
   curtailment: 'Risque de curtailment par région',
-  dominant: 'Source dominante par région',
+  dominant: 'Centrales & météo',
 }
 
 /** Per-source spans (start/end cumulative fraction + %) in fixed order —
@@ -389,7 +390,11 @@ export const FranceMap = memo(function FranceMap({
         </div>
       </div>
 
-      {loading ? (
+      {mode === 'dominant' ? (
+        <div style={{ flex: '1 1 0', minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+          <SourcesCanvasMap />
+        </div>
+      ) : loading ? (
         <div className="skeleton" style={{ flex: '1 1 0', minHeight: 0 }} />
       ) : (
         <div className={`map-wrapper${showMixRibbon ? ' map-wrapper--ribbon' : ''}`}>
@@ -692,14 +697,6 @@ export const FranceMap = memo(function FranceMap({
           <span className="map-legend__item">faible → élevée</span>
         </div>
       )}
-      {!loading && mode === 'dominant' && (
-        <div className="map-legend">
-          {SOURCE_ORDER.map(key => (
-            <span key={key} className="map-legend__item" style={{ color: SOURCE_COLORS[key] }}>● {SOURCE_LABELS[key]}</span>
-          ))}
-        </div>
-      )}
-
       <p className="map-hint">
         {highlightedSource
           ? `${SOURCE_LABELS[highlightedSource]} en surbrillance — cliquez à nouveau sur le ruban pour réinitialiser`
