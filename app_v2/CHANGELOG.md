@@ -1,3 +1,9 @@
+## [1.42.3](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.42.2...v1.42.3) (2026-09-23)
+
+### Bug Fixes
+
+* **pipeline:** run_on_startup=True on 15min timer to survive redeployments ([01468ef](https://github.com/DVDJNBR/WATT_WATCHER/commit/01468ef0d9905a7b60395c5e09c4a875bbc18c2b))
+
 ## [1.42.2](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.42.1...v1.42.2) (2026-09-23)
 
 ### Bug Fixes
