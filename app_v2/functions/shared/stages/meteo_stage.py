@@ -87,7 +87,43 @@ def run(job_id: str, bronze: Any, silver: Any) -> dict:
                     conn.commit()
             conn.commit()
             logger.info("[%s] Meteo: %d rows loaded", job_id, rows_loaded)
-            return {"status": "success", "rows": rows_loaded}
+
+            # ── meteo_grid : upsert current 22×16 grid state ─────────────────
+            grid_loaded = 0
+            try:
+                from shared.open_meteo_client import fetch_meteo_grid
+                grid_rows = fetch_meteo_grid()
+                tbl_grid = "METEO_GRID" if is_sqlite else "meteo_grid"
+                for gr in grid_rows:
+                    if is_sqlite:
+                        cursor.execute(
+                            f"""INSERT INTO {tbl_grid} (lat, lon, cloud_cover, wind_speed, wind_direction, updated_at)
+                                VALUES (?, ?, ?, ?, ?, datetime('now'))
+                                ON CONFLICT(lat, lon) DO UPDATE SET
+                                    cloud_cover    = excluded.cloud_cover,
+                                    wind_speed     = excluded.wind_speed,
+                                    wind_direction = excluded.wind_direction,
+                                    updated_at     = excluded.updated_at""",
+                            (gr["lat"], gr["lon"], gr["cloud_cover"], gr["wind_speed"], gr["wind_direction"]),
+                        )
+                    else:
+                        cursor.execute(
+                            f"""INSERT INTO {tbl_grid} (lat, lon, cloud_cover, wind_speed, wind_direction, updated_at)
+                                VALUES (%s, %s, %s, %s, %s, now())
+                                ON CONFLICT (lat, lon) DO UPDATE SET
+                                    cloud_cover    = EXCLUDED.cloud_cover,
+                                    wind_speed     = EXCLUDED.wind_speed,
+                                    wind_direction = EXCLUDED.wind_direction,
+                                    updated_at     = now()""",
+                            (gr["lat"], gr["lon"], gr["cloud_cover"], gr["wind_speed"], gr["wind_direction"]),
+                        )
+                    grid_loaded += 1
+                conn.commit()
+                logger.info("[%s] meteo_grid: %d points upserted", job_id, grid_loaded)
+            except Exception as grid_exc:
+                logger.warning("[%s] meteo_grid upsert failed (non-fatal): %s", job_id, grid_exc)
+
+            return {"status": "success", "rows": rows_loaded, "grid_points": grid_loaded}
         finally:
             conn.close()
 

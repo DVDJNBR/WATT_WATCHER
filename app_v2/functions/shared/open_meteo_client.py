@@ -30,6 +30,66 @@ REGION_CENTROIDS = {
 
 BASE_URL = "https://api.open-meteo.com/v1/forecast"
 
+# Canvas map grid constants (must match SourcesCanvasMap.jsx)
+_G_LON0, _G_LAT0 = -5.0, 41.0
+_DLON,   _DLAT   = 0.75, 0.75
+_G_NCOL, _G_NROW = 22, 16
+_BATCH  = 100  # max locations per Open-Meteo request
+
+
+def fetch_meteo_grid() -> list[dict]:
+    """
+    Fetch current cloud cover, wind speed and direction for the 22×16 grid
+    covering metropolitan France (352 points, ~0.75° resolution).
+
+    Uses Open-Meteo's multi-location support (comma-separated lat/lon).
+    Returns list of {lat, lon, cloud_cover, wind_speed, wind_direction}.
+    """
+    # Build grid points
+    points = [
+        (round(_G_LAT0 + row * _DLAT, 4), round(_G_LON0 + col * _DLON, 4))
+        for row in range(_G_NROW)
+        for col in range(_G_NCOL)
+    ]
+
+    results: list[dict] = []
+
+    for start in range(0, len(points), _BATCH):
+        batch = points[start: start + _BATCH]
+        lats = ",".join(str(p[0]) for p in batch)
+        lons = ",".join(str(p[1]) for p in batch)
+        try:
+            resp = requests.get(
+                BASE_URL,
+                params={
+                    "latitude":  lats,
+                    "longitude": lons,
+                    "current":   "cloudcover,wind_speed_10m,wind_direction_10m",
+                    "timezone":  "UTC",
+                    "forecast_days": 1,
+                },
+                timeout=20,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            # Single location → dict; multiple → list of dicts
+            if isinstance(data, dict):
+                data = [data]
+            for item, (lat, lon) in zip(data, batch):
+                cur = item.get("current", {})
+                results.append({
+                    "lat":           lat,
+                    "lon":           lon,
+                    "cloud_cover":   int(cur.get("cloudcover") or 0),
+                    "wind_speed":    float(cur.get("wind_speed_10m") or 0.0),
+                    "wind_direction": int(cur.get("wind_direction_10m") or 0),
+                })
+        except Exception as exc:
+            logger.warning("fetch_meteo_grid batch %d failed: %s", start, exc)
+
+    logger.info("fetch_meteo_grid: %d/%d points fetched", len(results), len(points))
+    return results
+
 
 def fetch_meteo_all_regions(past_days: int = 3) -> list[dict]:
     """
