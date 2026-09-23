@@ -1,3 +1,10 @@
+## [1.42.2](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.42.1...v1.42.2) (2026-09-23)
+
+### Bug Fixes
+
+* **canvas-map:** solar visibility + wind theme in light mode ([9641867](https://github.com/DVDJNBR/WATT_WATCHER/commit/964186735584ceef2f7de2db0e986ac964b6e75f)), closes [#9c9a96](https://github.com/DVDJNBR/WATT_WATCHER/issues/9c9a96)
+* **dashboard:** toolbar one-line, lighter clouds, slower wind, legend vent/nebulosité ([455ebcf](https://github.com/DVDJNBR/WATT_WATCHER/commit/455ebcf581b511ad014a5e3259cf4bc172afa050))
+
 ## [1.42.1](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.42.0...v1.42.1) (2026-09-23)
 
 ### Bug Fixes
