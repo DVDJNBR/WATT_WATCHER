@@ -22,6 +22,8 @@ function rgba(h,a){const c=hexRgb(h);return`rgba(${c[0]},${c[1]},${c[2]},${a})`}
 
 function mercLat(lat){const p=lat*Math.PI/180;return Math.log(Math.tan(Math.PI/4+p/2))}
 const YMN=mercLat(LAT_MIN),YMX=mercLat(LAT_MAX)
+// Geographic aspect ratio (width/height) of France in Mercator — ~1.26
+const GEO_AR=(LON_MAX-LON_MIN)*Math.PI/180/(YMX-YMN)
 
 // bicubic helpers
 function gv(arr,ci,ri){return arr[Math.max(0,Math.min(G_NROW-1,ri))*G_NCOL+Math.max(0,Math.min(G_NCOL-1,ci))]}
@@ -69,6 +71,7 @@ export default function SourcesCanvasMap({ selectedCode = '' }) {
 
     // ── mutable state ────────────────────────────────────────────────────
     let W=0, H=0
+    let drawW=0, drawH=0, offX=0, offY=0
     let REGIONS={}, regionPaths={}, regionCentroids={}, francePath=new Path2D()
     let heroPts=[], hoveredHero=-1
     let _installedMW={}, _filiereMax={}
@@ -87,13 +90,21 @@ export default function SourcesCanvasMap({ selectedCode = '' }) {
       return window.matchMedia('(prefers-color-scheme:dark)').matches
     }
 
+    // Letterbox: fit France's true Mercator aspect ratio into canvas
+    function updateDims(){
+      if(W<=0||H<=0){drawW=0;drawH=0;offX=PAD;offY=PAD;return}
+      const avW=W-2*PAD, avH=H-2*PAD
+      if(avW/avH>GEO_AR){drawH=avH;drawW=drawH*GEO_AR;offX=(W-drawW)/2;offY=PAD}
+      else{drawW=avW;drawH=drawW/GEO_AR;offX=PAD;offY=(H-drawH)/2}
+    }
     function proj(lon,lat){
-      return[PAD+(lon-LON_MIN)/(LON_MAX-LON_MIN)*(W-2*PAD),
-             PAD+(1-(mercLat(lat)-YMN)/(YMX-YMN))*(H-2*PAD)]
+      return[offX+(lon-LON_MIN)/(LON_MAX-LON_MIN)*drawW,
+             offY+(1-(mercLat(lat)-YMN)/(YMX-YMN))*drawH]
     }
     function unproj(px,py,cW,cH){
-      const lon=LON_MIN+(px-PAD)/(cW-2*PAD)*(LON_MAX-LON_MIN)
-      const m=YMN+(1-(py-PAD)/(cH-2*PAD))*(YMX-YMN)
+      const sx=cW/W||1, sy=cH/H||1
+      const lon=LON_MIN+(px/sx-offX)/drawW*(LON_MAX-LON_MIN)
+      const m=YMN+(1-(py/sy-offY)/drawH)*(YMX-YMN)
       return[lon,(2*Math.atan(Math.exp(m))-Math.PI/2)*180/Math.PI]
     }
 
@@ -164,7 +175,7 @@ export default function SourcesCanvasMap({ selectedCode = '' }) {
       let tries=0
       while(spawnPool.length<POOL_SIZE&&tries<20000){
         tries++
-        const x=PAD+Math.random()*(W-2*PAD), y=PAD+Math.random()*(H-2*PAD)
+        const x=offX+Math.random()*drawW, y=offY+Math.random()*drawH
         if(inFrance(x,y)) spawnPool.push([x,y])
       }
     }
@@ -250,11 +261,11 @@ export default function SourcesCanvasMap({ selectedCode = '' }) {
       const selCode=selectedCodeRef.current
       const selNom=selCode?(REGIONS[selCode]?.nom||''):''
 
-      // Lighter fills
-      const mapFillBase  = dark ? 'rgba(255,255,255,.46)' : 'rgba(20,20,22,.16)'
-      const mapFillDim   = dark ? 'rgba(255,255,255,.10)' : 'rgba(20,20,22,.04)'
-      const mapStrokeBase= dark ? 'rgba(255,255,255,.14)' : 'rgba(20,20,22,.22)'
-      const mapStrokeDim = dark ? 'rgba(255,255,255,.05)' : 'rgba(20,20,22,.07)'
+      // Map fills — light theme is very subtle so background stays airy
+      const mapFillBase  = dark ? 'rgba(255,255,255,.46)' : 'rgba(20,20,22,.07)'
+      const mapFillDim   = dark ? 'rgba(255,255,255,.10)' : 'rgba(20,20,22,.03)'
+      const mapStrokeBase= dark ? 'rgba(255,255,255,.14)' : 'rgba(20,20,22,.18)'
+      const mapStrokeDim = dark ? 'rgba(255,255,255,.05)' : 'rgba(20,20,22,.05)'
       const labelColBase = dark ? 'rgba(255,255,255,.45)' : 'rgba(20,20,22,.45)'
       const labelColDim  = dark ? 'rgba(255,255,255,.15)' : 'rgba(20,20,22,.15)'
 
@@ -397,6 +408,7 @@ export default function SourcesCanvasMap({ selectedCode = '' }) {
       W=rect.width; H=rect.height
       canvas.width=Math.round(W*dpr); canvas.height=Math.round(H*dpr)
       wCanvas.width=Math.round(W*dpr); wCanvas.height=Math.round(H*dpr)
+      updateDims()
       buildPaths()
       if(_sprData) buildPoints(_sprData)
       if(_cloudGrid){buildRaster();buildUVMap();buildFranceMask();buildSpawnPool();if(particles.length) initParticles()}
@@ -443,7 +455,7 @@ export default function SourcesCanvasMap({ selectedCode = '' }) {
           :[f.geometry.coordinates[0]]
         REGIONS[f.properties.code]={nom:f.properties.nom,paths:rings}
       })
-      buildPaths(); _sprData=units; buildPoints(units); setLoading(false); draw(); loadMix()
+      updateDims(); buildPaths(); _sprData=units; buildPoints(units); setLoading(false); draw(); loadMix()
       mixInterval=setInterval(loadMix,5*60*1000)
     }).catch(e=>{console.error(e);setLoading(false)})
 

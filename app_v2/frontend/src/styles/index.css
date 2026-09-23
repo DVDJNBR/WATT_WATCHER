@@ -409,14 +409,14 @@ body {
   transition: opacity var(--transition), transform var(--transition);
 }
 
-.app-tab:hover { color: var(--color-text); background: var(--color-surface-2); }
+.app-tab:hover { color: var(--color-accent); background: transparent; }
 .app-tab:hover svg { opacity: 1; transform: translateY(-1px); }
 
 .app-tab--active {
   color: var(--color-accent);
-  background: var(--color-bg);
+  background: var(--color-surface);
   border-color: var(--glass-border);
-  border-bottom: 1px solid var(--color-bg);
+  border-bottom: 1px solid var(--color-surface);
   font-weight: 600;
   margin-bottom: -1px;
   box-shadow: 0 -6px 16px -8px rgba(45, 212, 191, 0.35);
@@ -458,30 +458,29 @@ body {
   border-bottom-color: var(--color-accent);
 }
 
-/* ── Side theme tabs (dashboard) — vertical strip, text top-to-bottom ────── */
+/* ── Side theme tabs (dashboard) — exact .app-tab aesthetic, rotated 90° ─── */
 .dashboard-side-tabs {
   background: var(--color-surface-2);
   border-left: 1px solid var(--color-border);
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: stretch;
   justify-content: flex-start;
   gap: 2px;
   padding-top: 12px;
-  overflow-x: hidden;
-  overflow-y: auto;
+  overflow: visible;
 }
 
 .footer-tab {
   writing-mode: vertical-rl;
-  /* no rotate — text reads naturally top-to-bottom */
+  /* text reads top-to-bottom; shape mirrors .app-tab rotated 90° CW */
   display: flex;
   align-items: center;
   gap: 7px;
-  padding: 10px 8px;
-  width: 44px;
-  border: none;
-  border-radius: 8px 0 0 8px; /* rounded left side (toward content) */
+  padding: 16px 8px;
+  border-radius: 0 10px 10px 0; /* rounded outer (right) edge, flat inner (left) edge */
+  border: 1px solid transparent;
+  border-left: none;
   background: none;
   font: inherit;
   font-size: 0.85rem;
@@ -489,28 +488,31 @@ body {
   color: var(--color-text-muted);
   cursor: pointer;
   white-space: nowrap;
-  transition: color var(--transition), background var(--transition);
+  transition: color var(--transition), background var(--transition), border-color var(--transition), box-shadow var(--transition);
 }
 
 .footer-tab svg {
-  width: 15px;
-  height: 15px;
+  width: 16px;
+  height: 16px;
   opacity: 0.75;
   flex-shrink: 0;
-  /* counteract writing-mode glyph rotation so icons stay upright */
-  transform: rotate(-90deg);
-  transition: opacity var(--transition);
+  transform: rotate(-90deg); /* counteract writing-mode glyph rotation */
+  transition: opacity var(--transition), transform var(--transition);
 }
 
-/* hover: teal pre-selection colour, like top tabs */
-.footer-tab:hover { color: var(--color-accent); background: rgba(45,212,191,0.06); }
-.footer-tab:hover svg { opacity: 1; }
+/* hover: just accent text, no background (user request) */
+.footer-tab:hover { color: var(--color-accent); }
+.footer-tab:hover svg { opacity: 1; transform: rotate(-90deg) translateY(-1px); }
 
-/* active: teal halo behind, no border line */
+/* active: folder-tab pokes into content on the left */
 .footer-tab--active {
   color: var(--color-accent);
-  background: rgba(45,212,191,0.10);
+  background: var(--color-surface);
+  border-color: var(--glass-border);
+  border-left: 1px solid var(--color-surface); /* connects visually to content */
   font-weight: 600;
+  margin-left: -1px; /* overlay the sidebar left border */
+  box-shadow: 6px 0 16px -8px rgba(45, 212, 191, 0.35); /* glow on outer side */
 }
 .footer-tab--active svg { opacity: 1; }
 
@@ -546,10 +548,9 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
-  flex: 0 0 auto;
-  padding-bottom: 10px;
+  flex: 1;
   flex-wrap: nowrap;
-  overflow-x: auto;
+  justify-content: space-between;
 }
 
 .dash-toolbar__status {
@@ -608,12 +609,14 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 7px 24px;
+  padding: 5px 24px;
   background: var(--color-surface);
   border-bottom: 1px solid var(--color-border);
   flex-wrap: nowrap;
-  overflow-x: auto;
   flex-shrink: 0;
+  position: relative;
+  z-index: 100; /* dropdown must layer above chart content */
+  overflow: visible;
 }
 
 /* Inputs inside the full-width toolbar */

@@ -23,6 +23,7 @@ import {
   fetchMaintenance, fetchProductionUnits, fetchMarketPrice,
 } from '../services/api.js'
 import { RegionSelector } from '../components/RegionSelector.jsx'
+import { MeteoChart } from '../components/MeteoChart.jsx'
 import { CapacityChart } from '../components/CapacityChart.jsx'
 
 // HistoryChart and CapacityChart are kept imported (even if not rendered) to preserve
@@ -551,27 +552,30 @@ export default function DashboardPage() {
     { id: 'capacite',      label: 'Capacité' },
   ]
 
-  // Compact single-row toolbar — période + région + màj, always visible above all tabs
+  // Full-width toolbar — période + région + màj
   const toolbar = (
     <div className="dash-toolbar">
-      <div className="date-bar" data-testid="date-range">
-        <input id="date-start" type="date" className="selector-input"
-          value={startDate} max={endDate} aria-label="Date de début" data-testid="date-start"
-          onChange={e => { setStartDate(e.target.value); handleDateChange(e.target.value, endDate) }} />
-        <span style={{ color: 'var(--color-text-muted)', fontSize: '0.75rem' }} aria-hidden="true">→</span>
-        <input id="date-end" type="date" className="selector-input"
-          value={endDate} min={startDate} max={isoDate(0)} aria-label="Date de fin" data-testid="date-end"
-          onChange={e => { setEndDate(e.target.value); handleDateChange(startDate, e.target.value) }} />
-        <div className="date-bar__presets">
-          {[{ label: '24h', days: -1 }, { label: '7j', days: -7 }, { label: '30j', days: -30 }, { label: '3m', days: -91 }].map(({ label, days }) => (
-            <button key={label} onClick={() => {
-              const s = isoDate(days); const e = isoDate(0)
-              setStartDate(s); setEndDate(e); handleDateChange(s, e)
-            }}>{label}</button>
-          ))}
+      <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+        <span className="selector-label">Période</span>
+        <div className="date-bar" data-testid="date-range">
+          <input id="date-start" type="date" className="selector-input"
+            value={startDate} max={endDate} aria-label="Date de début" data-testid="date-start"
+            onChange={e => { setStartDate(e.target.value); handleDateChange(e.target.value, endDate) }} />
+          <span style={{ color: 'var(--color-text-muted)', fontSize: '0.75rem' }} aria-hidden="true">→</span>
+          <input id="date-end" type="date" className="selector-input"
+            value={endDate} min={startDate} max={isoDate(0)} aria-label="Date de fin" data-testid="date-end"
+            onChange={e => { setEndDate(e.target.value); handleDateChange(startDate, e.target.value) }} />
+          <div className="date-bar__presets">
+            {[{ label: '24h', days: -1 }, { label: '7j', days: -7 }, { label: '30j', days: -30 }, { label: '3m', days: -91 }].map(({ label, days }) => (
+              <button key={label} onClick={() => {
+                const s = isoDate(days); const e = isoDate(0)
+                setStartDate(s); setEndDate(e); handleDateChange(s, e)
+              }}>{label}</button>
+            ))}
+          </div>
         </div>
       </div>
-      <RegionSelector regions={regions} selected={selectedRegion} onChange={handleRegionChange} loading={loading} showLabel={false} />
+      <RegionSelector regions={regions} selected={selectedRegion} onChange={handleRegionChange} loading={loading} showLabel />
       <div className="dash-toolbar__status">
         {(loading || refreshing) && (
           <span className="refresh-dot" title="Actualisation en cours…" aria-label="Actualisation en cours" data-testid="refresh-indicator" />
@@ -608,6 +612,14 @@ export default function DashboardPage() {
           {l}
         </span>
       ))}
+      <span style={{ width:'1px', height:'10px', background:'var(--color-border)', flexShrink:0 }}/>
+      <span style={{ display:'flex', alignItems:'center', gap:4 }}>
+        <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+          <circle cx="7" cy="7" r="5" fill="none" stroke="var(--color-text-muted)" strokeWidth="1.2"/>
+          <path d="M7 2 L7 7" stroke="var(--color-text-muted)" strokeWidth="1.2"/>
+        </svg>
+        Centrale (taille = capacité, secteur = production en cours)
+      </span>
     </div>
   )
 
@@ -631,11 +643,16 @@ export default function DashboardPage() {
         {activeTab === 'production' && !error && (
           <>
             <div className="pbi-layout">
-              <div className="pbi-layout__left" style={{ gridTemplateRows: '1fr' }}>
+              <div className="pbi-layout__left" style={{ gridTemplateRows: '3fr 2fr' }}>
                 <HistoryChart
                   data={aggregatedProdData}
                   region={selectedRegionName || 'France'}
                   loading={loading || refreshing}
+                />
+                <MeteoChart
+                  data={aggregatedMeteoData}
+                  region={selectedRegionName || 'France'}
+                  loading={drillLoading}
                 />
               </div>
               <div className="pbi-layout__right">
