@@ -263,6 +263,8 @@ body {
 
 @media (max-width: 1024px) {
   .pbi-layout { grid-template-columns: 1fr; }
+  .pbi-layout__map-wrap { min-height: 320px; }
+  .app-main { grid-template-columns: 1fr 40px; }
 }
 
 /* ── Trend KPI card : chiffre clé + mini courbe pleine largeur ───────────── */
@@ -331,9 +333,8 @@ body {
   align-items: center;
   gap: 16px;
   padding: 0 24px;
-  background: var(--glass-bg);
-  border-bottom: 1px solid var(--glass-border);
-  backdrop-filter: blur(var(--glass-blur));
+  background: var(--color-surface-2);
+  border-bottom: 1px solid var(--color-border);
   position: sticky;
   top: 0;
   z-index: 100;
@@ -457,49 +458,56 @@ body {
   border-bottom-color: var(--color-accent);
 }
 
-/* ── Footer theme tabs (dashboard) — Power-BI-style pill bar, pinned bottom ── */
-/* Mirrors the header's folder tabs exactly, flipped vertically: rounded
-   bottom corners instead of top, active tab pokes UP into the content above
-   instead of down, glow points down into the footer instead of up. */
-.dashboard-footer-tabs {
+/* ── Side theme tabs (dashboard) — vertical strip pinned to the right edge ── */
+/* Tabs run bottom-to-top (writing-mode + rotate) so they read naturally
+   when the strip is on the right. Active tab gets a left accent bar instead
+   of the old bottom-border poke. */
+.dashboard-side-tabs {
+  background: var(--color-surface-2);
+  border-left: 1px solid var(--color-border);
   display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  gap: 4px;
-  border-top: 1px solid var(--color-border);
-  flex: 0 0 auto;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 2px;
+  padding-bottom: 16px;
+  overflow: hidden;
 }
 
 .footer-tab {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
   display: flex;
   align-items: center;
-  gap: 7px;
-  padding: 8px 16px 9px;
-  margin-top: 0;
-  border-radius: 0 0 10px 10px;
-  border: 1px solid transparent;
-  border-top: none;
+  gap: 6px;
+  padding: 10px 8px;
+  width: 44px;
+  border: none;
+  border-right: 2px solid transparent;
   background: none;
   font: inherit;
-  font-size: 0.85rem;
+  font-size: 0.78rem;
   font-weight: 500;
   color: var(--color-text-muted);
   cursor: pointer;
-  transition: color var(--transition), background var(--transition), margin var(--transition);
+  white-space: nowrap;
+  transition: color var(--transition), background var(--transition), border-color var(--transition);
 }
 
-.footer-tab svg { width: 15px; height: 15px; opacity: 0.75; }
+.footer-tab svg {
+  width: 14px;
+  height: 14px;
+  opacity: 0.7;
+  flex-shrink: 0;
+}
 
-.footer-tab:hover { color: var(--color-text); background: var(--color-surface-2); }
+.footer-tab:hover { color: var(--color-text); background: rgba(0,0,0,0.06); }
+[data-theme="dark"] .footer-tab:hover { background: rgba(255,255,255,0.06); }
 
 .footer-tab--active {
   color: var(--color-accent);
-  background: var(--color-bg);
-  border-color: var(--glass-border);
-  border-top: 1px solid var(--color-bg);
   font-weight: 600;
-  margin-top: -1px;
-  box-shadow: 0 6px 16px -8px rgba(45, 212, 191, 0.35);
+  border-right-color: var(--color-accent);
 }
 .footer-tab--active svg { opacity: 1; }
 
@@ -542,26 +550,40 @@ body {
 }
 
 /* ── Main content ─────────────────────────────────────────────────────────── */
-/* A real dashboard fits the viewport instead of stacking to whatever height
-   its content needs — .app-main fills the grid's 1fr row exactly and never
-   scrolls itself; only .dashboard-content (the chart grid, sized last) gets
-   a scroll fallback, and only if a given screen genuinely can't fit it. */
+/* Dashboard is a side-by-side layout: content area (white) + tab strip (grey)
+   pinned to the right edge. The tab strip takes 44px; content gets the rest. */
 .app-main {
   grid-area: main;
-  padding: 14px 24px 16px;
   overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+  display: grid;
+  grid-template-columns: 1fr 44px;
   min-height: 0;
 }
 
 .dashboard-content {
+  padding: 14px 16px 16px 24px;
+  background: var(--color-surface);
   flex: 1 1 0;
   min-height: 0;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
+}
+
+/* Flat surface — remove glass-card borders/backgrounds so charts sit directly
+   on the single white dashboard surface instead of nested in separate boxes. */
+.dashboard-content .glass-card {
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--color-border);
+  border-radius: 0;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: none;
+}
+.dashboard-content .glass-card:hover {
+  transform: none;
+  box-shadow: none;
 }
 
 .dashboard-content .hero-grid,

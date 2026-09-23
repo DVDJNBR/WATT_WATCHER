@@ -16,7 +16,6 @@ import { CurtailmentCalendar } from '../components/CurtailmentCalendar.jsx'
 import { HistoryChart } from '../components/HistoryChart.jsx'
 import { computeCarbonIntensity } from '../components/CarbonGauge.jsx'
 import { CapacityFactorChart } from '../components/CapacityFactorChart.jsx'
-import { TrendKpiCard } from '../components/TrendKpiCard.jsx'
 import { MaintenanceMap, normalize as normalizeUnitName } from '../components/MaintenanceMap.jsx'
 import { PriceTrendChart } from '../components/PriceTrendChart.jsx'
 import {
@@ -617,37 +616,23 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* ── Production & consommation : le surplus (curtailment) | sélecteur + carte risque + 2 chiffres ── */}
+        {/* ── Production & consommation : le surplus (curtailment) | sélecteur + carte risque ── */}
         {activeTab === 'production' && !error && (
           <div className="pbi-layout">
             <div className="pbi-layout__left pbi-layout__left--no-kpi">
-              <HistoryChart
-                data={aggregatedProdData}
-                region={selectedRegionName || 'France'}
-                loading={loading || refreshing}
-              />
               <MeteoChart
                 data={aggregatedMeteoData}
                 region={selectedRegionName}
                 loading={drillLoading}
               />
+              <HistoryChart
+                data={aggregatedProdData}
+                region={selectedRegionName || 'France'}
+                loading={loading || refreshing}
+              />
             </div>
             <div className="pbi-layout__right">
-              <div className="pbi-layout__kpi-row pbi-layout__kpi-row--compact">
-                <TrendKpiCard
-                  title={selectedRegionName ? `Production — ${selectedRegionName}` : 'Production totale'}
-                  explain="Production totale actuelle, toutes sources confondues, avec sa courbe sur la période sélectionnée."
-                  value={totalMw.toLocaleString('fr-FR')} unit="MW"
-                  color="#2dd4bf" sparkData={productionSparkData} loading={loading || refreshing}
-                />
-                <TrendKpiCard
-                  title="Équilibre prod/conso"
-                  explain="Écart entre la production et la consommation, avec sa courbe sur la période sélectionnée — positif quand la production dépasse la consommation (risque de curtailment)."
-                  value={soldeMw != null ? `${soldeMw >= 0 ? '+' : ''}${Math.round(soldeMw).toLocaleString('fr-FR')}` : '—'} unit="MW"
-                  color="#2dd4bf" primaryName="Production" secondaryColor="#f59e0b" secondaryName="Consommation"
-                  sparkData={soldeSparkData} loading={loading || refreshing}
-                />
-              </div>
+              {buildControlsColumn()}
               <div className="pbi-layout__map-wrap">
                 <FranceMap
                   regions={regions}
@@ -664,7 +649,6 @@ export default function DashboardPage() {
                   availableModes={['dominant']}
                 />
               </div>
-              {buildControlsColumn()}
             </div>
           </div>
         )}
@@ -701,6 +685,7 @@ export default function DashboardPage() {
                   loading={priceLoading}
                 />
               </div>
+              {buildControlsColumn()}
               <div className="pbi-layout__map-wrap">
                 <FranceMap
                   regions={regions}
@@ -714,7 +699,6 @@ export default function DashboardPage() {
                   availableModes={['balance']}
                 />
               </div>
-              {buildControlsColumn()}
             </div>
           </div>
         )}
@@ -769,18 +753,18 @@ export default function DashboardPage() {
                   loading={maintenanceLoading}
                 />
               </div>
+              {buildControlsColumn()}
               <div className="pbi-layout__map-wrap">
                 <MaintenanceMap maintenanceEvents={maintenanceEvents} loading={maintenanceLoading} />
               </div>
-              {buildControlsColumn()}
             </div>
           </div>
         )}
 
       </div>
 
-      {/* ── Onglets thématiques — footer, style Power BI ── */}
-      <nav className="dashboard-footer-tabs" role="tablist" aria-label="Sections du dashboard">
+      {/* ── Onglets thématiques — bande latérale droite ── */}
+      <nav className="dashboard-side-tabs" role="tablist" aria-label="Sections du dashboard">
         {TABS.map(t => (
           <button
             key={t.id}

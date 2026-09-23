@@ -34,7 +34,7 @@ const SOURCE_LABELS = {
   thermique:   'Thermique fossile',
 }
 const PROD_COLOR  = '#2dd4bf'
-const CONSO_COLOR = '#f59e0b'
+const CONSO_COLOR = '#fb7185'
 
 function formatTs(ts) {
   const d = new Date(ts)

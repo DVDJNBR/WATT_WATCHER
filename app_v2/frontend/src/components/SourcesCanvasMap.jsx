@@ -257,14 +257,14 @@ export default function SourcesCanvasMap() {
           ctx.strokeStyle=rgba(vc,0.25);ctx.lineWidth=0.8;ctx.stroke()
           return
         }
-        ctx.beginPath();ctx.arc(p.x,p.y,coreR,0,Math.PI*2);ctx.fillStyle=rgba(col,0.10);ctx.fill()
+        ctx.beginPath();ctx.arc(p.x,p.y,coreR,0,Math.PI*2);ctx.fillStyle=rgba(col,0.25);ctx.fill()
         if(scf>0.01){
           ctx.beginPath();ctx.moveTo(p.x,p.y)
           ctx.arc(p.x,p.y,coreR,-Math.PI/2,-Math.PI/2+scf*2*Math.PI)
           ctx.closePath();ctx.fillStyle=rgba(col,0.90);ctx.fill()
         }
         ctx.beginPath();ctx.arc(p.x,p.y,coreR,0,Math.PI*2)
-        ctx.strokeStyle=rgba(col,0.40);ctx.lineWidth=0.8;ctx.stroke()
+        ctx.strokeStyle=rgba(col,0.65);ctx.lineWidth=0.8;ctx.stroke()
       })
       if(hoveredHero>=0&&hoveredHero<heroPts.length){
         const p=heroPts[hoveredHero]
