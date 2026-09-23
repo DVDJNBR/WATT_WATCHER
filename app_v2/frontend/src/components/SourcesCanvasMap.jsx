@@ -189,13 +189,13 @@ export default function SourcesCanvasMap({ selectedCode = '' }) {
     }
     function startAnim(){
       if(animRAF) cancelAnimationFrame(animRAF)
-      const dark=isDark()
       function tick(){
+        const dark=isDark()
         wctx.globalCompositeOperation='destination-in'
         wctx.fillStyle=`rgba(0,0,0,${FADE})`
         wctx.fillRect(0,0,wCanvas.width,wCanvas.height)
         wctx.globalCompositeOperation='source-over'
-        wctx.strokeStyle=dark?'rgba(90,88,84,0.10)':'rgba(221,219,216,0.45)'
+        wctx.strokeStyle=dark?'rgba(90,88,84,0.10)':'rgba(80,78,74,0.18)'
         wctx.lineWidth=2.0; wctx.lineCap='round'
         wctx.save(); wctx.setTransform(dpr,0,0,dpr,0,0)
         wctx.beginPath()
@@ -308,14 +308,16 @@ export default function SourcesCanvasMap({ selectedCode = '' }) {
         }
 
         if(p.f==='solaire'&&scf<0.05){
-          const vc=dark?'#92400e':'#78350f'
+          // Off solar: dark theme → dim amber-brown; light theme → neutral gray so it reads as "off" not invisible
+          const vc=dark?'#92400e':'#9c9a96'
           ctx.beginPath();ctx.arc(p.x,p.y,coreR,0,Math.PI*2)
-          ctx.fillStyle=rgba(vc,0.12);ctx.fill()
+          ctx.fillStyle=rgba(vc,dark?0.12:0.28);ctx.fill()
           ctx.beginPath();ctx.arc(p.x,p.y,coreR,0,Math.PI*2)
-          ctx.strokeStyle=rgba(vc,0.25);ctx.lineWidth=0.8;ctx.stroke()
+          ctx.strokeStyle=rgba(vc,dark?0.25:0.55);ctx.lineWidth=0.8;ctx.stroke()
           return
         }
-        ctx.beginPath();ctx.arc(p.x,p.y,coreR,0,Math.PI*2);ctx.fillStyle=rgba(col,0.25);ctx.fill()
+        // Active: slightly more opaque fill in light theme so the base circle is visible before the sector
+        ctx.beginPath();ctx.arc(p.x,p.y,coreR,0,Math.PI*2);ctx.fillStyle=rgba(col,dark?0.25:0.38);ctx.fill()
         if(scf>0.01){
           ctx.beginPath();ctx.moveTo(p.x,p.y)
           ctx.arc(p.x,p.y,coreR,-Math.PI/2,-Math.PI/2+scf*2*Math.PI)
