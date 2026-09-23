@@ -105,7 +105,7 @@ if AZURE_FUNCTIONS_AVAILABLE:
     @app.timer_trigger(
         schedule="0 */15 * * * *",  # every 15 minutes
         arg_name="timer",
-        run_on_startup=False,
+        run_on_startup=True,  # self-heal after restarts/redeployments
     )
     def pipeline_15min(timer: func.TimerRequest) -> None:
         """RTE eCO2mix + Open-Meteo -> Bronze -> Silver -> Gold."""
