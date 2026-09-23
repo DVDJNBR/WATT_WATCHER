@@ -120,7 +120,7 @@ export function HistoryChart({ data, region, loading = false }) {
 
   const chartData = transformData(data)
   const sources   = deriveAllSources(chartData)
-  const sourceOpacity = { fill: 0.12, stroke: 0.30 }
+  const sourceOpacity = { fill: 0.25, stroke: 0.90 }
 
   return (
     <section className="glass-card chart-card" data-testid="history-chart">

@@ -6,12 +6,12 @@ const SRC_COLORS_LIGHT = {nucleaire:'#7c3aed',hydraulique:'#3b82f6',solaire:'#d9
 const FILIERES = ['nucleaire','hydraulique','solaire','eolien','thermique','autre']
 const F_LABEL  = {nucleaire:'Nucléaire',hydraulique:'Hydraulique',solaire:'Solaire',eolien:'Éolien',thermique:'Thermique',autre:'Autre'}
 const _NATIONAL_MW = {nucleaire:63100,hydraulique:25800,eolien:24100,solaire:78700,thermique:20000,autre:5000}
-const R_MIN=2.5, R_MAX=11.0
+const R_MIN=2.0, R_MAX=7.0
 const DLON=0.75,DLAT=0.75,G_LON0=-5.0,G_LAT0=41.0,G_NCOL=22,G_NROW=16
 const OW=160,OH=112
 const NPART=80,SPEED=0.20,FADE=0.95,MAX_AGE=250,UVS=8,POOL_SIZE=500
-// Tighter bounds: zoomed in, no Corse (excluded at GeoJSON level below)
-const LON_MIN=-5.5,LON_MAX=9.0,LAT_MIN=42.3,LAT_MAX=51.3,PAD=26
+// Tight bounds: France métropolitaine sans Corse, bien zoomée
+const LON_MIN=-4.8,LON_MAX=8.4,LAT_MIN=42.8,LAT_MAX=51.1,PAD=22
 const ODRE_TO_F = {nucleaire:'nucleaire',hydraulique:'hydraulique',eolien:'eolien',solaire:'solaire',gaz:'thermique',fioul:'thermique',charbon:'thermique',bioenergies:'autre'}
 const METEO_API = '/api/v1/meteo/grid'
 const ODRE_URL  = 'https://odre.opendatasoft.com/api/explore/v2.1/catalog/datasets/eco2mix-national-tr/records?limit=1&select=date_heure,nucleaire,hydraulique,eolien,solaire,fioul,charbon,gaz,bioenergies&order_by=date_heure+desc&where=nucleaire+is+not+null'
@@ -280,8 +280,8 @@ export default function SourcesCanvasMap({ selectedCode = '' }) {
       })
       if(!heroPts.length){ctx.restore();return}
 
-      // Proportional circle radius
-      const rScale=Math.min(W,H)/480
+      // Proportional circle radius — sqrt to avoid huge circles at large sizes
+      const rScale=Math.sqrt(Math.min(W,H)/480)
 
       heroPts.forEach((p,i)=>{
         const inSel = !selCode || p.region === selNom
@@ -407,7 +407,7 @@ export default function SourcesCanvasMap({ selectedCode = '' }) {
     function onMouseMove(e){
       const rect=canvas.getBoundingClientRect()
       const mx=e.clientX-rect.left, my=e.clientY-rect.top
-      const rScale=Math.min(W,H)/480
+      const rScale=Math.sqrt(Math.min(W,H)/480)
       let found=-1, bestD=Infinity
       heroPts.forEach((p,i)=>{
         const norm=p.mw/(_filiereMax[p.f]||p.mw||1)
@@ -510,33 +510,11 @@ export default function SourcesCanvasMap({ selectedCode = '' }) {
             <p style={{color:'var(--color-text-2)',margin:'2px 0 0',fontSize:11}}>{tooltip.live}</p>
           </div>
         )}
-      </div>
-
-      {/* Shared legend: prod + conso lines + filière dots */}
-      <div style={{display:'flex',flexWrap:'wrap',gap:'6px 16px',alignItems:'center',padding:'8px 14px',fontSize:11.5,color:'var(--color-text-2)'}}>
-        {/* Prod / conso line symbols */}
-        <span style={{display:'flex',alignItems:'center',gap:5}}>
-          <svg width="22" height="8" viewBox="0 0 22 8" aria-hidden="true">
-            <line x1="0" y1="4" x2="22" y2="4" stroke={PROD_COLOR} strokeWidth="1.5"/>
-          </svg>
-          Prod.
-        </span>
-        <span style={{display:'flex',alignItems:'center',gap:5}}>
-          <svg width="22" height="8" viewBox="0 0 22 8" aria-hidden="true">
-            <line x1="0" y1="4" x2="22" y2="4" stroke={consoLegendColor} strokeWidth="1.5" strokeDasharray="5 2.5"/>
-          </svg>
-          Conso.
-        </span>
-        <span style={{width:'1px',height:'12px',background:'var(--color-border)',flexShrink:0}}/>
-        <span style={{fontSize:10,fontWeight:700,textTransform:'uppercase',letterSpacing:'.1em'}}>Filière</span>
-        {FILIERES.map(k=>(
-          <span key={k} style={{display:'flex',alignItems:'center',gap:5}}>
-            <span style={{width:8,height:8,borderRadius:'50%',background:filiereColors[k]||'#888',flexShrink:0}}/>
-            {F_LABEL[k]}
-          </span>
-        ))}
-        <span style={{marginLeft:'auto',whiteSpace:'nowrap',opacity:.7}}>{mixNote}</span>
-        {mixTs&&<span style={{opacity:.5,fontSize:11}}>{mixTs}</span>}
+        {mixNote && (
+          <div style={{position:'absolute',bottom:8,right:10,pointerEvents:'none',fontSize:10.5,color:'var(--color-text-2)',opacity:.7,whiteSpace:'nowrap'}}>
+            {mixNote}
+          </div>
+        )}
       </div>
     </div>
   )

@@ -23,7 +23,6 @@ import {
   fetchMaintenance, fetchProductionUnits, fetchMarketPrice,
 } from '../services/api.js'
 import { RegionSelector } from '../components/RegionSelector.jsx'
-import { MeteoChart } from '../components/MeteoChart.jsx'
 import { CapacityChart } from '../components/CapacityChart.jsx'
 
 // HistoryChart and CapacityChart are kept imported (even if not rendered) to preserve
@@ -191,13 +190,13 @@ export default function DashboardPage() {
   const [lastUpdated, setLastUpdated] = useState(null)
   const [refreshing, setRefreshing] = useState(false)
 
-  // Date range filter (default: last 7 days)
-  const [startDate, setStartDate] = useState(isoDate(-7))
+  // Date range filter (default: last 24 h)
+  const [startDate, setStartDate] = useState(isoDate(-1))
   const [endDate, setEndDate] = useState(isoDate(0))
   // Tracks the most recently requested range so a slow, superseded fetch
   // (fired by an earlier preset click) can't overwrite the chart after a
   // faster later click already landed — see loadData/loadDrillData.
-  const latestRangeRef = useRef({ start: startDate, end: endDate })
+  const latestRangeRef = useRef({ start: startDate, end: isoDate(0) })
 
   // Meteo + capacity data for drill-down
   const [meteoData, setMeteoData] = useState([])
@@ -584,53 +583,82 @@ export default function DashboardPage() {
     </div>
   )
 
+  // Shared legend below charts + map (production tab only)
+  const sharedLegend = (
+    <div style={{ display:'flex', flexWrap:'wrap', gap:'5px 14px', alignItems:'center', padding:'6px 0 0', fontSize:11, color:'var(--color-text-muted)', flex:'0 0 auto' }}>
+      <span style={{ display:'flex', alignItems:'center', gap:4 }}>
+        <svg width="20" height="7" viewBox="0 0 20 7" aria-hidden="true"><line x1="0" y1="3.5" x2="20" y2="3.5" stroke="#2dd4bf" strokeWidth="1.5"/></svg>
+        Production
+      </span>
+      <span style={{ display:'flex', alignItems:'center', gap:4 }}>
+        <svg width="20" height="7" viewBox="0 0 20 7" aria-hidden="true"><line x1="0" y1="3.5" x2="20" y2="3.5" stroke="var(--color-text)" strokeWidth="1.5" strokeDasharray="5 2.5"/></svg>
+        Consommation
+      </span>
+      <span style={{ width:'1px', height:'10px', background:'var(--color-border)', flexShrink:0 }}/>
+      {[
+        ['nucleaire',   'var(--color-nucleaire)',   'Nucléaire'],
+        ['hydraulique', 'var(--color-hydraulique)', 'Hydraulique'],
+        ['solaire',     'var(--color-solaire)',      'Solaire'],
+        ['eolien',      'var(--color-eolien)',       'Éolien'],
+        ['thermique',   'var(--color-gaz)',          'Thermique'],
+        ['autre',       '#9a9a9e',                   'Autre'],
+      ].map(([k, c, l]) => (
+        <span key={k} style={{ display:'flex', alignItems:'center', gap:4 }}>
+          <span style={{ width:7, height:7, borderRadius:'50%', background:c, flexShrink:0 }}/>
+          {l}
+        </span>
+      ))}
+    </div>
+  )
+
   return (
     <main id="main-content" className="app-main">
 
-      {/* Content fills whatever height remains below the tabs —
-          this is the only piece allowed to scroll, and only if it has to. */}
-      <div className="dashboard-content">
+      {/* Full-width toolbar — période + région + màj, above all content */}
+      <div className="app-main__toolbar">
         {toolbar}
+      </div>
+
+      {/* Content fills whatever height remains — only piece allowed to scroll */}
+      <div className="dashboard-content">
         {error && (
           <div className="glass-card chart-card chart-error" data-testid="app-error">
             <p>Erreur : {error}</p>
           </div>
         )}
 
-        {/* ── Production & consommation : le surplus (curtailment) | sélecteur + carte risque ── */}
+        {/* ── Production & consommation ── */}
         {activeTab === 'production' && !error && (
-          <div className="pbi-layout">
-            <div className="pbi-layout__left pbi-layout__left--no-kpi">
-              <MeteoChart
-                data={aggregatedMeteoData}
-                region={selectedRegionName}
-                loading={drillLoading}
-              />
-              <HistoryChart
-                data={aggregatedProdData}
-                region={selectedRegionName || 'France'}
-                loading={loading || refreshing}
-              />
-            </div>
-            <div className="pbi-layout__right">
-              <div className="pbi-layout__map-wrap">
-                <FranceMap
-                  regions={regions}
-                  regionTotals={regionTotals}
-                  regionConsommation={regionConsommation}
-                  regionSources={regionSources}
-                  regionCurtailmentRisk={regionCurtailmentRisk}
-                  mixSources={lastSources}
-                  showMixRibbon
-                  selectedCode={selectedRegion}
-                  onSelect={handleRegionChange}
-                  loading={loading}
-                  mode="dominant"
-                  availableModes={['dominant']}
+          <>
+            <div className="pbi-layout">
+              <div className="pbi-layout__left" style={{ gridTemplateRows: '1fr' }}>
+                <HistoryChart
+                  data={aggregatedProdData}
+                  region={selectedRegionName || 'France'}
+                  loading={loading || refreshing}
                 />
               </div>
+              <div className="pbi-layout__right">
+                <div className="pbi-layout__map-wrap">
+                  <FranceMap
+                    regions={regions}
+                    regionTotals={regionTotals}
+                    regionConsommation={regionConsommation}
+                    regionSources={regionSources}
+                    regionCurtailmentRisk={regionCurtailmentRisk}
+                    mixSources={lastSources}
+                    showMixRibbon
+                    selectedCode={selectedRegion}
+                    onSelect={handleRegionChange}
+                    loading={loading}
+                    mode="dominant"
+                    availableModes={['dominant']}
+                  />
+                </div>
+              </div>
             </div>
-          </div>
+            {sharedLegend}
+          </>
         )}
 
         {/* ── Prix : prix spot + calendrier | sélecteur + carte export/import + 2 chiffres ── */}

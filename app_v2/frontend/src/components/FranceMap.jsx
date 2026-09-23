@@ -697,15 +697,6 @@ export const FranceMap = memo(function FranceMap({
           <span className="map-legend__item">faible → élevée</span>
         </div>
       )}
-      <p className="map-hint">
-        {highlightedSource
-          ? `${SOURCE_LABELS[highlightedSource]} en surbrillance — cliquez à nouveau sur le ruban pour réinitialiser`
-          : selectedCode
-          ? 'Cliquez sur une autre région pour comparer · ← Vue nationale pour revenir'
-          : showMixRibbon
-          ? 'Cliquez sur une région pour afficher son historique · cliquez sur le ruban pour explorer une source'
-          : 'Cliquez sur une région pour afficher son historique'}
-      </p>
     </section>
   )
 })

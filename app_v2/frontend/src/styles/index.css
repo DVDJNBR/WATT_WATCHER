@@ -264,7 +264,7 @@ body {
 @media (max-width: 1024px) {
   .pbi-layout { grid-template-columns: 1fr; }
   .pbi-layout__map-wrap { min-height: 320px; }
-  .app-main { grid-template-columns: 1fr 40px; }
+  .app-main { grid-template-columns: 1fr 44px; }
 }
 
 /* ── Trend KPI card : chiffre clé + mini courbe pleine largeur ───────────── */
@@ -458,10 +458,7 @@ body {
   border-bottom-color: var(--color-accent);
 }
 
-/* ── Side theme tabs (dashboard) — vertical strip pinned to the right edge ── */
-/* Tabs run bottom-to-top (writing-mode + rotate) so they read naturally
-   when the strip is on the right. Active tab gets a left accent bar instead
-   of the old bottom-border poke. */
+/* ── Side theme tabs (dashboard) — vertical strip, text top-to-bottom ────── */
 .dashboard-side-tabs {
   background: var(--color-surface-2);
   border-left: 1px solid var(--color-border);
@@ -471,21 +468,20 @@ body {
   justify-content: flex-start;
   gap: 2px;
   padding-top: 12px;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 .footer-tab {
   writing-mode: vertical-rl;
-  transform: rotate(180deg);
+  /* no rotate — text reads naturally top-to-bottom */
   display: flex;
   align-items: center;
   gap: 7px;
   padding: 10px 8px;
   width: 44px;
-  border: 1px solid transparent;
-  border-right: 2px solid transparent;
-  /* CSS: border-radius 0 10px 10px 0 → after rotate(180deg) → visual left side rounded (facing content) */
-  border-radius: 0 10px 10px 0;
+  border: none;
+  border-radius: 8px 0 0 8px; /* rounded left side (toward content) */
   background: none;
   font: inherit;
   font-size: 0.85rem;
@@ -493,7 +489,7 @@ body {
   color: var(--color-text-muted);
   cursor: pointer;
   white-space: nowrap;
-  transition: color var(--transition), background var(--transition), border-color var(--transition), box-shadow var(--transition);
+  transition: color var(--transition), background var(--transition);
 }
 
 .footer-tab svg {
@@ -501,20 +497,20 @@ body {
   height: 15px;
   opacity: 0.75;
   flex-shrink: 0;
-  transition: opacity var(--transition), transform var(--transition);
+  /* counteract writing-mode glyph rotation so icons stay upright */
+  transform: rotate(-90deg);
+  transition: opacity var(--transition);
 }
 
-.footer-tab:hover { color: var(--color-text); background: var(--color-surface-2); }
-.footer-tab:hover svg { opacity: 1; transform: translateY(-1px); }
+/* hover: teal pre-selection colour, like top tabs */
+.footer-tab:hover { color: var(--color-accent); background: rgba(45,212,191,0.06); }
+.footer-tab:hover svg { opacity: 1; }
 
+/* active: teal halo behind, no border line */
 .footer-tab--active {
   color: var(--color-accent);
-  background: var(--color-surface);
+  background: rgba(45,212,191,0.10);
   font-weight: 600;
-  border-color: var(--glass-border);
-  border-right-color: var(--color-accent);
-  /* CSS right direction = visual left (toward content) after rotation */
-  box-shadow: 2px 0 12px -4px rgba(45, 212, 191, 0.30);
 }
 .footer-tab--active svg { opacity: 1; }
 
@@ -596,14 +592,46 @@ body {
 }
 
 /* ── Main content ─────────────────────────────────────────────────────────── */
-/* Dashboard is a side-by-side layout: content area (white) + tab strip (grey)
-   pinned to the right edge. The tab strip takes 44px; content gets the rest. */
+/* Two-row layout: compact toolbar (full width) + content + tab strip */
 .app-main {
   grid-area: main;
   overflow: hidden;
   display: grid;
+  grid-template-rows: auto 1fr;
   grid-template-columns: 1fr 44px;
   min-height: 0;
+}
+
+/* Full-width toolbar spanning both content and tab-strip columns */
+.app-main__toolbar {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 24px;
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  flex-shrink: 0;
+}
+
+/* Inputs inside the full-width toolbar */
+.app-main__toolbar .selector-input {
+  font-size: 0.78rem;
+  padding: 5px 8px;
+  min-width: 88px;
+  max-width: 104px;
+  padding-right: 10px;
+  background-image: none;
+}
+.app-main__toolbar .date-bar__presets button {
+  font-size: 0.64rem;
+  padding: 2px 6px;
+}
+.app-main__toolbar .region-selector__button {
+  font-size: 0.78rem;
+  padding: 5px 10px;
 }
 
 .dashboard-content {
