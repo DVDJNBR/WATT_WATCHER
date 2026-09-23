@@ -552,54 +552,34 @@ export default function DashboardPage() {
     { id: 'capacite',      label: 'Capacité' },
   ]
 
-  // Période / région / màj — colonne centrale, empilée verticalement, identique sur tous les onglets.
-  // buildControlsColumn(extra) accepts extra tab-specific content to render above the shared
-  // controls — never nest two .pbi-layout__controls-col.
-  const buildControlsColumn = (extra = null) => (
-    <div className="pbi-layout__controls-col">
-      {extra}
-      <div className="controls-line">
-        <div className="controls-block">
-          <span className="selector-label">Période</span>
-          <div className="date-bar" data-testid="date-range">
-            <input id="date-start" type="date" className="selector-input date-bar__input"
-              value={startDate} max={endDate} aria-label="Date de début" data-testid="date-start"
-              onChange={e => { setStartDate(e.target.value); handleDateChange(e.target.value, endDate) }} />
-            <span className="selector-label" aria-hidden="true">→</span>
-            <input id="date-end" type="date" className="selector-input date-bar__input"
-              value={endDate} min={startDate} max={isoDate(0)} aria-label="Date de fin" data-testid="date-end"
-              onChange={e => { setEndDate(e.target.value); handleDateChange(startDate, e.target.value) }} />
-            <div className="date-bar__presets">
-              {/* 3m matches actual production data retention (~3 months) —
-                  6m used to return a range the backend couldn't fill. */}
-              {[{ label: '24h', days: -1 }, { label: '7j', days: -7 }, { label: '30j', days: -30 }, { label: '3m', days: -91 }].map(({ label, days }) => (
-                <button key={label} onClick={() => {
-                  const s = isoDate(days); const e = isoDate(0)
-                  setStartDate(s); setEndDate(e); handleDateChange(s, e)
-                }}>{label}</button>
-              ))}
-            </div>
-          </div>
+  // Compact single-row toolbar — période + région + màj, always visible above all tabs
+  const toolbar = (
+    <div className="dash-toolbar">
+      <div className="date-bar" data-testid="date-range">
+        <input id="date-start" type="date" className="selector-input"
+          value={startDate} max={endDate} aria-label="Date de début" data-testid="date-start"
+          onChange={e => { setStartDate(e.target.value); handleDateChange(e.target.value, endDate) }} />
+        <span style={{ color: 'var(--color-text-muted)', fontSize: '0.75rem' }} aria-hidden="true">→</span>
+        <input id="date-end" type="date" className="selector-input"
+          value={endDate} min={startDate} max={isoDate(0)} aria-label="Date de fin" data-testid="date-end"
+          onChange={e => { setEndDate(e.target.value); handleDateChange(startDate, e.target.value) }} />
+        <div className="date-bar__presets">
+          {[{ label: '24h', days: -1 }, { label: '7j', days: -7 }, { label: '30j', days: -30 }, { label: '3m', days: -91 }].map(({ label, days }) => (
+            <button key={label} onClick={() => {
+              const s = isoDate(days); const e = isoDate(0)
+              setStartDate(s); setEndDate(e); handleDateChange(s, e)
+            }}>{label}</button>
+          ))}
         </div>
-
-        <div className="controls-region-status">
-          <RegionSelector regions={regions} selected={selectedRegion} onChange={handleRegionChange} loading={loading} />
-          <div className="controls-block controls-block--status">
-            {(loading || refreshing) && (
-              <span
-                className="refresh-dot"
-                title="Actualisation en cours…"
-                aria-label="Actualisation en cours"
-                data-testid="refresh-indicator"
-              />
-            )}
-            {lastUpdated && (
-              <span className="last-updated" data-testid="last-updated">
-                Màj {formatTime(lastUpdated)}
-              </span>
-            )}
-          </div>
-        </div>
+      </div>
+      <RegionSelector regions={regions} selected={selectedRegion} onChange={handleRegionChange} loading={loading} showLabel={false} />
+      <div className="dash-toolbar__status">
+        {(loading || refreshing) && (
+          <span className="refresh-dot" title="Actualisation en cours…" aria-label="Actualisation en cours" data-testid="refresh-indicator" />
+        )}
+        {lastUpdated && (
+          <span className="last-updated" data-testid="last-updated">Màj {formatTime(lastUpdated)}</span>
+        )}
       </div>
     </div>
   )
@@ -610,6 +590,7 @@ export default function DashboardPage() {
       {/* Content fills whatever height remains below the tabs —
           this is the only piece allowed to scroll, and only if it has to. */}
       <div className="dashboard-content">
+        {toolbar}
         {error && (
           <div className="glass-card chart-card chart-error" data-testid="app-error">
             <p>Erreur : {error}</p>
@@ -632,7 +613,6 @@ export default function DashboardPage() {
               />
             </div>
             <div className="pbi-layout__right">
-              {buildControlsColumn()}
               <div className="pbi-layout__map-wrap">
                 <FranceMap
                   regions={regions}
@@ -685,7 +665,6 @@ export default function DashboardPage() {
                   loading={priceLoading}
                 />
               </div>
-              {buildControlsColumn()}
               <div className="pbi-layout__map-wrap">
                 <FranceMap
                   regions={regions}
@@ -753,7 +732,6 @@ export default function DashboardPage() {
                   loading={maintenanceLoading}
                 />
               </div>
-              {buildControlsColumn()}
               <div className="pbi-layout__map-wrap">
                 <MaintenanceMap maintenanceEvents={maintenanceEvents} loading={maintenanceLoading} />
               </div>

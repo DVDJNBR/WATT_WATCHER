@@ -468,9 +468,9 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: flex-start;
   gap: 2px;
-  padding-bottom: 16px;
+  padding-top: 12px;
   overflow: hidden;
 }
 
@@ -479,35 +479,42 @@ body {
   transform: rotate(180deg);
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 7px;
   padding: 10px 8px;
   width: 44px;
-  border: none;
+  border: 1px solid transparent;
   border-right: 2px solid transparent;
+  /* CSS: border-radius 0 10px 10px 0 → after rotate(180deg) → visual left side rounded (facing content) */
+  border-radius: 0 10px 10px 0;
   background: none;
   font: inherit;
-  font-size: 0.78rem;
+  font-size: 0.85rem;
   font-weight: 500;
   color: var(--color-text-muted);
   cursor: pointer;
   white-space: nowrap;
-  transition: color var(--transition), background var(--transition), border-color var(--transition);
+  transition: color var(--transition), background var(--transition), border-color var(--transition), box-shadow var(--transition);
 }
 
 .footer-tab svg {
-  width: 14px;
-  height: 14px;
-  opacity: 0.7;
+  width: 15px;
+  height: 15px;
+  opacity: 0.75;
   flex-shrink: 0;
+  transition: opacity var(--transition), transform var(--transition);
 }
 
-.footer-tab:hover { color: var(--color-text); background: rgba(0,0,0,0.06); }
-[data-theme="dark"] .footer-tab:hover { background: rgba(255,255,255,0.06); }
+.footer-tab:hover { color: var(--color-text); background: var(--color-surface-2); }
+.footer-tab:hover svg { opacity: 1; transform: translateY(-1px); }
 
 .footer-tab--active {
   color: var(--color-accent);
+  background: var(--color-surface);
   font-weight: 600;
+  border-color: var(--glass-border);
   border-right-color: var(--color-accent);
+  /* CSS right direction = visual left (toward content) after rotation */
+  box-shadow: 2px 0 12px -4px rgba(45, 212, 191, 0.30);
 }
 .footer-tab--active svg { opacity: 1; }
 
@@ -536,6 +543,45 @@ body {
   gap: 8px;
   margin-left: auto;
   padding-bottom: 8px;
+}
+
+/* ── Compact top toolbar (période + région + màj) ────────────────────────── */
+.dash-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+  padding-bottom: 10px;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+}
+
+.dash-toolbar__status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+/* Smaller inputs + presets inside the compact toolbar */
+.dash-toolbar .selector-input {
+  font-size: 0.78rem;
+  padding: 5px 8px;
+  min-width: 88px;
+  max-width: 104px;
+  padding-right: 10px;
+  background-image: none;
+}
+
+.dash-toolbar .date-bar__presets button {
+  font-size: 0.64rem;
+  padding: 2px 6px;
+}
+
+.dash-toolbar .region-selector__button {
+  font-size: 0.78rem;
+  padding: 5px 10px;
 }
 
 /* ── Sidebar ──────────────────────────────────────────────────────────────── */
@@ -575,7 +621,6 @@ body {
 .dashboard-content .glass-card {
   background: transparent;
   border: none;
-  border-bottom: 1px solid var(--color-border);
   border-radius: 0;
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
@@ -1090,16 +1135,9 @@ input[type="date"] {
 
 .region-selector__list {
   position: absolute;
-  /* Opens upward (bottom, not top) — this control sits right above the
-     footer tabs, near the bottom of the viewport, by design. Opening
-     downward left most of a 280px-tall list rendered off-screen below the
-     fold (confirmed: list bottom edge landed ~220px past the viewport
-     bottom). There's always more room above it (map + charts). */
-  bottom: calc(100% + 6px);
-  /* Right-anchored, not centered: the button sits at the right edge of its
-     column, so a centered dropdown routinely overflowed past the viewport
-     edge. Opening flush against the button's right edge and growing left
-     keeps it on-screen regardless of where the button itself sits. */
+  /* Opens downward — selector is now in the compact toolbar at the top of
+     the dashboard. */
+  top: calc(100% + 6px);
   right: 0;
   z-index: 50;
   min-width: 220px;

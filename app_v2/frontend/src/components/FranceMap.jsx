@@ -392,7 +392,7 @@ export const FranceMap = memo(function FranceMap({
 
       {mode === 'dominant' ? (
         <div style={{ flex: '1 1 0', minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-          <SourcesCanvasMap />
+          <SourcesCanvasMap selectedCode={selectedCode} />
         </div>
       ) : loading ? (
         <div className="skeleton" style={{ flex: '1 1 0', minHeight: 0 }} />

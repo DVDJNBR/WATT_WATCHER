@@ -27,8 +27,8 @@ const REGION_CODES = {
   "Provence-Alpes-Côte d'Azur": 'PACA',
 }
 
-/** @param {{ regions: Array<{code_insee:string,region:string}>, selected: string, onChange: (code:string)=>void, loading?: boolean }} props */
-export function RegionSelector({ regions, selected, onChange, loading = false }) {
+/** @param {{ regions: Array<{code_insee:string,region:string}>, selected: string, onChange: (code:string)=>void, loading?: boolean, showLabel?: boolean }} props */
+export function RegionSelector({ regions, selected, onChange, loading = false, showLabel = true }) {
   const [open, setOpen] = useState(false)
   const rootRef = useRef(null)
 
@@ -55,7 +55,7 @@ export function RegionSelector({ regions, selected, onChange, loading = false })
 
   return (
     <div className="region-selector" data-testid="region-selector" ref={rootRef}>
-      <span className="selector-label">Région</span>
+      {showLabel && <span className="selector-label">Région</span>}
       <button
         type="button"
         className="region-selector__button"

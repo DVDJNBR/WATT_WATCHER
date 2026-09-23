@@ -10,10 +10,12 @@ const R_MIN=2.5, R_MAX=11.0
 const DLON=0.75,DLAT=0.75,G_LON0=-5.0,G_LAT0=41.0,G_NCOL=22,G_NROW=16
 const OW=160,OH=112
 const NPART=80,SPEED=0.20,FADE=0.95,MAX_AGE=250,UVS=8,POOL_SIZE=500
-const LON_MIN=-5.5,LON_MAX=10.5,LAT_MIN=41.0,LAT_MAX=51.8,PAD=26
+// Tighter bounds: zoomed in, no Corse (excluded at GeoJSON level below)
+const LON_MIN=-5.5,LON_MAX=9.0,LAT_MIN=42.3,LAT_MAX=51.3,PAD=26
 const ODRE_TO_F = {nucleaire:'nucleaire',hydraulique:'hydraulique',eolien:'eolien',solaire:'solaire',gaz:'thermique',fioul:'thermique',charbon:'thermique',bioenergies:'autre'}
 const METEO_API = '/api/v1/meteo/grid'
 const ODRE_URL  = 'https://odre.opendatasoft.com/api/explore/v2.1/catalog/datasets/eco2mix-national-tr/records?limit=1&select=date_heure,nucleaire,hydraulique,eolien,solaire,fioul,charbon,gaz,bioenergies&order_by=date_heure+desc&where=nucleaire+is+not+null'
+const PROD_COLOR = '#2dd4bf'
 
 function hexRgb(h){return[parseInt(h.slice(1,3),16),parseInt(h.slice(3,5),16),parseInt(h.slice(5,7),16)]}
 function rgba(h,a){const c=hexRgb(h);return`rgba(${c[0]},${c[1]},${c[2]},${a})`}
@@ -31,15 +33,31 @@ function bicubic(arr,gx,gy){
   return cubicH(rows[0],rows[1],rows[2],rows[3],ty)
 }
 
-export default function SourcesCanvasMap() {
-  const mapRef      = useRef(null)
-  const windRef     = useRef(null)
-  const rebuildRef  = useRef(null)
-  const s           = useRef({})   // mutable state — avoids re-renders
+/** @param {{ selectedCode?: string }} props */
+export default function SourcesCanvasMap({ selectedCode = '' }) {
+  const mapRef          = useRef(null)
+  const windRef         = useRef(null)
+  const rebuildRef      = useRef(null)
+  const drawRef         = useRef(null)
+  const selectedCodeRef = useRef(selectedCode)
+  const s               = useRef({})
   const [loading,  setLoading]  = useState(true)
   const [mixNote,  setMixNote]  = useState('Chargement mix…')
   const [mixTs,    setMixTs]    = useState('')
-  const [tooltip,  setTooltip]  = useState(null) // {name,type,region,mw,live,x,y}
+  const [tooltip,  setTooltip]  = useState(null)
+  // isDarkTheme drives the legend colours in JSX (canvas reads isDark() inline)
+  const [isDarkTheme, setIsDarkTheme] = useState(() => {
+    const t = document.documentElement.getAttribute('data-theme')
+    if (t === 'dark') return true
+    if (t === 'light') return false
+    return window.matchMedia('(prefers-color-scheme:dark)').matches
+  })
+
+  // Sync selectedCode prop → ref → redraw
+  useEffect(() => {
+    selectedCodeRef.current = selectedCode
+    drawRef.current?.()
+  }, [selectedCode])
 
   useEffect(() => {
     const canvas  = mapRef.current
@@ -229,26 +247,55 @@ export default function SourcesCanvasMap() {
       ctx.save(); ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,W,H)
       const dark=isDark()
       const colors=dark?SRC_COLORS_DARK:SRC_COLORS_LIGHT
-      const mapFill =dark?'rgba(255,255,255,.28)':'rgba(20,20,22,.04)'
-      const mapStroke=dark?'rgba(255,255,255,.11)':'rgba(20,20,22,.18)'
-      const labelCol =dark?'rgba(255,255,255,.38)':'rgba(20,20,22,.40)'
+      const selCode=selectedCodeRef.current
+      const selNom=selCode?(REGIONS[selCode]?.nom||''):''
+
+      // Lighter fills
+      const mapFillBase  = dark ? 'rgba(255,255,255,.46)' : 'rgba(20,20,22,.16)'
+      const mapFillDim   = dark ? 'rgba(255,255,255,.10)' : 'rgba(20,20,22,.04)'
+      const mapStrokeBase= dark ? 'rgba(255,255,255,.14)' : 'rgba(20,20,22,.22)'
+      const mapStrokeDim = dark ? 'rgba(255,255,255,.05)' : 'rgba(20,20,22,.07)'
+      const labelColBase = dark ? 'rgba(255,255,255,.45)' : 'rgba(20,20,22,.45)'
+      const labelColDim  = dark ? 'rgba(255,255,255,.15)' : 'rgba(20,20,22,.15)'
 
       Object.keys(regionPaths).forEach(code=>{
-        ctx.fillStyle=mapFill; ctx.fill(regionPaths[code])
-        ctx.strokeStyle=mapStroke; ctx.lineWidth=0.8; ctx.stroke(regionPaths[code])
+        const dimmed = !!(selCode && code !== selCode)
+        ctx.fillStyle = dimmed ? mapFillDim : mapFillBase
+        ctx.fill(regionPaths[code])
+        ctx.strokeStyle = dimmed ? mapStrokeDim : mapStrokeBase
+        ctx.lineWidth=0.8; ctx.stroke(regionPaths[code])
       })
+      // Accent stroke on selected region
+      if(selCode && regionPaths[selCode]){
+        ctx.strokeStyle='rgba(45,212,191,0.60)'; ctx.lineWidth=1.5
+        ctx.stroke(regionPaths[selCode])
+      }
       drawCloudRaster()
       ctx.font='500 11px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif'
-      ctx.textAlign='center'; ctx.fillStyle=labelCol
+      ctx.textAlign='center'
       Object.keys(regionCentroids).forEach(code=>{
+        const dimmed = !!(selCode && code !== selCode)
+        ctx.fillStyle = dimmed ? labelColDim : labelColBase
         const c=regionCentroids[code]; ctx.fillText(REGIONS[code].nom,c[0],c[1])
       })
       if(!heroPts.length){ctx.restore();return}
+
+      // Proportional circle radius
+      const rScale=Math.min(W,H)/480
+
       heroPts.forEach((p,i)=>{
+        const inSel = !selCode || p.region === selNom
         const scf=_siteCF.length?Math.max(0,_siteCF[i]||0):Math.max(0,_capFactor[p.f]||0)
         const norm=p.mw/(_filiereMax[p.f]||p.mw||1)
-        const coreR=R_MIN+Math.sqrt(norm)*(R_MAX-R_MIN)
+        const coreR=(R_MIN+Math.sqrt(norm)*(R_MAX-R_MIN))*rScale
         const col=colors[p.f]
+
+        if(!inSel){
+          ctx.beginPath();ctx.arc(p.x,p.y,coreR,0,Math.PI*2)
+          ctx.fillStyle=rgba(col,0.07);ctx.fill()
+          return
+        }
+
         if(p.f==='solaire'&&scf<0.05){
           const vc=dark?'#92400e':'#78350f'
           ctx.beginPath();ctx.arc(p.x,p.y,coreR,0,Math.PI*2)
@@ -269,12 +316,15 @@ export default function SourcesCanvasMap() {
       if(hoveredHero>=0&&hoveredHero<heroPts.length){
         const p=heroPts[hoveredHero]
         const norm=p.mw/(_filiereMax[p.f]||p.mw||1)
-        const r=R_MIN+Math.sqrt(norm)*(R_MAX-R_MIN)+5
+        const r=(R_MIN+Math.sqrt(norm)*(R_MAX-R_MIN))*rScale+5
         ctx.beginPath();ctx.arc(p.x,p.y,r,0,Math.PI*2)
         ctx.strokeStyle=rgba(colors[p.f],0.9);ctx.lineWidth=1.5;ctx.stroke()
       }
       ctx.restore()
     }
+
+    // expose draw so the selectedCode effect can trigger redraws
+    drawRef.current = draw
 
     // ── Nearest grid ──────────────────────────────────────────────────────
     function _nearestGrid(lat,lon){
@@ -357,10 +407,11 @@ export default function SourcesCanvasMap() {
     function onMouseMove(e){
       const rect=canvas.getBoundingClientRect()
       const mx=e.clientX-rect.left, my=e.clientY-rect.top
+      const rScale=Math.min(W,H)/480
       let found=-1, bestD=Infinity
       heroPts.forEach((p,i)=>{
         const norm=p.mw/(_filiereMax[p.f]||p.mw||1)
-        const r=R_MIN+Math.sqrt(norm)*(R_MAX-R_MIN)+4
+        const r=(R_MIN+Math.sqrt(norm)*(R_MAX-R_MIN))*rScale+4
         const d=Math.sqrt((mx-p.x)**2+(my-p.y)**2)
         if(d<=r&&d<bestD){bestD=d;found=i}
       })
@@ -386,6 +437,7 @@ export default function SourcesCanvasMap() {
       fetch('/france-regions.geojson').then(r=>r.json()),
     ]).then(([units,gj])=>{
       gj.features.forEach(f=>{
+        if(f.properties.code==='94') return  // Corse: no data in pipeline
         const rings=f.geometry.type==='MultiPolygon'
           ?f.geometry.coordinates.map(p=>p[0])
           :[f.geometry.coordinates[0]]
@@ -401,6 +453,7 @@ export default function SourcesCanvasMap() {
 
     // ── Cleanup ───────────────────────────────────────────────────────────
     return ()=>{
+      drawRef.current=null
       if(animRAF) cancelAnimationFrame(animRAF)
       if(mixInterval) clearInterval(mixInterval)
       canvas.removeEventListener('mousemove',onMouseMove)
@@ -409,12 +462,21 @@ export default function SourcesCanvasMap() {
     }
   }, [])
 
-  // Theme observer — rebuild raster + redraw when data-theme changes
+  // Theme observer — rebuild raster + redraw + update isDarkTheme state
   useEffect(()=>{
-    const mo=new MutationObserver(()=>{ rebuildRef.current?.() })
+    const mo=new MutationObserver(()=>{
+      const t=document.documentElement.getAttribute('data-theme')
+      const dark=t==='dark'||(t!=='light'&&window.matchMedia('(prefers-color-scheme:dark)').matches)
+      setIsDarkTheme(dark)
+      rebuildRef.current?.()
+    })
     mo.observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']})
     return ()=>mo.disconnect()
   },[])
+
+  // Legend: current-theme filière colours + prod/conso line symbols
+  const filiereColors = isDarkTheme ? SRC_COLORS_DARK : SRC_COLORS_LIGHT
+  const consoLegendColor = isDarkTheme ? '#e8e8e6' : '#1c1b1a'
 
   return (
     <div style={{position:'relative',width:'100%',height:'100%',display:'flex',flexDirection:'column'}}>
@@ -449,12 +511,28 @@ export default function SourcesCanvasMap() {
           </div>
         )}
       </div>
-      <div style={{display:'flex',flexWrap:'wrap',gap:'8px 18px',alignItems:'center',padding:'10px 16px',borderTop:'1px solid var(--color-border)',fontSize:11.5,color:'var(--color-text-2)'}}>
+
+      {/* Shared legend: prod + conso lines + filière dots */}
+      <div style={{display:'flex',flexWrap:'wrap',gap:'6px 16px',alignItems:'center',padding:'8px 14px',fontSize:11.5,color:'var(--color-text-2)'}}>
+        {/* Prod / conso line symbols */}
+        <span style={{display:'flex',alignItems:'center',gap:5}}>
+          <svg width="22" height="8" viewBox="0 0 22 8" aria-hidden="true">
+            <line x1="0" y1="4" x2="22" y2="4" stroke={PROD_COLOR} strokeWidth="1.5"/>
+          </svg>
+          Prod.
+        </span>
+        <span style={{display:'flex',alignItems:'center',gap:5}}>
+          <svg width="22" height="8" viewBox="0 0 22 8" aria-hidden="true">
+            <line x1="0" y1="4" x2="22" y2="4" stroke={consoLegendColor} strokeWidth="1.5" strokeDasharray="5 2.5"/>
+          </svg>
+          Conso.
+        </span>
+        <span style={{width:'1px',height:'12px',background:'var(--color-border)',flexShrink:0}}/>
         <span style={{fontSize:10,fontWeight:700,textTransform:'uppercase',letterSpacing:'.1em'}}>Filière</span>
-        {[['nucleaire','#a78bfa','Nucléaire'],['hydraulique','#60a5fa','Hydraulique'],['solaire','#f59e0b','Solaire'],['eolien','#10b981','Éolien'],['thermique','#f87171','Thermique'],['autre','#9a9a9e','Autre']].map(([k,c,l])=>(
-          <span key={k} style={{display:'flex',alignItems:'center',gap:6}}>
-            <span style={{width:8,height:8,borderRadius:'50%',background:c,flexShrink:0}}/>
-            {l}
+        {FILIERES.map(k=>(
+          <span key={k} style={{display:'flex',alignItems:'center',gap:5}}>
+            <span style={{width:8,height:8,borderRadius:'50%',background:filiereColors[k]||'#888',flexShrink:0}}/>
+            {F_LABEL[k]}
           </span>
         ))}
         <span style={{marginLeft:'auto',whiteSpace:'nowrap',opacity:.7}}>{mixNote}</span>
