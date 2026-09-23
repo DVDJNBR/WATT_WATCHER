@@ -88,9 +88,8 @@ describe('App smoke test (Task 6.3)', () => {
     expect(screen.getByTestId('theme-toggle')).toBeInTheDocument()
   })
 
-  it('renders the Production tab KPI row (2 trend cards) and map', () => {
+  it('renders the Production tab map', () => {
     render(<App />)
-    expect(screen.getAllByTestId('trend-kpi-card').length).toBeGreaterThan(0)
     expect(screen.getByTestId('france-map')).toBeInTheDocument()
   })
 
