@@ -1,3 +1,9 @@
+## [1.41.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.40.0...v1.41.0) (2026-09-23)
+
+### Features
+
+* **dashboard:** compact toolbar, proportional map circles, region focus ([dfed21b](https://github.com/DVDJNBR/WATT_WATCHER/commit/dfed21b10b580898549dfb128d2d9c443d9cdee0))
+
 ## [1.40.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.39.0...v1.40.0) (2026-09-23)
 
 ### Features
