@@ -9,7 +9,7 @@ const _NATIONAL_MW = {nucleaire:63100,hydraulique:25800,eolien:24100,solaire:787
 const R_MIN=2.0, R_MAX=7.0
 const DLON=0.75,DLAT=0.75,G_LON0=-5.0,G_LAT0=41.0,G_NCOL=22,G_NROW=16
 const OW=160,OH=112
-const NPART=80,SPEED=0.20,FADE=0.95,MAX_AGE=250,UVS=8,POOL_SIZE=500
+const NPART=80,SPEED=0.12,FADE=0.95,MAX_AGE=250,UVS=8,POOL_SIZE=500
 // Tight bounds: France métropolitaine sans Corse, bien zoomée
 const LON_MIN=-4.8,LON_MAX=8.4,LAT_MIN=42.8,LAT_MAX=51.1,PAD=22
 const ODRE_TO_F = {nucleaire:'nucleaire',hydraulique:'hydraulique',eolien:'eolien',solaire:'solaire',gaz:'thermique',fioul:'thermique',charbon:'thermique',bioenergies:'autre'}
@@ -122,7 +122,7 @@ export default function SourcesCanvasMap({ selectedCode = '' }) {
           raw[row*OW+col]=Math.floor(v/STEP)*STEP
         }
       }
-      const MAX_ALPHA=dark?210:160
+      const MAX_ALPHA=dark?210:70
       const oc=document.createElement('canvas'); oc.width=OW; oc.height=OH
       const ox=oc.getContext('2d')
       const img=ox.createImageData(OW,OH); const px=img.data

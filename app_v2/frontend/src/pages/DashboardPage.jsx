@@ -620,6 +620,17 @@ export default function DashboardPage() {
         </svg>
         Centrale (taille = capacité, secteur = production en cours)
       </span>
+      <span style={{ width:'1px', height:'10px', background:'var(--color-border)', flexShrink:0 }}/>
+      <span style={{ display:'flex', alignItems:'center', gap:4 }}>
+        <svg width="18" height="8" viewBox="0 0 18 8" aria-hidden="true">
+          <path d="M0 4 Q4 1 9 4 Q14 7 18 4" fill="none" stroke="rgba(150,148,144,0.7)" strokeWidth="1.2"/>
+        </svg>
+        Vent (particules animées)
+      </span>
+      <span style={{ display:'flex', alignItems:'center', gap:4 }}>
+        <span style={{ width:14, height:10, background:'rgba(0,0,0,0.22)', borderRadius:2, flexShrink:0 }}/>
+        Nébulosité
+      </span>
     </div>
   )
 

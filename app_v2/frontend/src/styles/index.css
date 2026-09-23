@@ -609,14 +609,20 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 5px 24px;
+  padding: 4px 24px;
   background: var(--color-surface);
-  border-bottom: 1px solid var(--color-border);
   flex-wrap: nowrap;
   flex-shrink: 0;
   position: relative;
   z-index: 100; /* dropdown must layer above chart content */
   overflow: visible;
+}
+
+/* Region selector: horizontal (label + button side by side) in the toolbar */
+.app-main__toolbar .region-selector {
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
 }
 
 /* Inputs inside the full-width toolbar */
