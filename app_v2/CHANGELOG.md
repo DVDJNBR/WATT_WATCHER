@@ -1,3 +1,9 @@
+## [1.40.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.39.0...v1.40.0) (2026-09-23)
+
+### Features
+
+* **layout:** sidebar tabs, flat white surface, controls above map ([0807a5f](https://github.com/DVDJNBR/WATT_WATCHER/commit/0807a5ff3f28a3eef8f2387e2f17683eb87cdb5b)), closes [#f59e0b](https://github.com/DVDJNBR/WATT_WATCHER/issues/f59e0b) [#fb7185](https://github.com/DVDJNBR/WATT_WATCHER/issues/fb7185)
+
 ## [1.39.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.38.0...v1.39.0) (2026-09-23)
 
 ### Features
