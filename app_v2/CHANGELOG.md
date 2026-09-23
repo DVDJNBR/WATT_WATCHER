@@ -1,3 +1,9 @@
+## [1.39.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.38.0...v1.39.0) (2026-09-23)
+
+### Features
+
+* **dashboard:** replace dominant mode with SourcesCanvasMap canvas component ([798a9ba](https://github.com/DVDJNBR/WATT_WATCHER/commit/798a9bae4463d4217bce5c770e097095253e7e60))
+
 ## [1.38.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.37.0...v1.38.0) (2026-09-22)
 
 ### Features
