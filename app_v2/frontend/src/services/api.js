@@ -279,3 +279,15 @@ export async function fetchCrossBorder({ startDate, endDate } = {}) {
 export async function fetchProductionUnits({ region } = {}) {
   return apiGet('/v1/production/units', { region })
 }
+
+/**
+ * Latest timestamp available per fact table, plus `common_max` — the newest
+ * instant every plotted series has data for. The dashboard anchors its window
+ * on `common_max` rather than the wall clock, so all charts stop together
+ * instead of trailing an empty axis where the slower feeds haven't landed.
+ *
+ * @returns {Promise<{data: {per_table: Record<string, string|null>, common_max: string|null}}>}
+ */
+export async function fetchDataRange() {
+  return apiGet('/v1/data-range', {})
+}

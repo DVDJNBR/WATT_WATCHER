@@ -252,3 +252,7 @@ CLAUDE.local.md
 
 # Internal review reports — for local consultation, not meant for GitHub
 docs/*_report.md
+
+# Local dev database snapshots (multi-MB, seeded from Supabase)
+dev.sqlite
+dev.sqlite.bak

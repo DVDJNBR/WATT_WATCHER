@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 
+// Canvas uses a one-shot useEffect — tell Vite to full-reload on HMR instead
+if (import.meta.hot) import.meta.hot.decline()
+
 // ── Constants ──────────────────────────────────────────────────────────────
 const SRC_COLORS_DARK  = {nucleaire:'#a78bfa',hydraulique:'#60a5fa',solaire:'#f59e0b',eolien:'#10b981',thermique:'#f87171',autre:'#9a9a9e'}
 const SRC_COLORS_LIGHT = {nucleaire:'#7c3aed',hydraulique:'#3b82f6',solaire:'#d97706',eolien:'#059669',thermique:'#dc2626',autre:'#71717a'}
@@ -9,12 +12,11 @@ const _NATIONAL_MW = {nucleaire:63100,hydraulique:25800,eolien:24100,solaire:787
 const R_MIN=2.0, R_MAX=7.0
 const DLON=0.75,DLAT=0.75,G_LON0=-5.0,G_LAT0=41.0,G_NCOL=22,G_NROW=16
 const OW=160,OH=112
-const NPART=80,SPEED=0.12,FADE=0.95,MAX_AGE=250,UVS=8,POOL_SIZE=500
+const NPART=55,SPEED=0.12,FADE=0.89,MAX_AGE=150,UVS=8,POOL_SIZE=500
 // Tight bounds: France métropolitaine sans Corse, bien zoomée
 const LON_MIN=-4.8,LON_MAX=8.4,LAT_MIN=42.8,LAT_MAX=51.1,PAD=22
-const ODRE_TO_F = {nucleaire:'nucleaire',hydraulique:'hydraulique',eolien:'eolien',solaire:'solaire',gaz:'thermique',fioul:'thermique',charbon:'thermique',bioenergies:'autre'}
 const METEO_API = '/api/v1/meteo/grid'
-const ODRE_URL  = 'https://odre.opendatasoft.com/api/explore/v2.1/catalog/datasets/eco2mix-national-tr/records?limit=1&select=date_heure,nucleaire,hydraulique,eolien,solaire,fioul,charbon,gaz,bioenergies&order_by=date_heure+desc&where=nucleaire+is+not+null'
+const PROD_API  = '/api/v1/production/regional'
 const PROD_COLOR = '#2dd4bf'
 
 function hexRgb(h){return[parseInt(h.slice(1,3),16),parseInt(h.slice(3,5),16),parseInt(h.slice(5,7),16)]}
@@ -122,13 +124,15 @@ export default function SourcesCanvasMap({ selectedCode = '' }) {
           raw[row*OW+col]=Math.floor(v/STEP)*STEP
         }
       }
-      const MAX_ALPHA=dark?210:70
+      const MAX_ALPHA=dark?210:80
+      // Light: slate-blue overlay, airy but visible on white paper
+      const [cr,cg,cb]=dark?[0,0,0]:[40,52,80]
       const oc=document.createElement('canvas'); oc.width=OW; oc.height=OH
       const ox=oc.getContext('2d')
       const img=ox.createImageData(OW,OH); const px=img.data
       for(let i=0;i<OW*OH;i++){
         const alpha=Math.round(MAX_ALPHA*raw[i]/100)
-        const o=i*4; px[o]=0;px[o+1]=0;px[o+2]=0;px[o+3]=alpha
+        const o=i*4; px[o]=cr;px[o+1]=cg;px[o+2]=cb;px[o+3]=alpha
       }
       ox.putImageData(img,0,0); _cloudRasterCanvas=oc
     }
@@ -195,12 +199,16 @@ export default function SourcesCanvasMap({ selectedCode = '' }) {
         wctx.fillStyle=`rgba(0,0,0,${FADE})`
         wctx.fillRect(0,0,wCanvas.width,wCanvas.height)
         wctx.globalCompositeOperation='source-over'
-        wctx.strokeStyle=dark?'rgba(90,88,84,0.10)':'rgba(80,78,74,0.18)'
-        wctx.lineWidth=2.0; wctx.lineCap='round'
+        wctx.strokeStyle=dark?'rgba(90,88,84,0.12)':'rgba(40,52,80,0.20)'
+        wctx.lineWidth=1.3; wctx.lineCap='round'
         wctx.save(); wctx.setTransform(dpr,0,0,dpr,0,0)
         wctx.beginPath()
         for(let i=0;i<particles.length;i++){
           const p=particles[i], uv=windAt(p.x,p.y)
+          const spd=Math.sqrt(uv[0]*uv[0]+uv[1]*uv[1])
+          // Calm zone: no visible trail, just respawn
+          if(spd<0.5){const s=randomSpawn();p.x=s[0];p.y=s[1];p.age=0;continue}
+          // UV × SPEED: speed and trail length both proportional to wind magnitude
           const nx=p.x+uv[0]*SPEED, ny=p.y+uv[1]*SPEED
           p.age++
           if(p.age>MAX_AGE||!inFrance(nx,ny)){const s=randomSpawn();p.x=s[0];p.y=s[1];p.age=0;continue}
@@ -261,11 +269,11 @@ export default function SourcesCanvasMap({ selectedCode = '' }) {
       const selCode=selectedCodeRef.current
       const selNom=selCode?(REGIONS[selCode]?.nom||''):''
 
-      // Map fills — light theme is very subtle so background stays airy
-      const mapFillBase  = dark ? 'rgba(255,255,255,.46)' : 'rgba(20,20,22,.07)'
-      const mapFillDim   = dark ? 'rgba(255,255,255,.10)' : 'rgba(20,20,22,.03)'
-      const mapStrokeBase= dark ? 'rgba(255,255,255,.14)' : 'rgba(20,20,22,.18)'
-      const mapStrokeDim = dark ? 'rgba(255,255,255,.05)' : 'rgba(20,20,22,.05)'
+      // Map fills — light theme stays airy, strokes carry the borders
+      const mapFillBase  = dark ? 'rgba(255,255,255,.46)' : 'rgba(100,95,90,.05)'
+      const mapFillDim   = dark ? 'rgba(255,255,255,.10)' : 'rgba(100,95,90,.02)'
+      const mapStrokeBase= dark ? 'rgba(255,255,255,.14)' : 'rgba(20,20,22,.02)'
+      const mapStrokeDim = dark ? 'rgba(255,255,255,.05)' : 'rgba(20,20,22,.01)'
       const labelColBase = dark ? 'rgba(255,255,255,.45)' : 'rgba(20,20,22,.45)'
       const labelColDim  = dark ? 'rgba(255,255,255,.15)' : 'rgba(20,20,22,.15)'
 
@@ -307,24 +315,33 @@ export default function SourcesCanvasMap({ selectedCode = '' }) {
           return
         }
 
-        if(p.f==='solaire'&&scf<0.05){
-          // Off solar: dark theme → dim amber-brown; light theme → neutral gray so it reads as "off" not invisible
-          const vc=dark?'#92400e':'#9c9a96'
+        if(p.f==='solaire'&&scf<0.03){
+          // Off solar: muted amber in both themes
+          const vc=dark?'#92400e':'#d97706'
           ctx.beginPath();ctx.arc(p.x,p.y,coreR,0,Math.PI*2)
-          ctx.fillStyle=rgba(vc,dark?0.12:0.28);ctx.fill()
+          ctx.fillStyle=rgba(vc,dark?0.12:0.10);ctx.fill()
           ctx.beginPath();ctx.arc(p.x,p.y,coreR,0,Math.PI*2)
-          ctx.strokeStyle=rgba(vc,dark?0.25:0.55);ctx.lineWidth=0.8;ctx.stroke()
+          ctx.strokeStyle=rgba(vc,dark?0.25:0.38);ctx.lineWidth=0.8;ctx.stroke()
           return
         }
-        // Active: slightly more opaque fill in light theme so the base circle is visible before the sector
-        ctx.beginPath();ctx.arc(p.x,p.y,coreR,0,Math.PI*2);ctx.fillStyle=rgba(col,dark?0.25:0.38);ctx.fill()
+        if(p.f==='eolien'&&scf<0.02){
+          // Off éolien: même traitement que off solaire
+          const vc=dark?'#064e3b':'#059669'
+          ctx.beginPath();ctx.arc(p.x,p.y,coreR,0,Math.PI*2)
+          ctx.fillStyle=rgba(vc,dark?0.12:0.10);ctx.fill()
+          ctx.beginPath();ctx.arc(p.x,p.y,coreR,0,Math.PI*2)
+          ctx.strokeStyle=rgba(vc,dark?0.25:0.38);ctx.lineWidth=0.8;ctx.stroke()
+          return
+        }
+        // Active: visible base + strong sector so on/off is unmistakable in light theme
+        ctx.beginPath();ctx.arc(p.x,p.y,coreR,0,Math.PI*2);ctx.fillStyle=rgba(col,dark?0.25:0.28);ctx.fill()
         if(scf>0.01){
           ctx.beginPath();ctx.moveTo(p.x,p.y)
           ctx.arc(p.x,p.y,coreR,-Math.PI/2,-Math.PI/2+scf*2*Math.PI)
-          ctx.closePath();ctx.fillStyle=rgba(col,0.90);ctx.fill()
+          ctx.closePath();ctx.fillStyle=rgba(col,dark?0.80:0.82);ctx.fill()
         }
         ctx.beginPath();ctx.arc(p.x,p.y,coreR,0,Math.PI*2)
-        ctx.strokeStyle=rgba(col,0.65);ctx.lineWidth=0.8;ctx.stroke()
+        ctx.strokeStyle=rgba(col,dark?0.50:0.55);ctx.lineWidth=0.8;ctx.stroke()
       })
       if(hoveredHero>=0&&hoveredHero<heroPts.length){
         const p=heroPts[hoveredHero]
@@ -391,17 +408,38 @@ export default function SourcesCanvasMap({ selectedCode = '' }) {
     }
 
     function loadMix(){
-      fetch(ODRE_URL).then(r=>r.json()).then(d=>{
-        const rec=d.results&&d.results[0]; if(!rec) return
-        const actual={nucleaire:0,hydraulique:0,eolien:0,solaire:0,thermique:0,autre:0}
-        Object.keys(ODRE_TO_F).forEach(k=>{const f=ODRE_TO_F[k],v=rec[k]||0;actual[f]=(actual[f]||0)+(v>0?v:0)})
-        FILIERES.forEach(f=>{const inst=_NATIONAL_MW[f]||_installedMW[f]||1;_capFactor[f]=Math.min(1,actual[f]/inst)})
-        const ts=rec.date_heure?new Date(rec.date_heure).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}):''
-        setMixTs('Mix J-1 '+ts)
-        const parts=['nucl. '+Math.round(actual.nucleaire/1000)+'GW','hydro '+Math.round(actual.hydraulique/1000)+'GW','éol. '+Math.round(actual.eolien/1000)+'GW','sol. '+Math.round(actual.solaire/1000)+'GW','therm. '+Math.round(actual.thermique/1000)+'GW']
-        setMixNote(parts.join(' · '))
-        _siteCF=heroPts.map(p=>_capFactor[p.f]||0); draw(); loadWeather()
-      }).catch(()=>setMixNote('Mix indisponible'))
+      const today=new Date().toISOString().slice(0,10)
+      const yesterday=new Date(Date.now()-86400000).toISOString().slice(0,10)
+      fetch(`${PROD_API}?start_date=${yesterday}&end_date=${today}&limit=300`)
+        .then(r=>r.json()).then(resp=>{
+          const arr=resp.data||[]; if(!arr.length){setMixNote('Mix indisponible');return}
+          // latest timestamp across all regions
+          const latest=arr.reduce((mx,r)=>r.timestamp>mx?r.timestamp:mx,'')
+          const latestRows=arr.filter(r=>r.timestamp===latest)
+          const actual={nucleaire:0,hydraulique:0,eolien:0,solaire:0,thermique:0,autre:0}
+          latestRows.forEach(r=>{
+            Object.entries(r.sources||{}).forEach(([src,v])=>{
+              if(v>0){const f=src==='bioenergies'?'autre':src; if(actual[f]!==undefined) actual[f]+=v}
+            })
+          })
+          FILIERES.forEach(f=>{const inst=_NATIONAL_MW[f]||_installedMW[f]||1;_capFactor[f]=Math.min(1,actual[f]/inst)})
+          const ts=latest?new Date(latest).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}):''
+          setMixTs('Màj '+ts)
+          const parts=['nucl. '+Math.round(actual.nucleaire/1000)+'GW','hydro '+Math.round(actual.hydraulique/1000)+'GW','éol. '+Math.round(actual.eolien/1000)+'GW','sol. '+Math.round(actual.solaire/1000)+'GW','therm. '+Math.round(actual.thermique/1000)+'GW']
+          setMixNote(parts.join(' · '))
+          _siteCF=heroPts.map(p=>{
+            const baseCF=_capFactor[p.f]||0
+            if(_cloudGrid&&(p.f==='solaire'||p.f==='eolien')){
+              const gi=_nearestGrid(p.lat,p.lon)
+              if(gi!==null){
+                if(p.f==='solaire') return baseCF*(1-_cloudGrid[gi]/100)
+                if(p.f==='eolien')  return baseCF*Math.min(1,_weatherGrid[gi]?.wind/10||0)
+              }
+            }
+            return baseCF
+          })
+          draw(); loadWeather()
+        }).catch(()=>setMixNote('Mix indisponible'))
     }
 
     // ── Resize ────────────────────────────────────────────────────────────
