@@ -20,7 +20,7 @@ import { MaintenanceMap, normalize as normalizeUnitName } from '../components/Ma
 import { PriceTrendChart } from '../components/PriceTrendChart.jsx'
 import {
   fetchAllProduction, fetchRegions, fetchMeteo, fetchCapacity, fetchCurtailmentCalendar, fetchCurtailmentRisk,
-  fetchMaintenance, fetchProductionUnits, fetchMarketPrice,
+  fetchMaintenance, fetchProductionUnits, fetchMarketPrice, fetchDataRange,
 } from '../services/api.js'
 import { RegionSelector } from '../components/RegionSelector.jsx'
 import { MeteoChart } from '../components/MeteoChart.jsx'
@@ -131,7 +131,11 @@ function computeTotalMw(data) {
 
 function formatTime(date) {
   if (!date) return '—'
-  return date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+  return date.toLocaleString('fr-FR', {
+    day: 'numeric', month: 'short',
+    hour: '2-digit', minute: '2-digit',
+    timeZone: 'UTC',
+  })
 }
 
 /** Return ISO date string (YYYY-MM-DD) for a Date offset by `days` from today. */
@@ -139,6 +143,34 @@ function isoDate(offsetDays = 0) {
   const d = new Date()
   d.setDate(d.getDate() + offsetDays)
   return d.toISOString().slice(0, 10)
+}
+
+/**
+ * Parse a Gold-table horodatage ("2026-09-23 23:00:00+00:00") into a Date.
+ * Safari won't parse the space-separated form, so normalise it to ISO first.
+ */
+function parseHorodatage(ts) {
+  if (!ts) return null
+  const d = new Date(ts.replace(' ', 'T'))
+  return isNaN(d) ? null : d
+}
+
+/**
+ * Shift a horodatage by `days` and render it back in the same
+ * "YYYY-MM-DD HH:MM:SS" shape the API compares against lexicographically.
+ * Anchoring on the data's own last point (rather than `new Date()`) is what
+ * keeps the window from running past where the series actually stop.
+ */
+function shiftHorodatage(ts, days) {
+  const d = parseHorodatage(ts)
+  if (!d) return null
+  d.setUTCDate(d.getUTCDate() + days)
+  return d.toISOString().slice(0, 19).replace('T', ' ')
+}
+
+/** Day part (YYYY-MM-DD) of a horodatage — what <input type="date"> needs. */
+function dayOf(ts) {
+  return ts ? ts.slice(0, 10) : ''
 }
 
 /** Average MW per source across a time series (for capacity-factor). */
@@ -191,7 +223,13 @@ export default function DashboardPage() {
   const [lastUpdated, setLastUpdated] = useState(null)
   const [refreshing, setRefreshing] = useState(false)
 
-  // Date range filter (default: last 24 h)
+  // Newest instant every plotted series has data for, from /v1/data-range.
+  // Null until that first call lands; every date control anchors on it so the
+  // dashboard never claims to show data fresher than what's actually stored.
+  const [dataMax, setDataMax] = useState(null)
+
+  // Date range filter (default: last 24 h of available data, re-anchored on
+  // dataMax as soon as it arrives)
   const [startDate, setStartDate] = useState(isoDate(-1))
   const [endDate, setEndDate] = useState(isoDate(0))
   // Tracks the most recently requested range so a slow, superseded fetch
@@ -255,7 +293,12 @@ export default function DashboardPage() {
       const data = (result.data || []).sort((a, b) => (a.timestamp < b.timestamp ? -1 : 1))
       setProductionData(data)
       if (updateGlobal || !regionCode) setGlobalData(data)
-      setLastUpdated(new Date())
+      // Show the timestamp of the latest data point, not the current clock —
+      // data comes from a DB snapshot so the clock time is meaningless. No
+      // data means no freshness to report: fall back to nothing rather than
+      // to `new Date()`, which would pass off page-load time as data time.
+      const latestTs = data.length ? data[data.length - 1].timestamp : null
+      setLastUpdated(parseHorodatage(latestTs))
     } catch (err) {
       if (start === latestRangeRef.current.start && end === latestRangeRef.current.end) {
         setError(err.message || 'Erreur de chargement des données')
@@ -293,10 +336,22 @@ export default function DashboardPage() {
     let cancelled = false
     ;(async () => {
       setLoading(true)
+      // Anchor the window on the data's own last common point before fetching
+      // anything: feeds land at different times (météo trails production by
+      // hours), so a clock-based range draws an axis past where series stop.
+      const range = await fetchDataRange().then(r => r?.data?.common_max || null).catch(() => null)
+      const end = range || endDate
+      const start = (range && shiftHorodatage(range, -1)) || startDate
+      if (!cancelled && range) {
+        setDataMax(range)
+        setStartDate(start)
+        setEndDate(end)
+        latestRangeRef.current = { start, end }
+      }
       const [regsResult] = await Promise.all([
         fetchRegions().catch(() => []),
-        loadData('', startDate, endDate, true),
-        loadDrillData('', startDate, endDate),
+        loadData('', start, end, true),
+        loadDrillData('', start, end),
       ])
       if (!cancelled) {
         setRegions(regsResult)
@@ -558,17 +613,23 @@ export default function DashboardPage() {
       <div style={{ display:'flex', alignItems:'center', gap:6 }}>
         <span className="selector-label">Période</span>
         <div className="date-bar" data-testid="date-range">
+          {/* startDate/endDate carry a full horodatage so the window can land
+              on an exact data point; type="date" only ever shows the day. */}
           <input id="date-start" type="date" className="selector-input"
-            value={startDate} max={endDate} aria-label="Date de début" data-testid="date-start"
+            value={dayOf(startDate)} max={dayOf(endDate)} aria-label="Date de début" data-testid="date-start"
             onChange={e => { setStartDate(e.target.value); handleDateChange(e.target.value, endDate) }} />
           <span style={{ color: 'var(--color-text-muted)', fontSize: '0.75rem' }} aria-hidden="true">→</span>
           <input id="date-end" type="date" className="selector-input"
-            value={endDate} min={startDate} max={isoDate(0)} aria-label="Date de fin" data-testid="date-end"
+            value={dayOf(endDate)} min={dayOf(startDate)} max={dayOf(dataMax) || isoDate(0)}
+            aria-label="Date de fin" data-testid="date-end"
             onChange={e => { setEndDate(e.target.value); handleDateChange(startDate, e.target.value) }} />
           <div className="date-bar__presets">
             {[{ label: '24h', days: -1 }, { label: '7j', days: -7 }, { label: '30j', days: -30 }, { label: '3m', days: -91 }].map(({ label, days }) => (
               <button key={label} onClick={() => {
-                const s = isoDate(days); const e = isoDate(0)
+                // Presets count back from the last available data point, not
+                // from today — "24h" means the last 24 h that actually exist.
+                const e = dataMax || isoDate(0)
+                const s = (dataMax && shiftHorodatage(dataMax, days)) || isoDate(days)
                 setStartDate(s); setEndDate(e); handleDateChange(s, e)
               }}>{label}</button>
             ))}
@@ -605,7 +666,7 @@ export default function DashboardPage() {
         ['solaire',     'var(--color-solaire)',      'Solaire'],
         ['eolien',      'var(--color-eolien)',       'Éolien'],
         ['thermique',   'var(--color-gaz)',          'Thermique'],
-        ['autre',       '#9a9a9e',                   'Autre'],
+        ['bioenergies', '#84cc16',                   'Bioénergies'],
       ].map(([k, c, l]) => (
         <span key={k} style={{ display:'flex', alignItems:'center', gap:4 }}>
           <span style={{ width:7, height:7, borderRadius:'50%', background:c, flexShrink:0 }}/>
@@ -618,18 +679,18 @@ export default function DashboardPage() {
           <circle cx="7" cy="7" r="5" fill="none" stroke="var(--color-text-muted)" strokeWidth="1.2"/>
           <path d="M7 2 L7 7" stroke="var(--color-text-muted)" strokeWidth="1.2"/>
         </svg>
-        Centrale (taille = capacité, secteur = production en cours)
+        Centrale — taille = capacité installée, secteur = part produite
       </span>
       <span style={{ width:'1px', height:'10px', background:'var(--color-border)', flexShrink:0 }}/>
       <span style={{ display:'flex', alignItems:'center', gap:4 }}>
         <svg width="18" height="8" viewBox="0 0 18 8" aria-hidden="true">
           <path d="M0 4 Q4 1 9 4 Q14 7 18 4" fill="none" stroke="rgba(150,148,144,0.7)" strokeWidth="1.2"/>
         </svg>
-        Vent (particules animées)
+        Vent — vitesse et direction en temps réel
       </span>
       <span style={{ display:'flex', alignItems:'center', gap:4 }}>
-        <span style={{ width:14, height:10, background:'rgba(0,0,0,0.22)', borderRadius:2, flexShrink:0 }}/>
-        Nébulosité
+        <span style={{ width:14, height:10, background:'rgba(60,75,110,0.35)', borderRadius:2, flexShrink:0 }}/>
+        Nébulosité — zones sombres = fort couvert nuageux
       </span>
     </div>
   )
@@ -654,16 +715,16 @@ export default function DashboardPage() {
         {activeTab === 'production' && !error && (
           <>
             <div className="pbi-layout">
-              <div className="pbi-layout__left" style={{ gridTemplateRows: '3fr 2fr' }}>
-                <HistoryChart
-                  data={aggregatedProdData}
-                  region={selectedRegionName || 'France'}
-                  loading={loading || refreshing}
-                />
+              <div className="pbi-layout__left" style={{ gridTemplateRows: '1fr 1fr' }}>
                 <MeteoChart
                   data={aggregatedMeteoData}
                   region={selectedRegionName || 'France'}
                   loading={drillLoading}
+                />
+                <HistoryChart
+                  data={aggregatedProdData}
+                  region={selectedRegionName || 'France'}
+                  loading={loading || refreshing}
                 />
               </div>
               <div className="pbi-layout__right">

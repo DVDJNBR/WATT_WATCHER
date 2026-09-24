@@ -262,8 +262,16 @@ body {
 }
 
 @media (max-width: 1024px) {
-  .pbi-layout { grid-template-columns: 1fr; }
-  .pbi-layout__map-wrap { min-height: 320px; }
+  .pbi-layout {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto;
+  }
+  /* vh-based heights so the charts keep roughly the same proportions as on
+     desktop (each chart ≈ 44 % of viewport height), rather than a fixed px
+     value that shrinks them relative to the screen. height (not min-height)
+     is required: only a definite size lets fr rows distribute space. */
+  .pbi-layout__left { height: 90vh; }
+  .pbi-layout__map-wrap { height: 55vh; }
   .app-main { grid-template-columns: 1fr 44px; }
 }
 
@@ -609,7 +617,7 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 4px 24px;
+  padding: 4px 52px 4px 24px; /* right: 52px keeps Màj out of the 44px tab strip */
   background: var(--color-surface);
   flex-wrap: nowrap;
   flex-shrink: 0;
@@ -691,6 +699,10 @@ body {
 
 @media (max-width: 1024px) {
   .charts-grid { grid-template-columns: 1fr; }
+  /* pbi-layout declared here (after .dashboard-content .pbi-layout) so the
+     cascade order is correct — the higher-specificity general rule is above,
+     and this media query overrides it at the same specificity but later. */
+  .dashboard-content .pbi-layout { flex: 0 0 auto; }
 }
 
 /* ── Buttons ──────────────────────────────────────────────────────────────── */

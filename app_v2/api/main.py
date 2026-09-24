@@ -20,7 +20,7 @@ from api.cache import cache, make_key
 from api.capacity_service import query_capacity
 from api.cross_border_service import query_cross_border
 from api.curtailment_service import query_curtailment_calendar, query_curtailment_risk
-from api.db import get_db_connection
+from api.db import get_db_connection, is_sqlite
 from api.error_handlers import bad_request, not_found, server_error
 from api.export_service import export_to_csv
 from api.maintenance_service import query_maintenance
@@ -48,6 +48,57 @@ app.add_middleware(
 @app.get("/health")
 def health():
     return {"status": "healthy", "version": app.version, "cache_entries": cache.size()}
+
+
+@app.get("/v1/data-range")
+def data_range():
+    """
+    Latest timestamp actually available per fact table, plus the newest point
+    common to every series the dashboard plots.
+
+    Upstream feeds don't land in lockstep — fact_meteo typically trails
+    fact_energy_flow by a few hours. Anchoring the dashboard window on the
+    wall clock therefore draws an axis that runs past where half the series
+    stop. `common_max` is the min of those maxima: the most recent instant
+    where every plotted series has data, so all charts share one cutoff.
+    """
+    request_id = str(uuid.uuid4())
+    conn = None
+    try:
+        conn = get_db_connection()
+        sqlite_ = is_sqlite(conn)
+        tables = {
+            "energy_flow":  "FACT_ENERGY_FLOW" if sqlite_ else "fact_energy_flow",
+            "meteo":        "FACT_METEO" if sqlite_ else "fact_meteo",
+            "national_mix": "FACT_NATIONAL_MIX" if sqlite_ else "fact_national_mix",
+        }
+        dim_time = "DIM_TIME" if sqlite_ else "dim_time"
+
+        cur = conn.cursor()
+        maxima = {}
+        for label, tbl in tables.items():
+            cur.execute(
+                f"SELECT MAX(t.horodatage) FROM {tbl} f "
+                f"JOIN {dim_time} t ON f.id_date = t.id_date"
+            )
+            row = cur.fetchone()
+            maxima[label] = str(row[0]) if row and row[0] else None
+
+        present = [v for v in maxima.values() if v]
+        result = {
+            "data": {
+                "per_table": maxima,
+                # ISO strings sort lexicographically, so min() is the true earliest.
+                "common_max": min(present) if present else None,
+            }
+        }
+        return JSONResponse(result, headers={"X-Request-Id": request_id})
+    except Exception:
+        logger.exception("data-range endpoint error [%s]", request_id)
+        return JSONResponse(server_error(request_id=request_id), status_code=500)
+    finally:
+        if conn:
+            conn.close()
 
 
 @app.get("/v1/production/regional")

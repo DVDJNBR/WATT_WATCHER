@@ -13,7 +13,7 @@ import { useMemo } from 'react'
 function formatTs(ts) {
   const d = new Date(ts)
   if (isNaN(d)) return ts
-  return d.toLocaleString('fr-FR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+  return d.toLocaleString('fr-FR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'UTC' })
 }
 
 const tooltipStyle = {
