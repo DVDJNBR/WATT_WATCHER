@@ -6,6 +6,7 @@ https://open-meteo.com/
 """
 
 import logging
+from datetime import datetime, timezone
 
 import requests
 
@@ -101,8 +102,14 @@ def fetch_meteo_all_regions(past_days: int = 3) -> list[dict]:
     Returns:
         List of dicts: {region_code, region_name, timestamp, temperature_c,
                         wind_speed_10m, cloudcover_pct}
+        Timestamps are UTC, "YYYY-MM-DDTHH:MM", and never run past the
+        current hour.
     """
     records = []
+    # Same "YYYY-MM-DDTHH:MM" shape Open-Meteo returns, so the cutoff below is
+    # a plain string comparison — both are zero-padded UTC, which sorts
+    # chronologically.
+    now_hour = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M")
 
     for code, info in REGION_CENTROIDS.items():
         try:
@@ -112,9 +119,18 @@ def fetch_meteo_all_regions(past_days: int = 3) -> list[dict]:
                     "latitude": info["lat"],
                     "longitude": info["lon"],
                     "hourly": "temperature_2m,wind_speed_10m,cloudcover",
-                    "timezone": "Europe/Paris",
+                    # UTC, like fetch_meteo_grid above: Open-Meteo returns
+                    # naive local times, so asking for Europe/Paris wrote
+                    # Paris-local hours into a column whose every other row is
+                    # UTC — météo landed ~2 h off against production.
+                    "timezone": "UTC",
                     "past_days": past_days,
-                    "forecast_days": 0,
+                    # forecast_days=0 yields only *completed* past days, so the
+                    # current day was never fetched at all and fact_meteo could
+                    # never hold anything newer than yesterday 23:00. 1 reaches
+                    # today; the loop below drops anything past the present
+                    # hour so no actual forecast is stored.
+                    "forecast_days": 1,
                 },
                 timeout=15,
             )
@@ -126,18 +142,28 @@ def fetch_meteo_all_regions(past_days: int = 3) -> list[dict]:
             winds  = hourly.get("wind_speed_10m", [])
             clouds = hourly.get("cloudcover", [])
 
+            kept = 0
             for ts, temp, wind, cloud in zip(times, temps, winds, clouds):
-                if temp is not None:
-                    records.append({
-                        "region_code": code,
-                        "region_name": info["name"],
-                        "timestamp": ts,          # "YYYY-MM-DDTHH:MM"
-                        "temperature_c":  float(temp),
-                        "wind_speed_10m": float(wind)  if wind  is not None else None,
-                        "cloudcover_pct": float(cloud) if cloud is not None else None,
-                    })
+                if temp is None:
+                    continue
+                # forecast_days=1 also returns the rest of today as forecast;
+                # fact_meteo is an observations table, so stop at the present.
+                if ts > now_hour:
+                    continue
+                kept += 1
+                records.append({
+                    "region_code": code,
+                    "region_name": info["name"],
+                    "timestamp": ts,          # "YYYY-MM-DDTHH:MM", UTC
+                    "temperature_c":  float(temp),
+                    "wind_speed_10m": float(wind)  if wind  is not None else None,
+                    "cloudcover_pct": float(cloud) if cloud is not None else None,
+                })
 
-            logger.info("Fetched %d météo records for region %s (%s) (cloudcover included)", len(times), code, info["name"])
+            logger.info(
+                "Fetched %d/%d météo records (past+today, forecast dropped) for region %s (%s)",
+                kept, len(times), code, info["name"],
+            )
 
         except Exception as exc:
             logger.warning("Failed to fetch météo for region %s: %s", code, exc)
