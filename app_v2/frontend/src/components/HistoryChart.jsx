@@ -3,7 +3,7 @@
  * Sources are always visible in the background; total prod + conso
  * are the two bold foreground lines. The gap between them is surplus.
  */
-import { useMemo, useState, useEffect } from 'react'
+import { useDarkTheme } from '../hooks/useDarkTheme.js'
 import {
   ComposedChart, Area, Line,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -26,24 +26,6 @@ const SOURCE_LABELS = {
   thermique:   'Thermique fossile',
 }
 const PROD_COLOR = '#2dd4bf'
-
-function useDarkTheme() {
-  const [dark, setDark] = useState(() => {
-    const t = document.documentElement.getAttribute('data-theme')
-    if (t === 'dark') return true
-    if (t === 'light') return false
-    return window.matchMedia('(prefers-color-scheme:dark)').matches
-  })
-  useEffect(() => {
-    const mo = new MutationObserver(() => {
-      const t = document.documentElement.getAttribute('data-theme')
-      setDark(t === 'dark' || (t !== 'light' && window.matchMedia('(prefers-color-scheme:dark)').matches))
-    })
-    mo.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] })
-    return () => mo.disconnect()
-  }, [])
-  return dark
-}
 
 function formatTs(ts) {
   const d = new Date(ts)

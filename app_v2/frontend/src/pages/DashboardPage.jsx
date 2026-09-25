@@ -18,6 +18,8 @@ import { computeCarbonIntensity } from '../components/CarbonGauge.jsx'
 import { CapacityFactorChart } from '../components/CapacityFactorChart.jsx'
 import { MaintenanceMap, normalize as normalizeUnitName } from '../components/MaintenanceMap.jsx'
 import { PriceTrendChart } from '../components/PriceTrendChart.jsx'
+import { cloudScale, cloudScaleBase } from '../components/SourcesCanvasMap.jsx'
+import { useDarkTheme } from '../hooks/useDarkTheme.js'
 import {
   fetchAllProduction, fetchRegions, fetchMeteo, fetchCapacity, fetchCurtailmentCalendar, fetchCurtailmentRisk,
   fetchMaintenance, fetchProductionUnits, fetchMarketPrice, fetchDataRange,
@@ -210,6 +212,9 @@ function latestCapacityBySource(capacityData) {
 }
 
 export default function DashboardPage() {
+  // Drives the cloud gauge in the shared legend, which mirrors the map's veil
+  // and therefore has to resolve the same theme the canvas does.
+  const isDark = useDarkTheme()
   const [selectedRegion, setSelectedRegion] = useState('')
   const [regions, setRegions] = useState([])
 
@@ -339,7 +344,14 @@ export default function DashboardPage() {
       // Anchor the window on the data's own last common point before fetching
       // anything: feeds land at different times (météo trails production by
       // hours), so a clock-based range draws an axis past where series stop.
-      const range = await fetchDataRange().then(r => r?.data?.common_max || null).catch(() => null)
+      // Wrapped, not just .catch()'d: a throw here (endpoint down, or the
+      // symbol missing entirely) would otherwise take the whole effect with it
+      // and leave the dashboard blank rather than merely mis-ranged. The
+      // clock-based window is a worse default, not a broken one.
+      let range = null
+      try {
+        range = (await fetchDataRange())?.data?.common_max || null
+      } catch { /* fall back to the clock-based window below */ }
       const end = range || endDate
       const start = (range && shiftHorodatage(range, -1)) || startDate
       if (!cancelled && range) {
@@ -679,18 +691,37 @@ export default function DashboardPage() {
           <circle cx="7" cy="7" r="5" fill="none" stroke="var(--color-text-muted)" strokeWidth="1.2"/>
           <path d="M7 2 L7 7" stroke="var(--color-text-muted)" strokeWidth="1.2"/>
         </svg>
-        Centrale — taille = capacité installée, secteur = part produite
+        Centrale — taille = capacité installée, secteur = % de part produite
       </span>
       <span style={{ width:'1px', height:'10px', background:'var(--color-border)', flexShrink:0 }}/>
       <span style={{ display:'flex', alignItems:'center', gap:4 }}>
         <svg width="18" height="8" viewBox="0 0 18 8" aria-hidden="true">
           <path d="M0 4 Q4 1 9 4 Q14 7 18 4" fill="none" stroke="rgba(150,148,144,0.7)" strokeWidth="1.2"/>
         </svg>
-        Vent — vitesse et direction en temps réel
+        Vent — vitesse et direction à la dernière mesure
       </span>
-      <span style={{ display:'flex', alignItems:'center', gap:4 }}>
-        <span style={{ width:14, height:10, background:'rgba(60,75,110,0.35)', borderRadius:2, flexShrink:0 }}/>
-        Nébulosité — zones sombres = fort couvert nuageux
+      {/* Cloud gauge: the map's own ladder, clear sky (transparent) on the
+          left through to full cover on the right. Swatches come from
+          cloudScale() rather than being restated here, so the legend can't
+          drift when the scale is retuned. */}
+      <span style={{ display:'flex', alignItems:'center', gap:6 }}>
+        Nébulosité
+        <span style={{ display:'flex', alignItems:'center', gap:3 }}>
+          <span style={{ fontSize:10, opacity:.75 }}>0 %</span>
+          <span style={{
+            display:'flex', background:cloudScaleBase(isDark), borderRadius:2,
+            overflow:'hidden', outline:'1px solid var(--color-border)', flexShrink:0,
+          }}>
+            {cloudScale(isDark).map(b => (
+              <span
+                key={b.from}
+                title={`${b.from}–${b.to} % de couverture`}
+                style={{ width:11, height:10, background:b.color }}
+              />
+            ))}
+          </span>
+          <span style={{ fontSize:10, opacity:.75 }}>100 %</span>
+        </span>
       </span>
     </div>
   )

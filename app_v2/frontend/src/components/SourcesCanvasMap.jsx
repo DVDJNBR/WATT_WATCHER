@@ -55,6 +55,37 @@ function cloudAlpha(cover){
   const t=band/(CLOUD_BANDS-1)
   return 1-Math.pow(1-t,CLOUD_GAMMA)
 }
+
+/**
+ * The cloud ladder as swatches, clear sky first — for the legend gauge.
+ *
+ * Exported from here on purpose: a legend that restates the scale by hand
+ * drifts the moment CLOUD_STEP or the gamma is tweaked, and this scale has
+ * already been retuned several times. Rendering it from the same function the
+ * map paints with means the two cannot disagree.
+ *
+ * Swatches are the veil itself, so the first one is genuinely transparent and
+ * shows whatever the legend sits on — exactly what a clear sky does on the map.
+ */
+/**
+ * What the map's landmass shows with no cloud on it — the backing a legend
+ * gauge needs behind the veil swatches, so the transparent end reads as the
+ * clear-sky map rather than as the page behind the legend.
+ */
+export function cloudScaleBase(dark){
+  return dark ? DARK_BASE_GREY : 'transparent'
+}
+
+export function cloudScale(dark){
+  return Array.from({length:CLOUD_BANDS},(_,band)=>{
+    const a=1-Math.pow(1-band/(CLOUD_BANDS-1),CLOUD_GAMMA)
+    return {
+      from: Math.round(band*CLOUD_STEP),
+      to:   Math.round((band+1)*CLOUD_STEP),
+      color: dark ? `rgba(0,0,0,${a.toFixed(3)})` : `rgba(40,52,80,${(a*110/255).toFixed(3)})`,
+    }
+  })
+}
 const NPART=55,SPEED=0.12,MAX_AGE=150,UVS=8,POOL_SIZE=500
 // Trail is now an explicit position history redrawn each frame (see startAnim),
 // so its length is a segment count rather than a per-frame decay factor.
@@ -346,7 +377,7 @@ export default function SourcesCanvasMap({ selectedCode = '' }) {
         // more transparent, never recolour them, so head and tail could not
         // differ in tone.
         wctx.clearRect(0,0,W,H)
-        wctx.lineWidth=1.3; wctx.lineCap='round'
+        wctx.lineWidth=1.8; wctx.lineCap='round'
         const buckets=new Map()
         for(let i=0;i<particles.length;i++){
           const p=particles[i], uv=windAt(p.x,p.y)
@@ -506,11 +537,15 @@ export default function SourcesCanvasMap({ selectedCode = '' }) {
         // readable whatever the weather above it.
         if(p.f==='solaire'&&scf<0.03){
           // Off solar: muted amber in both themes
-          const vc=dark?'#b45309':'#d97706'
+          // Light theme used #d97706 here — byte for byte the live solar
+          // colour, so off and running sites were the same hue and only the
+          // sector told them apart. Burnt sienna shifts 18° of hue like the
+          // dark-theme pair does.
+          const vc=dark?'#b45309':'#7c2d12'
           ctx.beginPath();ctx.arc(p.x,p.y,coreR,0,Math.PI*2)
-          ctx.fillStyle=rgba(vc,dark?0.30:0.10);ctx.fill()
+          ctx.fillStyle=rgba(vc,dark?0.30:0.14);ctx.fill()
           ctx.beginPath();ctx.arc(p.x,p.y,coreR,0,Math.PI*2)
-          ctx.strokeStyle=rgba(vc,dark?0.60:0.38);ctx.lineWidth=0.8;ctx.stroke()
+          ctx.strokeStyle=rgba(vc,dark?0.60:0.55);ctx.lineWidth=0.8;ctx.stroke()
           return
         }
         // Same absolute bar as solar above (3 % of nameplate). The old 0.02
@@ -525,11 +560,13 @@ export default function SourcesCanvasMap({ selectedCode = '' }) {
           // emerald's own hue and only darkened, so they read as "same green,
           // dimmer". Fir green moves 18° of hue as well, matching solar's
           // shift, and drops 43 points of lightness on top.
-          const vc=dark?'#15401c':'#15803d'
+          // Light: #15803d sat only ΔE 16 from the live emerald, far too close
+          // to read; fir green doubles that.
+          const vc=dark?'#15401c':'#14532d'
           ctx.beginPath();ctx.arc(p.x,p.y,coreR,0,Math.PI*2)
           ctx.fillStyle=rgba(vc,dark?0.48:0.16);ctx.fill()
           ctx.beginPath();ctx.arc(p.x,p.y,coreR,0,Math.PI*2)
-          ctx.strokeStyle=rgba(vc,dark?0.85:0.50);ctx.lineWidth=0.9;ctx.stroke()
+          ctx.strokeStyle=rgba(vc,dark?0.85:0.58);ctx.lineWidth=0.9;ctx.stroke()
           return
         }
         // Active: visible base + strong sector so on/off is unmistakable in light theme
