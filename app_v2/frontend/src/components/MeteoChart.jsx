@@ -10,6 +10,10 @@ import {
 } from 'recharts'
 import { useMemo } from 'react'
 
+// Yellow, not the slate grey it used to be: it reads as sunlight being taken
+// away, and stays distinct from the orange temperature line above it.
+const CLOUD_COLOR = '#facc15'
+
 function formatTs(ts) {
   const d = new Date(ts)
   if (isNaN(d)) return ts
@@ -80,6 +84,15 @@ export function MeteoChart({ data = [], region, loading = false }) {
             with HistoryChart's margin.right + YAxis width below so the two
             charts' plot areas (and day gridlines) still line up. */}
         <ComposedChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+          <defs>
+            {/* Nébulosité reads as a 0–100 % scale rather than a flat wash:
+                the gradient runs down the right axis, so full cover is solid
+                yellow at the top and 0 % fades out to fully transparent. */}
+            <linearGradient id="meteo-cloud" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%"   stopColor={CLOUD_COLOR} stopOpacity={0.55} />
+              <stop offset="100%" stopColor={CLOUD_COLOR} stopOpacity={0} />
+            </linearGradient>
+          </defs>
           <CartesianGrid strokeDasharray="3 3" stroke="#888" strokeOpacity={0.15} />
           <XAxis
             dataKey="timestamp"
@@ -110,10 +123,10 @@ export function MeteoChart({ data = [], region, loading = false }) {
               yAxisId="right"
               type="monotone"
               dataKey="cloudcover_pct"
-              fill="#94a3b8"
-              fillOpacity={0.15}
-              stroke="#94a3b8"
+              fill="url(#meteo-cloud)"
+              stroke={CLOUD_COLOR}
               strokeWidth={1}
+              strokeOpacity={0.7}
               dot={false}
               name="Nébulosité (%)"
             />

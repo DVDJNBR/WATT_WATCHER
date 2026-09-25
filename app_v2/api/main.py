@@ -77,12 +77,23 @@ def data_range():
         cur = conn.cursor()
         maxima = {}
         for label, tbl in tables.items():
+            # Newest *complete* slice, not merely MAX(horodatage). A slice is
+            # written region by region (or source by source), so the freshest
+            # timestamp routinely holds a fraction of them — ending the window
+            # there makes every chart dip on its last point and, on the map,
+            # summed the national mix over a single region. Compare row counts
+            # over recent slices and keep the newest that reaches the fullest.
             cur.execute(
-                f"SELECT MAX(t.horodatage) FROM {tbl} f "
-                f"JOIN {dim_time} t ON f.id_date = t.id_date"
+                f"SELECT t.horodatage, COUNT(*) AS n "
+                f"FROM {tbl} f JOIN {dim_time} t ON f.id_date = t.id_date "
+                f"GROUP BY t.horodatage ORDER BY t.horodatage DESC LIMIT 200"
             )
-            row = cur.fetchone()
-            maxima[label] = str(row[0]) if row and row[0] else None
+            slices = [(str(h), n) for h, n in cur.fetchall() if h]
+            if not slices:
+                maxima[label] = None
+                continue
+            full = max(n for _, n in slices)
+            maxima[label] = max(h for h, n in slices if n == full)
 
         present = [v for v in maxima.values() if v]
         result = {

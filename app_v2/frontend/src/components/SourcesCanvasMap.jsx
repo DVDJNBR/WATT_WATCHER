@@ -1,7 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 
-// Canvas uses a one-shot useEffect — tell Vite to full-reload on HMR instead
-if (import.meta.hot) import.meta.hot.decline()
+// The entire canvas is built inside a one-shot useEffect, so React Fast
+// Refresh re-renders the component without ever re-running it: edits to the
+// drawing code applied to nothing and the old canvas kept running until a
+// manual hard reload. decline() doesn't help — the React plugin registers its
+// own Fast Refresh boundary and wins — so force a real reload.
+if (import.meta.hot) import.meta.hot.accept(() => window.location.reload())
 
 // ── Constants ──────────────────────────────────────────────────────────────
 const SRC_COLORS_DARK  = {nucleaire:'#a78bfa',hydraulique:'#60a5fa',solaire:'#f59e0b',eolien:'#10b981',thermique:'#f87171',autre:'#9a9a9e'}
@@ -11,7 +15,40 @@ const F_LABEL  = {nucleaire:'Nucléaire',hydraulique:'Hydraulique',solaire:'Sola
 const _NATIONAL_MW = {nucleaire:63100,hydraulique:25800,eolien:24100,solaire:78700,thermique:20000,autre:5000}
 const R_MIN=2.0, R_MAX=7.0
 const DLON=0.75,DLAT=0.75,G_LON0=-5.0,G_LAT0=41.0,G_NCOL=22,G_NROW=16
-const OW=160,OH=112
+// Cloud raster resolution. The field is quantised into 10-point bands, but at
+// 160×112 each cell covered ~5 screen px, so the bilinear upscale melted the
+// bands back into one continuous gradient — the strata stopped reading as
+// steps. Rasterising near screen resolution keeps each band's edge sharp while
+// smoothing stays on (turning it off just brings back visible pixel blocks).
+const OW=400,OH=280
+
+// ── Dark-theme cloud ladder ────────────────────────────────────────────────
+// The landmass is an opaque DARK_BASE_L % grey and cloud is a black veil laid
+// over it, in 10-point bands: a clear sky paints nothing at all (alpha 0, the
+// map shows through untouched) and full cover is solid black (alpha 1), with
+// the bands in between ramping linearly.
+//
+// Anchoring the two ends on transparency rather than on absolute luminosities
+// is what makes DARK_BASE_L meaningful: the map's own brightness is what a
+// clear sky reveals, so raising it lifts the whole map without touching the
+// "100 % cover reads black" end of the scale.
+// Separation between two neighbouring strata is DARK_BASE_L / (CLOUD_BANDS-1):
+// the clear-sky and full-cover ends are pinned, so the base luminosity is the
+// only room the in-between rungs have to spread out. Adding bands without
+// raising it just packs them tighter — 45 % over 8 bands buys the same 16-point
+// spacing that 5 bands had at 25 %, on a noticeably lighter map.
+const DARK_BASE_L    = 45
+const DARK_BASE_GREY = `rgb(${Math.round(255*DARK_BASE_L/100)},${Math.round(255*DARK_BASE_L/100)},${Math.round(255*DARK_BASE_L/100)})`
+// Band width, in cover-%. Fewer, wider bands put more opacity between one
+// stratum and the next, so the steps read at a glance; at 10 % the rungs were
+// only ~11 % of alpha apart and blurred into one another.
+const CLOUD_STEP     = 12.5
+const CLOUD_BANDS    = Math.round(100/CLOUD_STEP)  // 8: 0–12.5 %, 12.5–25 % … 87.5–100 %
+/** Black-veil alpha (0–1) for a cloud-cover percentage, per the ladder above. */
+function cloudAlpha(cover){
+  const band=Math.max(0,Math.min(CLOUD_BANDS-1,Math.floor(cover/CLOUD_STEP)))
+  return band/(CLOUD_BANDS-1)
+}
 const NPART=55,SPEED=0.12,FADE=0.89,MAX_AGE=150,UVS=8,POOL_SIZE=500
 // Tight bounds: France métropolitaine sans Corse, bien zoomée
 const LON_MIN=-4.8,LON_MAX=8.4,LAT_MIN=42.8,LAT_MAX=51.1,PAD=22
@@ -111,28 +148,54 @@ export default function SourcesCanvasMap({ selectedCode = '' }) {
     }
 
     // ── cloud raster ─────────────────────────────────────────────────────
+    // Isobands, the way a forecast chart draws them: quantise AFTER the
+    // interpolation, never before. Banding the coarse field first makes every
+    // boundary follow a cell edge — the blocky "Minecraft" look — because the
+    // steps are baked in before anything smooths them. Interpolating the
+    // continuous field up to screen resolution first and only then cutting it
+    // into bands puts each boundary on a true iso-line of the field, so it
+    // comes out as a clean curve.
     function buildRaster(){
-      if(!_cloudGrid) return
+      if(!_cloudGrid||W<=0||H<=0) return
       const dark=isDark(); _rasterDark=dark
-      const raw=new Float32Array(OW*OH)
-      const STEP=10
+
+      // 1. Continuous field (no banding yet) at working resolution.
+      const fc=document.createElement('canvas'); fc.width=OW; fc.height=OH
+      const fx=fc.getContext('2d')
+      const fimg=fx.createImageData(OW,OH); const fpx=fimg.data
       for(let row=0;row<OH;row++){
         for(let col=0;col<OW;col++){
           const ll=unproj(col/OW*W,row/OH*H,W,H)
           const gx=(ll[0]-G_LON0)/DLON, gy=(ll[1]-G_LAT0)/DLAT
           const v=Math.max(0,Math.min(100,bicubic(_cloudGrid,gx,gy)))
-          raw[row*OW+col]=Math.floor(v/STEP)*STEP
+          const o=(row*OW+col)*4, b=Math.round(v*2.55)
+          fpx[o]=b;fpx[o+1]=b;fpx[o+2]=b;fpx[o+3]=255
         }
       }
-      const MAX_ALPHA=dark?210:80
-      // Light: slate-blue overlay, airy but visible on white paper
-      const [cr,cg,cb]=dark?[0,0,0]:[40,52,80]
-      const oc=document.createElement('canvas'); oc.width=OW; oc.height=OH
+      fx.putImageData(fimg,0,0)
+
+      // 2. Smooth upscale to device resolution — this interpolation is what
+      //    the band edges will later be carved out of.
+      const RW=Math.max(1,Math.round(W*dpr)), RH=Math.max(1,Math.round(H*dpr))
+      const oc=document.createElement('canvas'); oc.width=RW; oc.height=RH
       const ox=oc.getContext('2d')
-      const img=ox.createImageData(OW,OH); const px=img.data
-      for(let i=0;i<OW*OH;i++){
-        const alpha=Math.round(MAX_ALPHA*raw[i]/100)
-        const o=i*4; px[o]=cr;px[o+1]=cg;px[o+2]=cb;px[o+3]=alpha
+      ox.imageSmoothingEnabled=true; ox.imageSmoothingQuality='high'
+      ox.drawImage(fc,0,0,RW,RH)
+
+      // 3. Band each output pixel. Edges land on iso-lines, one device pixel
+      //    wide, so they read as crisp curves rather than staircases.
+      const img=ox.getImageData(0,0,RW,RH); const px=img.data
+      const MAX_ALPHA=80  // light: slate-blue wash, airy on white paper
+      const [cr,cg,cb]=dark?[0,0,0]:[40,52,80]
+      for(let i=0;i<RW*RH;i++){
+        const o=i*4
+        const cover=px[o]/2.55
+        // Dark follows the banded veil (transparent at clear sky, black at
+        // full cover); light keeps the simple linear wash.
+        const alpha=dark
+          ? Math.round(255*cloudAlpha(cover))
+          : Math.round(MAX_ALPHA*(Math.floor(cover/CLOUD_STEP)*CLOUD_STEP)/100)
+        px[o]=cr;px[o+1]=cg;px[o+2]=cb;px[o+3]=alpha
       }
       ox.putImageData(img,0,0); _cloudRasterCanvas=oc
     }
@@ -258,7 +321,10 @@ export default function SourcesCanvasMap({ selectedCode = '' }) {
       if(_rasterDark!==isDark()) buildRaster()
       if(!_cloudRasterCanvas) return
       ctx.save(); ctx.clip(francePath)
-      ctx.imageSmoothingEnabled=true; ctx.imageSmoothingQuality='high'
+      // The raster is already at device resolution, so this lands 1:1 and no
+      // resampling occurs either way; smoothing stays off so a rounding
+      // mismatch can never soften the band edges.
+      ctx.imageSmoothingEnabled=false
       ctx.drawImage(_cloudRasterCanvas,0,0,W,H)
       ctx.restore()
     }
@@ -269,9 +335,13 @@ export default function SourcesCanvasMap({ selectedCode = '' }) {
       const selCode=selectedCodeRef.current
       const selNom=selCode?(REGIONS[selCode]?.nom||''):''
 
-      // Map fills — light theme stays airy, strokes carry the borders
-      const mapFillBase  = dark ? 'rgba(255,255,255,.46)' : 'rgba(100,95,90,.05)'
-      const mapFillDim   = dark ? 'rgba(255,255,255,.10)' : 'rgba(100,95,90,.02)'
+      // Map fills — light theme stays airy, strokes carry the borders.
+      // Dark: an opaque DARK_BASE_L grey rather than a translucent white, so
+      // the landmass has one known luminosity for the cloud ladder in
+      // buildRaster to darken from. Translucent white composited over the
+      // page background gave a value that drifted with whatever sat behind.
+      const mapFillBase  = dark ? DARK_BASE_GREY : 'rgba(100,95,90,.05)'
+      const mapFillDim   = dark ? 'rgb(28,28,28)' : 'rgba(100,95,90,.02)'
       const mapStrokeBase= dark ? 'rgba(255,255,255,.14)' : 'rgba(20,20,22,.02)'
       const mapStrokeDim = dark ? 'rgba(255,255,255,.05)' : 'rgba(20,20,22,.01)'
       const labelColBase = dark ? 'rgba(255,255,255,.45)' : 'rgba(20,20,22,.45)'
@@ -315,22 +385,35 @@ export default function SourcesCanvasMap({ selectedCode = '' }) {
           return
         }
 
+        // Off states sit on top of the cloud layer, which now reaches pure
+        // black at full cover — the old dark alphas (.12 fill / .25 stroke)
+        // were set against a mid-grey map and vanished entirely over an
+        // overcast cell. Brighter hue + firmer alpha keeps a stopped site
+        // readable whatever the weather above it.
         if(p.f==='solaire'&&scf<0.03){
           // Off solar: muted amber in both themes
-          const vc=dark?'#92400e':'#d97706'
+          const vc=dark?'#b45309':'#d97706'
           ctx.beginPath();ctx.arc(p.x,p.y,coreR,0,Math.PI*2)
-          ctx.fillStyle=rgba(vc,dark?0.12:0.10);ctx.fill()
+          ctx.fillStyle=rgba(vc,dark?0.30:0.10);ctx.fill()
           ctx.beginPath();ctx.arc(p.x,p.y,coreR,0,Math.PI*2)
-          ctx.strokeStyle=rgba(vc,dark?0.25:0.38);ctx.lineWidth=0.8;ctx.stroke()
+          ctx.strokeStyle=rgba(vc,dark?0.60:0.38);ctx.lineWidth=0.8;ctx.stroke()
           return
         }
-        if(p.f==='eolien'&&scf<0.02){
-          // Off éolien: même traitement que off solaire
-          const vc=dark?'#064e3b':'#059669'
+        // Same absolute bar as solar above (3 % of nameplate). The old 0.02
+        // was the real reason off éolien went unnoticed: wind's scf ceiling is
+        // ~5x lower than solar's, so that bar caught only 25 % of wind sites
+        // against 57 % of solar ones — a colour difference with almost nothing
+        // to colour. At 0.03 it marks 45 %, which is honest: with wind at 4 %
+        // of national capacity, most farms really are idle.
+        if(p.f==='eolien'&&scf<0.03){
+          // Off éolien: mirrors off solaire. #0f766e read as a teal barely
+          // separable from the live emerald; a deep desaturated green puts the
+          // same distance between off and live that amber→brown gives solar.
+          const vc=dark?'#14532d':'#047857'
           ctx.beginPath();ctx.arc(p.x,p.y,coreR,0,Math.PI*2)
-          ctx.fillStyle=rgba(vc,dark?0.12:0.10);ctx.fill()
+          ctx.fillStyle=rgba(vc,dark?0.42:0.14);ctx.fill()
           ctx.beginPath();ctx.arc(p.x,p.y,coreR,0,Math.PI*2)
-          ctx.strokeStyle=rgba(vc,dark?0.25:0.38);ctx.lineWidth=0.8;ctx.stroke()
+          ctx.strokeStyle=rgba(vc,dark?0.75:0.45);ctx.lineWidth=0.9;ctx.stroke()
           return
         }
         // Active: visible base + strong sector so on/off is unmistakable in light theme
@@ -413,8 +496,16 @@ export default function SourcesCanvasMap({ selectedCode = '' }) {
       fetch(`${PROD_API}?start_date=${yesterday}&end_date=${today}&limit=300`)
         .then(r=>r.json()).then(resp=>{
           const arr=resp.data||[]; if(!arr.length){setMixNote('Mix indisponible');return}
-          // latest timestamp across all regions
-          const latest=arr.reduce((mx,r)=>r.timestamp>mx?r.timestamp:mx,'')
+          // Newest *complete* timestamp, not simply the newest. Regions don't
+          // land in one write, so the freshest slice routinely holds a single
+          // region — summing that as the national mix reported éol./sol. at
+          // 0 GW and left the map with no wind or solar sites lit up.
+          const byTs=new Map()
+          for(const r of arr) byTs.set(r.timestamp,(byTs.get(r.timestamp)||0)+1)
+          const full=Math.max(...byTs.values())
+          const latest=[...byTs.entries()]
+            .filter(([,n])=>n===full)
+            .reduce((mx,[ts])=>ts>mx?ts:mx,'')
           const latestRows=arr.filter(r=>r.timestamp===latest)
           const actual={nucleaire:0,hydraulique:0,eolien:0,solaire:0,thermique:0,autre:0}
           latestRows.forEach(r=>{
@@ -423,7 +514,9 @@ export default function SourcesCanvasMap({ selectedCode = '' }) {
             })
           })
           FILIERES.forEach(f=>{const inst=_NATIONAL_MW[f]||_installedMW[f]||1;_capFactor[f]=Math.min(1,actual[f]/inst)})
-          const ts=latest?new Date(latest).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}):''
+          // UTC: horodatage is stored UTC, so rendering in local time would
+          // shift the map's "Màj" 2 h ahead of the data it describes.
+          const ts=latest?new Date(latest.replace(' ','T')).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit',timeZone:'UTC'}):''
           setMixTs('Màj '+ts)
           const parts=['nucl. '+Math.round(actual.nucleaire/1000)+'GW','hydro '+Math.round(actual.hydraulique/1000)+'GW','éol. '+Math.round(actual.eolien/1000)+'GW','sol. '+Math.round(actual.solaire/1000)+'GW','therm. '+Math.round(actual.thermique/1000)+'GW']
           setMixNote(parts.join(' · '))
