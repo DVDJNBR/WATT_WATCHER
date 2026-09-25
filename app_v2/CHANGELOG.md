@@ -1,3 +1,13 @@
+## [1.43.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.42.3...v1.43.0) (2026-09-23)
+
+### Features
+
+* **pipeline:** update meteo_grid every 15 min via meteo_stage ([358ad48](https://github.com/DVDJNBR/WATT_WATCHER/commit/358ad48678c3344a2030629e5c39c78ae027c179))
+
+### Reverts
+
+* restore run_on_startup=False on pipeline_15min timer ([8aa5859](https://github.com/DVDJNBR/WATT_WATCHER/commit/8aa5859c1ab5e8e3cd079b94d43ac9a72518cc69))
+
 ## [1.42.3](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.42.2...v1.42.3) (2026-09-23)
 
 ### Bug Fixes
