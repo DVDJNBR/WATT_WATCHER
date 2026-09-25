@@ -1,3 +1,16 @@
+## [1.44.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.43.0...v1.44.0) (2026-09-25)
+
+### Features
+
+* **dashboard:** anchor date window on data freshness, not the clock ([7f23680](https://github.com/DVDJNBR/WATT_WATCHER/commit/7f23680b7fc481cf37754f41ea24b0c46ced97ba))
+* **map:** draw cloud cover as isobands, fix national mix on partial slices ([22aa9eb](https://github.com/DVDJNBR/WATT_WATCHER/commit/22aa9ebcec2611e68f3e7baa99bd92ad89529354))
+* **map:** tint wind off the cloud layer, stack plants above the trails ([9fc0f20](https://github.com/DVDJNBR/WATT_WATCHER/commit/9fc0f20a1640b8c30a944dcfd9d74a229303e823))
+
+### Bug Fixes
+
+* **dashboard:** survive a failing data-range; cloud gauge in the legend ([e1f5a69](https://github.com/DVDJNBR/WATT_WATCHER/commit/e1f5a6954b7ce8c6403786396c09cb86abf580d7)), closes [#d97706](https://github.com/DVDJNBR/WATT_WATCHER/issues/d97706)
+* **meteo:** fetch the current day, in UTC, in fetch_meteo_all_regions ([fc0598b](https://github.com/DVDJNBR/WATT_WATCHER/commit/fc0598b8273402c9b4fe2bb6e111ba047d19297e))
+
 ## [1.43.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.42.3...v1.43.0) (2026-09-23)
 
 ### Features
