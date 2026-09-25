@@ -271,7 +271,11 @@ body {
      value that shrinks them relative to the screen. height (not min-height)
      is required: only a definite size lets fr rows distribute space. */
   .pbi-layout__left { height: 90vh; }
-  .pbi-layout__map-wrap { height: 55vh; }
+  /* The map is the densest thing on the page — plants, wind, cloud bands — so
+     stacked it gets more room than the charts it sits under, not less. Sized
+     against the viewport's shorter side as well as its height so a wide, short
+     window can't squash it into a letterbox. */
+  .pbi-layout__map-wrap { height: max(70vh, 70vmin); }
   .app-main { grid-template-columns: 1fr 44px; }
 }
 

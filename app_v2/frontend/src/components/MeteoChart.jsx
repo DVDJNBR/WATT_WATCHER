@@ -10,9 +10,10 @@ import {
 } from 'recharts'
 import { useMemo } from 'react'
 
-// Yellow, not the slate grey it used to be: it reads as sunlight being taken
-// away, and stays distinct from the orange temperature line above it.
-const CLOUD_COLOR = '#facc15'
+// Slate grey, matching the map's cloud veil. Yellow read as sunshine next to
+// a layer that darkens with cover, so the same quantity was saying opposite
+// things in two places on the same screen.
+const CLOUD_COLOR = '#94a3b8'
 
 function formatTs(ts) {
   const d = new Date(ts)

@@ -22,6 +22,10 @@ vi.mock('../services/api.js', () => ({
   fetchCurtailmentRisk:   vi.fn().mockResolvedValue({ data: [] }),
   fetchMarketPrice:       vi.fn().mockResolvedValue({ data: [] }),
   fetchProductionUnits:   vi.fn().mockResolvedValue({ data: [] }),
+  // The dashboard anchors its date window on this before loading anything;
+  // omitting it used to throw inside the mount effect and silently prevent
+  // every other fetch from firing.
+  fetchDataRange:         vi.fn().mockResolvedValue({ data: { per_table: {}, common_max: null } }),
 }))
 
 // FranceMap uses react-simple-maps which fetches a GeoJSON URL —
