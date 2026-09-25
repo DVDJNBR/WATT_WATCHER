@@ -44,12 +44,39 @@ const DARK_BASE_GREY = `rgb(${Math.round(255*DARK_BASE_L/100)},${Math.round(255*
 // only ~11 % of alpha apart and blurred into one another.
 const CLOUD_STEP     = 12.5
 const CLOUD_BANDS    = Math.round(100/CLOUD_STEP)  // 8: 0–12.5 %, 12.5–25 % … 87.5–100 %
+// Rung spacing isn't uniform: luminosity falls as (1−t)^CLOUD_GAMMA, which with
+// gamma < 1 keeps the bright rungs close together and opens a wide drop into
+// the final black band — overcast reads as a distinct mass rather than as one
+// more step. At 1 the ladder is evenly spaced again.
+const CLOUD_GAMMA    = 0.6
 /** Black-veil alpha (0–1) for a cloud-cover percentage, per the ladder above. */
 function cloudAlpha(cover){
   const band=Math.max(0,Math.min(CLOUD_BANDS-1,Math.floor(cover/CLOUD_STEP)))
-  return band/(CLOUD_BANDS-1)
+  const t=band/(CLOUD_BANDS-1)
+  return 1-Math.pow(1-t,CLOUD_GAMMA)
 }
-const NPART=55,SPEED=0.12,FADE=0.89,MAX_AGE=150,UVS=8,POOL_SIZE=500
+const NPART=55,SPEED=0.12,MAX_AGE=150,UVS=8,POOL_SIZE=500
+// Trail is now an explicit position history redrawn each frame (see startAnim),
+// so its length is a segment count rather than a per-frame decay factor.
+const TRAIL_LEN=14
+// Wind sits WIND_TONES rungs of the cloud ladder away from whatever the map
+// shows beneath it — lighter in dark theme, darker in light. TRAIL_SPREAD is
+// how far head and tail straddle that offset, so the head always comes out the
+// lighter end and the tail the darker one.
+const WIND_TONES=1, WIND_TRAIL_SPREAD=2
+// Floor on the trail's own luminance. The tint is an offset *added to the
+// local map*, so over the black overcast band the whole trail lands near 0 and
+// all but disappears, while over clear map it rides on 115 and shouts. Same
+// offset either way — what differs is that the eye, adapted to the bright
+// parts of the map, can't resolve a near-black trail on near-black ground.
+// Scaling the floor by t keeps the head-to-tail gradient instead of clamping
+// the trail flat.
+const WIND_MIN_L=48
+// Grey quantisation for batching trail segments into colour buckets.
+const WIND_QUANT=8
+// Light theme reference luminances: the paper, and the slate wash at full
+// opacity, used to work out what the map shows under a particle.
+const LIGHT_PAPER_L=250, LIGHT_WASH_L=52, MAX_WASH_A=110/255
 // Tight bounds: France métropolitaine sans Corse, bien zoomée
 const LON_MIN=-4.8,LON_MAX=8.4,LAT_MIN=42.8,LAT_MAX=51.1,PAD=22
 const METEO_API = '/api/v1/meteo/grid'
@@ -78,6 +105,7 @@ function bicubic(arr,gx,gy){
 export default function SourcesCanvasMap({ selectedCode = '' }) {
   const mapRef          = useRef(null)
   const windRef         = useRef(null)
+  const ptsRef          = useRef(null)
   const rebuildRef      = useRef(null)
   const drawRef         = useRef(null)
   const selectedCodeRef = useRef(selectedCode)
@@ -103,9 +131,11 @@ export default function SourcesCanvasMap({ selectedCode = '' }) {
   useEffect(() => {
     const canvas  = mapRef.current
     const wCanvas = windRef.current
-    if(!canvas || !wCanvas) return
+    const pCanvas = ptsRef.current
+    if(!canvas || !wCanvas || !pCanvas) return
     const ctx  = canvas.getContext('2d')
     const wctx = wCanvas.getContext('2d')
+    const pctx = pCanvas.getContext('2d')
     const dpr  = Math.max(1, window.devicePixelRatio || 1)
 
     // ── mutable state ────────────────────────────────────────────────────
@@ -118,7 +148,7 @@ export default function SourcesCanvasMap({ selectedCode = '' }) {
     let _siteCF=[], _weatherGrid=[]
     let _cloudGrid=null, _ugrid=null, _vgrid=null
     let _cloudRasterCanvas=null, _rasterDark=null
-    let uvU=null, uvV=null, _uvW=0, _uvH=0
+    let uvU=null, uvV=null, uvC=null, _uvW=0, _uvH=0
     let MW2=0, MH2=0, franceMask=null
     let particles=[], spawnPool=[], animRAF=null
     let mixInterval=null, _sprData=null
@@ -185,7 +215,7 @@ export default function SourcesCanvasMap({ selectedCode = '' }) {
       // 3. Band each output pixel. Edges land on iso-lines, one device pixel
       //    wide, so they read as crisp curves rather than staircases.
       const img=ox.getImageData(0,0,RW,RH); const px=img.data
-      const MAX_ALPHA=80  // light: slate-blue wash, airy on white paper
+      const MAX_ALPHA=110  // light: slate-blue wash, deeper than the old 80
       const [cr,cg,cb]=dark?[0,0,0]:[40,52,80]
       for(let i=0;i<RW*RH;i++){
         const o=i*4
@@ -194,7 +224,7 @@ export default function SourcesCanvasMap({ selectedCode = '' }) {
         // full cover); light keeps the simple linear wash.
         const alpha=dark
           ? Math.round(255*cloudAlpha(cover))
-          : Math.round(MAX_ALPHA*(Math.floor(cover/CLOUD_STEP)*CLOUD_STEP)/100)
+          : Math.round(MAX_ALPHA*cloudAlpha(cover))
         px[o]=cr;px[o+1]=cg;px[o+2]=cb;px[o+3]=alpha
       }
       ox.putImageData(img,0,0); _cloudRasterCanvas=oc
@@ -205,12 +235,24 @@ export default function SourcesCanvasMap({ selectedCode = '' }) {
       if(!_ugrid||!_vgrid) return
       _uvW=Math.ceil(W/UVS)+1; _uvH=Math.ceil(H/UVS)+1
       uvU=new Float32Array(_uvW*_uvH); uvV=new Float32Array(_uvW*_uvH)
+      // Cloud cover rides along on the same lattice as the wind field: the
+      // particle tint needs it per-particle per-frame, and sampling this grid
+      // is a couple of lookups where a fresh bicubic would be ~16.
+      uvC=_cloudGrid?new Float32Array(_uvW*_uvH):null
       for(let r=0;r<_uvH;r++) for(let c=0;c<_uvW;c++){
         const ll=unproj(c*UVS,r*UVS,W,H)
         const gx=(ll[0]-G_LON0)/DLON, gy=(ll[1]-G_LAT0)/DLAT
         uvU[r*_uvW+c]=bicubic(_ugrid,gx,gy)
         uvV[r*_uvW+c]=bicubic(_vgrid,gx,gy)
+        if(uvC) uvC[r*_uvW+c]=Math.max(0,Math.min(100,bicubic(_cloudGrid,gx,gy)))
       }
+    }
+    /** Cloud cover (0–100) under a canvas point, bilinear on the UV lattice. */
+    function cloudAt(x,y){
+      if(!uvC) return 0
+      const c=x/UVS,r=y/UVS,ci=Math.floor(c),ri=Math.floor(r),tx=c-ci,ty=r-ri
+      const bi=(ci2,ri2)=>uvC[Math.max(0,Math.min(_uvH-1,ri2))*_uvW+Math.max(0,Math.min(_uvW-1,ci2))]
+      return (1-tx)*((1-ty)*bi(ci,ri)+ty*bi(ci,ri+1))+tx*((1-ty)*bi(ci+1,ri)+ty*bi(ci+1,ri+1))
     }
     function windAt(x,y){
       const c=x/UVS,r=y/UVS,ci=Math.floor(c),ri=Math.floor(r),tx=c-ci,ty=r-ri
@@ -252,33 +294,88 @@ export default function SourcesCanvasMap({ selectedCode = '' }) {
     }
     function initParticles(){
       particles=[]
-      for(let i=0;i<NPART;i++){const s=randomSpawn();particles.push({x:s[0],y:s[1],age:Math.floor(Math.random()*MAX_AGE)})}
+      for(let i=0;i<NPART;i++){
+        const s=randomSpawn()
+        particles.push({x:s[0],y:s[1],age:Math.floor(Math.random()*MAX_AGE),trail:[[s[0],s[1]]]})
+      }
     }
+    function respawn(p){
+      const s=randomSpawn()
+      p.x=s[0]; p.y=s[1]; p.age=0; p.trail=[[s[0],s[1]]]
+    }
+
+    /**
+     * Wind stroke colour at a point, derived from the map *as composited under
+     * the clouds there* and offset by WIND_TONES rungs of the cloud ladder.
+     *
+     * This is what sells the illusion: the particle canvas sits above
+     * everything in the DOM, but a trail crossing an overcast cell is tinted
+     * off that cell's near-black, so it darkens exactly as if the weather were
+     * passing over it. Keeping the offset in ladder rungs rather than fixed
+     * greys means it tracks DARK_BASE_L and CLOUD_BANDS automatically.
+     *
+     * @param t 0 at the tail of the trail, 1 at the head — head always ends up
+     *          the lighter of the two, tail the darker, in both themes.
+     */
+    function windGrey(x,y,t,dark){
+      const cover=cloudAt(x,y)
+      const tone=(255*DARK_BASE_L/100)/(CLOUD_BANDS-1)
+      // Luminance the map actually shows here, clouds included.
+      const localL=dark
+        ? (255*DARK_BASE_L/100)*(1-cloudAlpha(cover))
+        : LIGHT_PAPER_L+(LIGHT_WASH_L-LIGHT_PAPER_L)*(MAX_WASH_A*cloudAlpha(cover))
+      const dir=dark?1:-1
+      let L=localL+dir*tone*(WIND_TONES+(t-0.5)*WIND_TRAIL_SPREAD)
+      // Keep the trail off the floor in dark theme (see WIND_MIN_L); the head
+      // gets the full floor, the tail 40 % of it, so the gradient survives.
+      if(dark) L=Math.max(L,WIND_MIN_L*(0.4+0.6*t))
+      // Snapped to WIND_QUANT so segments collapse into a handful of colour
+      // buckets: per-segment strokeStyle would mean ~700 stroke() calls a
+      // frame, where bucketing keeps it to one per distinct tone.
+      const g=Math.max(0,Math.min(255,Math.round(L)))
+      return Math.round(g/WIND_QUANT)*WIND_QUANT
+    }
+
     function startAnim(){
       if(animRAF) cancelAnimationFrame(animRAF)
       function tick(){
         const dark=isDark()
-        wctx.globalCompositeOperation='destination-in'
-        wctx.fillStyle=`rgba(0,0,0,${FADE})`
-        wctx.fillRect(0,0,wCanvas.width,wCanvas.height)
-        wctx.globalCompositeOperation='source-over'
-        wctx.strokeStyle=dark?'rgba(90,88,84,0.12)':'rgba(40,52,80,0.20)'
-        wctx.lineWidth=1.3; wctx.lineCap='round'
         wctx.save(); wctx.setTransform(dpr,0,0,dpr,0,0)
-        wctx.beginPath()
+        // Trails are redrawn from stored history every frame rather than left
+        // to decay on the canvas: a fading buffer can only make old strokes
+        // more transparent, never recolour them, so head and tail could not
+        // differ in tone.
+        wctx.clearRect(0,0,W,H)
+        wctx.lineWidth=1.3; wctx.lineCap='round'
+        const buckets=new Map()
         for(let i=0;i<particles.length;i++){
           const p=particles[i], uv=windAt(p.x,p.y)
           const spd=Math.sqrt(uv[0]*uv[0]+uv[1]*uv[1])
           // Calm zone: no visible trail, just respawn
-          if(spd<0.5){const s=randomSpawn();p.x=s[0];p.y=s[1];p.age=0;continue}
+          if(spd<0.5){respawn(p);continue}
           // UV × SPEED: speed and trail length both proportional to wind magnitude
           const nx=p.x+uv[0]*SPEED, ny=p.y+uv[1]*SPEED
           p.age++
-          if(p.age>MAX_AGE||!inFrance(nx,ny)){const s=randomSpawn();p.x=s[0];p.y=s[1];p.age=0;continue}
-          wctx.moveTo(p.x,p.y); wctx.lineTo(nx,ny)
+          if(p.age>MAX_AGE||!inFrance(nx,ny)){respawn(p);continue}
           p.x=nx; p.y=ny
+          p.trail.push([nx,ny])
+          if(p.trail.length>TRAIL_LEN) p.trail.shift()
+
+          const n=p.trail.length
+          for(let k=1;k<n;k++){
+            const a=p.trail[k-1], b=p.trail[k]
+            const g=windGrey((a[0]+b[0])/2,(a[1]+b[1])/2,k/(n-1),dark)
+            let path=buckets.get(g)
+            if(!path){path=new Path2D();buckets.set(g,path)}
+            path.moveTo(a[0],a[1]); path.lineTo(b[0],b[1])
+          }
         }
-        wctx.stroke(); wctx.restore()
+        const alpha=dark?0.55:0.5
+        buckets.forEach((path,g)=>{
+          wctx.strokeStyle=`rgba(${g},${g},${g},${alpha})`
+          wctx.stroke(path)
+        })
+        wctx.restore()
         animRAF=requestAnimationFrame(tick)
       }
       tick()
@@ -331,9 +428,7 @@ export default function SourcesCanvasMap({ selectedCode = '' }) {
     function draw(){
       ctx.save(); ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,W,H)
       const dark=isDark()
-      const colors=dark?SRC_COLORS_DARK:SRC_COLORS_LIGHT
       const selCode=selectedCodeRef.current
-      const selNom=selCode?(REGIONS[selCode]?.nom||''):''
 
       // Map fills — light theme stays airy, strokes carry the borders.
       // Dark: an opaque DARK_BASE_L grey rather than a translucent white, so
@@ -367,7 +462,26 @@ export default function SourcesCanvasMap({ selectedCode = '' }) {
         ctx.fillStyle = dimmed ? labelColDim : labelColBase
         const c=regionCentroids[code]; ctx.fillText(REGIONS[code].nom,c[0],c[1])
       })
-      if(!heroPts.length){ctx.restore();return}
+      ctx.restore()
+      drawPoints()
+    }
+
+    /**
+     * Power plants, on their own canvas stacked above the wind layer.
+     *
+     * They used to share the map canvas, which sits *below* the particles, so
+     * trails crossed over every site. Splitting them out is the only way to
+     * get map → clouds → wind → plants in that order, since each layer has to
+     * composite over the one beneath it.
+     */
+    function drawPoints(){
+      pctx.save(); pctx.setTransform(dpr,0,0,dpr,0,0); pctx.clearRect(0,0,W,H)
+      if(!heroPts.length){pctx.restore();return}
+      const dark=isDark()
+      const colors=dark?SRC_COLORS_DARK:SRC_COLORS_LIGHT
+      const selCode=selectedCodeRef.current
+      const selNom=selCode?(REGIONS[selCode]?.nom||''):''
+      const ctx=pctx  // keep the drawing calls below verbatim
 
       // Proportional circle radius — sqrt to avoid huge circles at large sizes
       const rScale=Math.sqrt(Math.min(W,H)/480)
@@ -406,14 +520,16 @@ export default function SourcesCanvasMap({ selectedCode = '' }) {
         // to colour. At 0.03 it marks 45 %, which is honest: with wind at 4 %
         // of national capacity, most farms really are idle.
         if(p.f==='eolien'&&scf<0.03){
-          // Off éolien: mirrors off solaire. #0f766e read as a teal barely
-          // separable from the live emerald; a deep desaturated green puts the
-          // same distance between off and live that amber→brown gives solar.
-          const vc=dark?'#14532d':'#047857'
+          // Off éolien: mirrors off solaire, which shifts amber→brown by ~16°
+          // of hue and 25 points of lightness. Earlier picks stayed in the
+          // emerald's own hue and only darkened, so they read as "same green,
+          // dimmer". Fir green moves 18° of hue as well, matching solar's
+          // shift, and drops 43 points of lightness on top.
+          const vc=dark?'#15401c':'#15803d'
           ctx.beginPath();ctx.arc(p.x,p.y,coreR,0,Math.PI*2)
-          ctx.fillStyle=rgba(vc,dark?0.42:0.14);ctx.fill()
+          ctx.fillStyle=rgba(vc,dark?0.48:0.16);ctx.fill()
           ctx.beginPath();ctx.arc(p.x,p.y,coreR,0,Math.PI*2)
-          ctx.strokeStyle=rgba(vc,dark?0.75:0.45);ctx.lineWidth=0.9;ctx.stroke()
+          ctx.strokeStyle=rgba(vc,dark?0.85:0.50);ctx.lineWidth=0.9;ctx.stroke()
           return
         }
         // Active: visible base + strong sector so on/off is unmistakable in light theme
@@ -541,6 +657,7 @@ export default function SourcesCanvasMap({ selectedCode = '' }) {
       W=rect.width; H=rect.height
       canvas.width=Math.round(W*dpr); canvas.height=Math.round(H*dpr)
       wCanvas.width=Math.round(W*dpr); wCanvas.height=Math.round(H*dpr)
+      pCanvas.width=Math.round(W*dpr); pCanvas.height=Math.round(H*dpr)
       updateDims()
       buildPaths()
       if(_sprData) buildPoints(_sprData)
@@ -630,8 +747,14 @@ export default function SourcesCanvasMap({ selectedCode = '' }) {
           ref={mapRef}
           style={{display:'block',width:'100%',height:'100%',cursor:'default'}}
         />
+        {/* Stacking order is the compositing order: map + clouds, then wind,
+            then plants on top — so trails pass behind every site. */}
         <canvas
           ref={windRef}
+          style={{position:'absolute',top:0,left:0,width:'100%',height:'100%',pointerEvents:'none'}}
+        />
+        <canvas
+          ref={ptsRef}
           style={{position:'absolute',top:0,left:0,width:'100%',height:'100%',pointerEvents:'none'}}
         />
         {loading && (
