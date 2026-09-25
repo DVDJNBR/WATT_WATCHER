@@ -18,7 +18,7 @@ import { computeCarbonIntensity } from '../components/CarbonGauge.jsx'
 import { CapacityFactorChart } from '../components/CapacityFactorChart.jsx'
 import { MaintenanceMap, normalize as normalizeUnitName } from '../components/MaintenanceMap.jsx'
 import { PriceTrendChart } from '../components/PriceTrendChart.jsx'
-import { cloudScale, cloudScaleBase } from '../components/SourcesCanvasMap.jsx'
+import { cloudScale, cloudScaleBase, OFF_COLORS } from '../components/SourcesCanvasMap.jsx'
 import { useDarkTheme } from '../hooks/useDarkTheme.js'
 import {
   fetchAllProduction, fetchRegions, fetchMeteo, fetchCapacity, fetchCurtailmentCalendar, fetchCurtailmentRisk,
@@ -685,6 +685,21 @@ export default function DashboardPage() {
           {l}
         </span>
       ))}
+      {/* Idle sites are deliberately quiet on the map, so the legend has to
+          say what that quietness means — otherwise a muted dot just looks
+          like a colour that didn't render. Swatches come from OFF_COLORS so
+          they stay the exact greys the canvas paints. */}
+      <span style={{ display:'flex', alignItems:'center', gap:4 }}>
+        <span style={{
+          width:7, height:7, borderRadius:'50%', flexShrink:0,
+          background:(isDark ? OFF_COLORS.dark : OFF_COLORS.light).solaire,
+        }}/>
+        <span style={{
+          width:7, height:7, borderRadius:'50%', flexShrink:0,
+          background:(isDark ? OFF_COLORS.dark : OFF_COLORS.light).eolien,
+        }}/>
+        Ne produit pas
+      </span>
       <span style={{ width:'1px', height:'10px', background:'var(--color-border)', flexShrink:0 }}/>
       <span style={{ display:'flex', alignItems:'center', gap:4 }}>
         <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">

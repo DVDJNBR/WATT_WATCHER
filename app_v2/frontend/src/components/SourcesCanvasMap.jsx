@@ -10,6 +10,19 @@ if (import.meta.hot) import.meta.hot.accept(() => window.location.reload())
 // ── Constants ──────────────────────────────────────────────────────────────
 const SRC_COLORS_DARK  = {nucleaire:'#a78bfa',hydraulique:'#60a5fa',solaire:'#f59e0b',eolien:'#10b981',thermique:'#f87171',autre:'#9a9a9e'}
 const SRC_COLORS_LIGHT = {nucleaire:'#7c3aed',hydraulique:'#3b82f6',solaire:'#d97706',eolien:'#059669',thermique:'#dc2626',autre:'#71717a'}
+/**
+ * Idle sites (solar under cloud, wind in a lull).
+ *
+ * Chosen by luminance, not hue: a dot recedes when it sits level with the map
+ * behind it. Measured against the clear-sky map — L*48 dark, L*98 light — the
+ * previous picks were 25 and 68 points *below* it, so they punched dark holes
+ * and drew the eye as much as a lit site would. These sit level with their own
+ * theme's map (L*46 / L*78) at a low chroma: present, clearly not producing.
+ */
+export const OFF_COLORS = {
+  dark:  { solaire:'#7e6954', eolien:'#547464' },
+  light: { solaire:'#d8bca7', eolien:'#a6c9b7' },
+}
 const FILIERES = ['nucleaire','hydraulique','solaire','eolien','thermique','autre']
 const F_LABEL  = {nucleaire:'Nucléaire',hydraulique:'Hydraulique',solaire:'Solaire',eolien:'Éolien',thermique:'Thermique',autre:'Autre'}
 const _NATIONAL_MW = {nucleaire:63100,hydraulique:25800,eolien:24100,solaire:78700,thermique:20000,autre:5000}
@@ -536,16 +549,11 @@ export default function SourcesCanvasMap({ selectedCode = '' }) {
         // overcast cell. Brighter hue + firmer alpha keeps a stopped site
         // readable whatever the weather above it.
         if(p.f==='solaire'&&scf<0.03){
-          // Off solar: muted amber in both themes
-          // Light theme used #d97706 here — byte for byte the live solar
-          // colour, so off and running sites were the same hue and only the
-          // sector told them apart. Burnt sienna shifts 18° of hue like the
-          // dark-theme pair does.
-          const vc=dark?'#b45309':'#7c2d12'
+          const vc=dark?OFF_COLORS.dark.solaire:OFF_COLORS.light.solaire
           ctx.beginPath();ctx.arc(p.x,p.y,coreR,0,Math.PI*2)
-          ctx.fillStyle=rgba(vc,dark?0.30:0.14);ctx.fill()
+          ctx.fillStyle=rgba(vc,dark?0.48:0.40);ctx.fill()
           ctx.beginPath();ctx.arc(p.x,p.y,coreR,0,Math.PI*2)
-          ctx.strokeStyle=rgba(vc,dark?0.60:0.55);ctx.lineWidth=0.8;ctx.stroke()
+          ctx.strokeStyle=rgba(vc,dark?0.85:0.80);ctx.lineWidth=0.9;ctx.stroke()
           return
         }
         // Same absolute bar as solar above (3 % of nameplate). The old 0.02
@@ -555,18 +563,11 @@ export default function SourcesCanvasMap({ selectedCode = '' }) {
         // to colour. At 0.03 it marks 45 %, which is honest: with wind at 4 %
         // of national capacity, most farms really are idle.
         if(p.f==='eolien'&&scf<0.03){
-          // Off éolien: mirrors off solaire, which shifts amber→brown by ~16°
-          // of hue and 25 points of lightness. Earlier picks stayed in the
-          // emerald's own hue and only darkened, so they read as "same green,
-          // dimmer". Fir green moves 18° of hue as well, matching solar's
-          // shift, and drops 43 points of lightness on top.
-          // Light: #15803d sat only ΔE 16 from the live emerald, far too close
-          // to read; fir green doubles that.
-          const vc=dark?'#15401c':'#14532d'
+          const vc=dark?OFF_COLORS.dark.eolien:OFF_COLORS.light.eolien
           ctx.beginPath();ctx.arc(p.x,p.y,coreR,0,Math.PI*2)
-          ctx.fillStyle=rgba(vc,dark?0.48:0.16);ctx.fill()
+          ctx.fillStyle=rgba(vc,dark?0.48:0.40);ctx.fill()
           ctx.beginPath();ctx.arc(p.x,p.y,coreR,0,Math.PI*2)
-          ctx.strokeStyle=rgba(vc,dark?0.85:0.58);ctx.lineWidth=0.9;ctx.stroke()
+          ctx.strokeStyle=rgba(vc,dark?0.85:0.80);ctx.lineWidth=0.9;ctx.stroke()
           return
         }
         // Active: visible base + strong sector so on/off is unmistakable in light theme
