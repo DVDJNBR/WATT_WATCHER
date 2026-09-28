@@ -18,6 +18,18 @@ import {
 const UP_COLOR = '#2dd4bf'
 const DOWN_COLOR = '#ef4444'
 
+// Pixels of clear space either side of the zero line. Without it the up bar
+// and the down bar of a mixed day meet, and the pair reads as one green bar
+// with a red bite taken out of it rather than as two facts about that day.
+const ZERO_GUTTER = 2
+
+/** Bar shape that stops short of the zero line instead of resting on it. */
+function GutterBar({ x, y, width, height, fill, downward }) {
+  if (!(height > 0) || !(width > 0)) return null
+  const h = Math.max(0.6, height - ZERO_GUTTER)
+  return <rect x={x} y={downward ? y + ZERO_GUTTER : y} width={width} height={h} fill={fill} />
+}
+
 /** Day key in UTC — the same frame every other chart on the dashboard plots in. */
 function dayKey(ts) {
   const d = new Date(ts.replace(' ', 'T'))
@@ -108,6 +120,19 @@ export const PriceHistoryBars = memo(function PriceHistoryBars({ data = [], load
     return { rows: rows_, hi: hi_, lo: lo_ }
   }, [data])
 
+  // A dashed line drawn across three months of bars reads as a threshold that
+  // means something all along its length. It doesn't — it marks one day. So
+  // each trait is a stub around its own record instead.
+  const traitFor = useMemo(() => (record, key) => {
+    if (!rows.length || !record) return null
+    const i = rows.findIndex(r => r.day === record.day)
+    if (i < 0) return null
+    const half = Math.max(3, Math.round(rows.length * 0.06))
+    const from = rows[Math.max(0, i - half)].day
+    const to = rows[Math.min(rows.length - 1, i + half)].day
+    return [{ x: from, y: record[key] }, { x: to, y: record[key] }]
+  }, [rows])
+
   const title = 'Prix spot — France'
   const explain = 'Prix spot day-ahead (EUR/MWh), France entière. Une barre par jour : vers le haut le prix le plus élevé atteint, vers le bas le plus bas prix négatif. La ligne est la moyenne du jour.'
 
@@ -181,9 +206,16 @@ export const PriceHistoryBars = memo(function PriceHistoryBars({ data = [], load
             <Tooltip content={<PriceTooltip />} cursor={{ fill: 'var(--color-text)', fillOpacity: 0.06 }} />
 
             {/* stackId keeps both bars on the same x slot; recharts stacks the
-                positive value upward and the negative one downward from 0. */}
-            <Bar dataKey="up"   stackId="amp" fill="url(#price-bar-up)"   isAnimationActive={false} />
-            <Bar dataKey="down" stackId="amp" fill="url(#price-bar-down)" isAnimationActive={false} />
+                positive value upward and the negative one downward from 0.
+                The custom shape opens a gutter so they stay two marks. */}
+            <Bar
+              dataKey="up" stackId="amp" fill="url(#price-bar-up)" isAnimationActive={false}
+              shape={props => <GutterBar {...props} />}
+            />
+            <Bar
+              dataKey="down" stackId="amp" fill="url(#price-bar-down)" isAnimationActive={false}
+              shape={props => <GutterBar {...props} downward />}
+            />
 
             <Line
               type="monotone" dataKey="mean" dot={false} isAnimationActive={false}
@@ -191,14 +223,18 @@ export const PriceHistoryBars = memo(function PriceHistoryBars({ data = [], load
             />
 
             <ReferenceLine y={0} stroke="var(--color-text-muted)" strokeOpacity={0.7} />
-            <ReferenceLine
-              y={hi.max} stroke={UP_COLOR} strokeDasharray="5 4" strokeOpacity={0.8}
-              label={{ value: fmtEur(hi.max), position: 'right', fill: UP_COLOR, fontSize: 11, fontWeight: 600 }}
-            />
-            <ReferenceLine
-              y={lo.min} stroke={DOWN_COLOR} strokeDasharray="5 4" strokeOpacity={0.8}
-              label={{ value: fmtEur(lo.min), position: 'right', fill: DOWN_COLOR, fontSize: 11, fontWeight: 600 }}
-            />
+            {traitFor(hi, 'max') && (
+              <ReferenceLine
+                segment={traitFor(hi, 'max')} stroke={UP_COLOR} strokeWidth={1.5} strokeOpacity={0.9}
+                label={{ value: fmtEur(hi.max), position: 'right', fill: UP_COLOR, fontSize: 11, fontWeight: 600 }}
+              />
+            )}
+            {traitFor(lo, 'min') && (
+              <ReferenceLine
+                segment={traitFor(lo, 'min')} stroke={DOWN_COLOR} strokeWidth={1.5} strokeOpacity={0.9}
+                label={{ value: fmtEur(lo.min), position: 'right', fill: DOWN_COLOR, fontSize: 11, fontWeight: 600 }}
+              />
+            )}
           </ComposedChart>
         </ResponsiveContainer>
       </div>

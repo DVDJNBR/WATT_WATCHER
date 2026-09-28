@@ -258,6 +258,16 @@ export async function fetchMarketPrice({ startDate, endDate, limit = 20000 } = {
 }
 
 /**
+ * Fetch the most recent priced day, slot by slot: day-ahead price alongside
+ * national consumption and wind+solar output, so the Prix tab can plot the
+ * price against the residual load that sets it.
+ * @returns {Promise<{day: string|null, data: Array, total_records: number}>}
+ */
+export async function fetchDayAhead() {
+  return apiGet('/v1/prices/day-ahead')
+}
+
+/**
  * Fetch net cross-border physical flow (France <-> GB/CH/IT/ES) from
  * fact_cross_border_flow. Positive flow_mw = France exporting.
  * @param {Object} params

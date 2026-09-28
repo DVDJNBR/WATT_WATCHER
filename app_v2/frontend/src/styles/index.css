@@ -206,32 +206,33 @@ body {
 }
 
 /* ── Prix tab ─────────────────────────────────────────────────────────────
-   Not a pbi-layout: the price history is one wide hero (three months of
-   daily bars need the horizontal room) with the 24 h profile and the
-   figures beneath it, rather than two equal columns flanking a map. */
+   Not a pbi-layout. Top row: the day-ahead day wide enough for two axes, the
+   24 h dial in a square beside it, four figures in a narrow column. Bottom
+   row: the daily history across the full width, because three months of bars
+   are the only thing here that reads as a calendar. */
 .prix-layout {
   display: grid;
-  grid-template-rows: 1.3fr 1fr;
+  grid-template-rows: 1.15fr 1fr;
   gap: 16px;
   min-height: 0;
 }
 .prix-layout > * { min-width: 0; min-height: 0; }
 
-.prix-layout__hero {
+.prix-layout__top {
   display: grid;
-  min-height: 0;
-}
-
-.prix-layout__bottom {
-  display: grid;
-  grid-template-columns: 1fr 240px;
+  grid-template-columns: minmax(0, 1.7fr) minmax(260px, 1fr) 200px;
   gap: 16px;
   min-height: 0;
 }
-.prix-layout__bottom > * { min-width: 0; min-height: 0; }
+.prix-layout__top > * { min-width: 0; min-height: 0; }
 
-/* Four short figures stacked beside the profile — deliberately narrow so
-   the chart keeps the width. */
+.prix-layout__bottom {
+  display: grid;
+  min-height: 0;
+}
+
+/* Four short figures beside the dial — deliberately narrow so the two charts
+   keep the width. */
 .prix-kpi-stack {
   display: grid;
   grid-template-rows: repeat(4, 1fr);
@@ -243,12 +244,12 @@ body {
   justify-content: center;
 }
 .prix-kpi-stack .kpi-header { margin-bottom: 2px; }
-.prix-kpi-stack .kpi-title { font-size: 0.66rem; letter-spacing: 0.06em; }
-.prix-kpi-stack .kpi-value { font-size: 1.35rem; }
-.prix-kpi-stack .kpi-unit { font-size: 0.72rem; }
-.prix-kpi-stack .kpi-sublabel { font-size: 0.66rem; margin-top: 2px; }
+.prix-kpi-stack .kpi-title { font-size: 0.64rem; letter-spacing: 0.05em; }
+.prix-kpi-stack .kpi-value { font-size: 1.25rem; }
+.prix-kpi-stack .kpi-unit { font-size: 0.7rem; }
+.prix-kpi-stack .kpi-sublabel { font-size: 0.64rem; margin-top: 2px; }
 
-/* Chart title row that carries its own readouts on the right. */
+/* Chart title row that carries its own readout on the right. */
 .price-hero__head {
   display: flex;
   align-items: baseline;
@@ -257,6 +258,14 @@ body {
   flex: 0 0 auto;
 }
 
+.price-profile__note {
+  font-size: 0.7rem;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+/* The two prices the tab exists to show, stated outright rather than left
+   to a hover: highest reached, lowest gone under. */
 .price-hero__extremes {
   display: flex;
   gap: 18px;
@@ -264,8 +273,6 @@ body {
   justify-content: flex-end;
 }
 
-/* The two prices the tab exists to show, stated outright rather than left
-   to a hover: highest reached, lowest gone under. */
 .price-extreme {
   display: flex;
   flex-direction: column;
@@ -281,7 +288,7 @@ body {
 }
 
 .price-extreme__label {
-  font-size: 0.66rem;
+  font-size: 0.64rem;
   text-transform: uppercase;
   letter-spacing: 0.07em;
   color: var(--color-text-muted);
@@ -290,24 +297,99 @@ body {
 .price-extreme--up .price-extreme__value { color: #2dd4bf; }
 .price-extreme--down .price-extreme__value { color: #ef4444; }
 
-.price-profile__note {
+/* Day-ahead: the sentence that keeps "résidu" from being jargon. */
+.price-dayahead__gloss {
+  flex: 0 0 auto;
+  margin-top: 6px;
   font-size: 0.7rem;
+  line-height: 1.45;
   color: var(--color-text-muted);
-  white-space: nowrap;
 }
+.price-dayahead__gloss strong { color: var(--color-text); font-weight: 600; }
+
+/* ── Price clock ─────────────────────────────────────────────────────────
+   The dial keeps its own aspect: the svg is sized off the available height so
+   a wide card leaves margin rather than stretching the circle into an oval. */
+.price-clock__dial {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.price-clock__dial svg {
+  height: 100%;
+  width: 100%;
+  max-width: 100%;
+  overflow: visible;
+}
+
+.price-clock__ring {
+  fill: none;
+  stroke: var(--color-border);
+  stroke-width: 1;
+}
+.price-clock__ring--zero {
+  stroke: var(--color-text-muted);
+  stroke-opacity: 0.45;
+  stroke-dasharray: 3 3;
+}
+
+.price-clock__ringlabel,
+.price-clock__hour {
+  fill: var(--color-text-muted);
+  font-size: 11px;
+  font-family: var(--font-sans);
+}
+
+/* The 50/100 € rings pass behind the petals, so their labels are knocked out
+   against the card rather than left to fight the fill underneath. */
+.price-clock__ringlabel {
+  paint-order: stroke;
+  stroke: var(--color-surface);
+  stroke-width: 3px;
+  stroke-linejoin: round;
+}
+.price-clock__hour { fill: var(--color-text); font-weight: 600; }
+
+.price-clock__petal {
+  fill: var(--color-accent);
+  stroke: var(--color-surface);
+  stroke-width: 1;
+  cursor: pointer;
+  transition: opacity var(--transition);
+}
+.price-clock__petal--on { opacity: 1 !important; }
+
+.price-clock__neg {
+  fill: #ef4444;
+  stroke: none;
+  pointer-events: none;
+}
+
+.price-clock__readout {
+  flex: 0 0 auto;
+  margin-top: 8px;
+  font-size: 0.72rem;
+  line-height: 1.45;
+  color: var(--color-text-muted);
+  min-height: 2.2em;
+}
+.price-clock__readout strong { color: var(--color-text); font-weight: 600; }
 
 @media (max-width: 1024px) {
   .prix-layout { grid-template-rows: auto auto; }
-  .prix-layout__hero { min-height: 280px; }
-  .prix-layout__bottom {
+  .prix-layout__top {
     grid-template-columns: 1fr;
-    grid-auto-rows: minmax(240px, auto);
+    grid-auto-rows: minmax(260px, auto);
   }
+  .prix-layout__bottom { min-height: 280px; }
   .prix-kpi-stack {
     grid-template-rows: none;
     grid-template-columns: repeat(4, 1fr);
     min-height: 92px;
   }
+  .price-clock__dial { min-height: 300px; }
 }
 
 /* ── Controls row (below the map) — période / région / màj, horizontal ── */

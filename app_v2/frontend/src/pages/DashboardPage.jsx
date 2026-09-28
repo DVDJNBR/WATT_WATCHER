@@ -18,12 +18,13 @@ import { CapacityFactorChart } from '../components/CapacityFactorChart.jsx'
 import { MaintenanceMap, normalize as normalizeUnitName } from '../components/MaintenanceMap.jsx'
 import { PriceTrendChart } from '../components/PriceTrendChart.jsx'
 import { PriceHistoryBars } from '../components/PriceHistoryBars.jsx'
-import { PriceHourlyProfile } from '../components/PriceHourlyProfile.jsx'
+import { PriceClock } from '../components/PriceClock.jsx'
+import { PriceDayAheadChart } from '../components/PriceDayAheadChart.jsx'
 import { cloudScale, cloudScaleBase, OFF_COLORS } from '../components/SourcesCanvasMap.jsx'
 import { useDarkTheme } from '../hooks/useDarkTheme.js'
 import {
   fetchAllProduction, fetchRegions, fetchMeteo, fetchCapacity, fetchCurtailmentCalendar, fetchCurtailmentRisk,
-  fetchMaintenance, fetchProductionUnits, fetchMarketPrice, fetchDataRange,
+  fetchMaintenance, fetchProductionUnits, fetchMarketPrice, fetchDayAhead, fetchDataRange,
 } from '../services/api.js'
 import { RegionSelector } from '../components/RegionSelector.jsx'
 import { MeteoChart } from '../components/MeteoChart.jsx'
@@ -275,6 +276,11 @@ export default function DashboardPage() {
   const [priceHistory, setPriceHistory] = useState([])
   const [priceHistoryLoading, setPriceHistoryLoading] = useState(true)
 
+  // Last priced day, with the national consumption and wind+solar of the same
+  // slots — the Prix tab's hero. Served pre-joined by /v1/prices/day-ahead.
+  const [dayAhead, setDayAhead] = useState({ day: null, data: [] })
+  const [dayAheadLoading, setDayAheadLoading] = useState(true)
+
   // Maintenance events — Capacité tab
   const [maintenanceEvents, setMaintenanceEvents] = useState([])
   const [maintenanceLoading, setMaintenanceLoading] = useState(true)
@@ -427,6 +433,16 @@ export default function DashboardPage() {
       .then(result => { if (!cancelled) setPriceHistory(result.data || []) })
       .catch(() => { if (!cancelled) setPriceHistory([]) })
       .finally(() => { if (!cancelled) setPriceHistoryLoading(false) })
+    return () => { cancelled = true }
+  }, [])
+
+  // Day-ahead hero — fetched once, independent of the toolbar range.
+  useEffect(() => {
+    let cancelled = false
+    fetchDayAhead()
+      .then(result => { if (!cancelled) setDayAhead({ day: result.day || null, data: result.data || [] }) })
+      .catch(() => { if (!cancelled) setDayAhead({ day: null, data: [] }) })
+      .finally(() => { if (!cancelled) setDayAheadLoading(false) })
     return () => { cancelled = true }
   }, [])
 
@@ -829,19 +845,16 @@ export default function DashboardPage() {
           </>
         )}
 
-        {/* ── Prix : historique en barres haut/bas | profil horaire + calendrier + chiffres ── */}
+        {/* ── Prix : day-ahead + horloge + chiffres | histogramme pleine largeur ── */}
         {activeTab === 'prixnegatifs' && !error && (
           <div className="prix-layout">
-            {/* Hero across the full width: three months of daily bars need the
-                horizontal room, and it's the one view that answers both
-                "quand ça monte" and "quand ça passe sous zéro". */}
-            <div className="prix-layout__hero">
-              <PriceHistoryBars data={priceHistory} loading={priceHistoryLoading} />
-            </div>
-
-            <div className="prix-layout__bottom">
-              <PriceHourlyProfile data={priceHistory} loading={priceHistoryLoading} />
-
+            <div className="prix-layout__top">
+              <PriceDayAheadChart
+                day={dayAhead.day}
+                data={dayAhead.data}
+                loading={dayAheadLoading}
+              />
+              <PriceClock data={priceHistory} loading={priceHistoryLoading} />
               <div className="prix-kpi-stack">
                 <KPICard
                   title="Prix moyen"
@@ -872,6 +885,12 @@ export default function DashboardPage() {
                   loading={priceHistoryLoading}
                 />
               </div>
+            </div>
+
+            {/* Three months of daily bars need the full width — they are the
+                only thing on the tab that reads as a calendar. */}
+            <div className="prix-layout__bottom">
+              <PriceHistoryBars data={priceHistory} loading={priceHistoryLoading} />
             </div>
           </div>
         )}

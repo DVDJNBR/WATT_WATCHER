@@ -21,6 +21,7 @@ vi.mock('../services/api.js', () => ({
   fetchCurtailmentCalendar: vi.fn().mockResolvedValue({ days: [], range: null, stats: null }),
   fetchCurtailmentRisk:   vi.fn().mockResolvedValue({ data: [] }),
   fetchMarketPrice:       vi.fn().mockResolvedValue({ data: [] }),
+  fetchDayAhead:          vi.fn().mockResolvedValue({ day: null, data: [] }),
   fetchProductionUnits:   vi.fn().mockResolvedValue({ data: [] }),
   // The dashboard anchors its date window on this before loading anything;
   // omitting it used to throw inside the mount effect and silently prevent
