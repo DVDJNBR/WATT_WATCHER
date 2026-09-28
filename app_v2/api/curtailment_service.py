@@ -102,6 +102,15 @@ def query_curtailment_risk(
     }
 
 
+def _as_day(value) -> Optional[str]:
+    """ISO day string from either a datetime (Postgres) or a string (SQLite)."""
+    if value is None:
+        return None
+    if hasattr(value, "date"):
+        return value.date().isoformat()
+    return str(value)[:10]
+
+
 def query_curtailment_calendar(
     conn: Any,
     request_id: Optional[str] = None,
@@ -158,8 +167,10 @@ def query_curtailment_calendar(
     return {
         "days": days,
         "range": {
-            "start": range_min.date().isoformat() if range_min else None,
-            "end": range_max.date().isoformat() if range_max else None,
+            # Postgres hands back a datetime, SQLite a plain string — the dev
+            # database took the whole endpoint down on the .date() call.
+            "start": _as_day(range_min),
+            "end": _as_day(range_max),
         },
         "stats": {
             "total_days": len(days),

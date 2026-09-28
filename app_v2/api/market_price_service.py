@@ -34,19 +34,23 @@ def query_market_price(
         params.append(end_date)
 
     where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
+    # Ordered DESC so that a range wider than `limit` drops the OLDEST slots,
+    # not the newest — a LIMIT on an ASC scan silently truncates the chart at
+    # whatever point the history passed the cap. Reversed below so callers
+    # still receive ascending chronological order.
     query = f"""
         SELECT t.horodatage, p.price_eur_mwh
         FROM {tbl_price} p
         JOIN {tbl_time} t ON t.id_date = p.id_date
         {where}
-        ORDER BY t.horodatage ASC
+        ORDER BY t.horodatage DESC
         LIMIT {ph}
     """
     params.append(limit)
 
     cursor = conn.cursor()
     cursor.execute(query, params)
-    rows = cursor.fetchall()
+    rows = list(reversed(cursor.fetchall()))
     data = [
         {"timestamp": str(row[0]), "price_eur_mwh": float(row[1]) if row[1] is not None else None}
         for row in rows

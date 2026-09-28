@@ -366,7 +366,9 @@ def prices_regional(request: Request):
             conn,
             start_date=params.get("start_date") or None,
             end_date=params.get("end_date") or None,
-            limit=min(int(params.get("limit", 5000)), 20000),
+            # 40 000 15-min slots ~= 15 months of national price history, so
+            # the Prix tab's whole-history fetch isn't silently truncated.
+            limit=min(int(params.get("limit", 5000)), 40000),
             request_id=request_id,
         )
         cache.set(key, result)
