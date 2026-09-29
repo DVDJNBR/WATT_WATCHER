@@ -297,15 +297,56 @@ body {
 .price-extreme--up .price-extreme__value { color: #2dd4bf; }
 .price-extreme--down .price-extreme__value { color: #ef4444; }
 
-/* Day-ahead: the sentence that keeps "résidu" from being jargon. */
+/* Day-ahead: the legend and the sentence that keep "résidu" from being
+   jargon. */
 .price-dayahead__gloss {
   flex: 0 0 auto;
   margin-top: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
   font-size: 0.7rem;
   line-height: 1.45;
   color: var(--color-text-muted);
 }
 .price-dayahead__gloss strong { color: var(--color-text); font-weight: 600; }
+
+.price-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 14px;
+}
+.price-legend__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.price-legend__line {
+  width: 14px;
+  height: 2px;
+  flex-shrink: 0;
+}
+.price-legend__box {
+  width: 10px;
+  height: 10px;
+  flex-shrink: 0;
+}
+.price-legend__box--residu {
+  background: color-mix(in srgb, var(--color-text-muted) 34%, transparent);
+  outline: 1px solid var(--color-border);
+}
+.price-legend__note { opacity: 0.75; font-style: italic; }
+
+/* Replaces the période/région controls on the Prix tab, where neither
+   applies — says so rather than leaving an inert control sitting there. */
+.dash-toolbar__scope {
+  font-size: 0.72rem;
+  line-height: 1.4;
+  color: var(--color-text-muted);
+  margin: 0;
+  max-width: 70ch;
+}
 
 /* ── Price clock ─────────────────────────────────────────────────────────
    The dial keeps its own aspect: the svg is sized off the available height so
@@ -316,12 +357,15 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
+  /* The svg is sized off this box and letterboxed inside it by the viewBox's
+     default preserveAspectRatio, so the dial stays circular whatever shape
+     the card is. Without a bounded box it claimed its own height and grew
+     straight through the card below. */
+  overflow: hidden;
 }
 .price-clock__dial svg {
-  height: 100%;
   width: 100%;
-  max-width: 100%;
-  overflow: visible;
+  height: 100%;
 }
 
 .price-clock__ring {
@@ -389,7 +433,9 @@ body {
     grid-template-columns: repeat(4, 1fr);
     min-height: 92px;
   }
-  .price-clock__dial { min-height: 300px; }
+  /* Stacked layout: the rows are content-sized, so the dial needs a height of
+     its own rather than a share of one. */
+  .price-clock__dial { flex: 0 0 auto; height: 320px; }
 }
 
 /* ── Controls row (below the map) — période / région / màj, horizontal ── */
@@ -894,7 +940,8 @@ body {
   /* pbi-layout declared here (after .dashboard-content .pbi-layout) so the
      cascade order is correct — the higher-specificity general rule is above,
      and this media query overrides it at the same specificity but later. */
-  .dashboard-content .pbi-layout { flex: 0 0 auto; }
+  .dashboard-content .pbi-layout,
+  .dashboard-content .prix-layout { flex: 0 0 auto; }
 }
 
 /* ── Buttons ──────────────────────────────────────────────────────────────── */

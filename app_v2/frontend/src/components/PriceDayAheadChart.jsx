@@ -19,8 +19,14 @@ import {
   ReferenceLine, ResponsiveContainer,
 } from 'recharts'
 
+// Teal is the app's accent and is spent on one thing per chart: the series
+// the viewer is meant to read. Here that is the price. Everything underneath
+// borrows the production tab's palette instead, so a green band means wind
+// and an amber one means solar wherever they appear on the dashboard.
 const PRICE_COLOR = '#2dd4bf'
 const NEG_COLOR = '#ef4444'
+const EOLIEN_COLOR = '#10b981'
+const SOLAIRE_COLOR = '#f59e0b'
 
 function hhmm(ts) {
   const d = new Date(String(ts).replace(' ', 'T'))
@@ -57,7 +63,7 @@ function DayAheadTooltip({ active, payload }) {
           {/* The subtraction written out: the tooltip is where "résidu"
               stops being jargon. */}
           <span style={{ fontSize: '0.75rem' }}>
-            {fmtGw(r.cons)} consommés − {fmtGw(r.ren)} éolien/solaire
+            {fmtGw(r.cons)} consommés − {fmtGw(r.eolien)} éolien − {fmtGw(r.solaire)} solaire
           </span>
           <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>
             = {fmtGw(r.residu)} à produire autrement
@@ -85,7 +91,12 @@ export const PriceDayAheadChart = memo(function PriceDayAheadChart({ day, data =
         residu: r.residu_mw,
         cons: r.consommation_mw,
         ren: r.renouvelable_mw,
+        eolien: r.eolien_mw,
+        solaire: r.solaire_mw,
       }))
+    // residu + éolien + solaire stack to exactly consommation, so the chart
+    // shows the subtraction as three slabs instead of asserting it in a
+    // caption.
     return { rows: rows_, hasResidual: rows_.some(r => r.residu != null) }
   }, [data])
 
@@ -129,11 +140,23 @@ export const PriceDayAheadChart = memo(function PriceDayAheadChart({ day, data =
         <ResponsiveContainer width="100%" height="100%">
           <ComposedChart data={rows} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
             <defs>
-              {/* Fades to nothing at the baseline: the band shows the shape of
+              {/* Fades to nothing at the baseline: the slab shows the shape of
                   the residual, it doesn't claim the whole area beneath it. */}
               <linearGradient id="residu-grad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%"   stopColor="var(--color-text-muted)" stopOpacity={0.42} />
+                <stop offset="0%"   stopColor="var(--color-text-muted)" stopOpacity={0.34} />
                 <stop offset="100%" stopColor="var(--color-text-muted)" stopOpacity={0} />
+              </linearGradient>
+              {/* One gradient per source rather than one blended band: the
+                  production tab's green is wind and its amber is solar, and
+                  fading one into the other would invent a colour that means
+                  neither. */}
+              <linearGradient id="eolien-grad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%"   stopColor={EOLIEN_COLOR} stopOpacity={0.5} />
+                <stop offset="100%" stopColor={EOLIEN_COLOR} stopOpacity={0.22} />
+              </linearGradient>
+              <linearGradient id="solaire-grad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%"   stopColor={SOLAIRE_COLOR} stopOpacity={0.5} />
+                <stop offset="100%" stopColor={SOLAIRE_COLOR} stopOpacity={0.22} />
               </linearGradient>
             </defs>
 
@@ -156,15 +179,23 @@ export const PriceDayAheadChart = memo(function PriceDayAheadChart({ day, data =
 
             {hasResidual && (
               <>
+                {/* Stacked, so the top of the band is consommation and the
+                    coloured slab is literally what wind and solar took out
+                    of it. */}
                 <Area
-                  yAxisId="load" type="monotone" dataKey="residu"
-                  stroke="var(--color-text-muted)" strokeWidth={1.4}
+                  yAxisId="load" type="monotone" dataKey="residu" stackId="load"
+                  stroke="var(--color-text-muted)" strokeWidth={1.2} strokeOpacity={0.8}
                   fill="url(#residu-grad)" isAnimationActive={false} connectNulls
                 />
-                <Line
-                  yAxisId="load" type="monotone" dataKey="cons" dot={false}
-                  stroke="var(--color-text-muted)" strokeWidth={1} strokeDasharray="5 3"
-                  strokeOpacity={0.7} isAnimationActive={false} connectNulls
+                <Area
+                  yAxisId="load" type="monotone" dataKey="eolien" stackId="load"
+                  stroke={EOLIEN_COLOR} strokeWidth={1} strokeOpacity={0.8}
+                  fill="url(#eolien-grad)" isAnimationActive={false} connectNulls
+                />
+                <Area
+                  yAxisId="load" type="monotone" dataKey="solaire" stackId="load"
+                  stroke={SOLAIRE_COLOR} strokeWidth={1} strokeOpacity={0.8}
+                  fill="url(#solaire-grad)" isAnimationActive={false} connectNulls
                 />
               </>
             )}
@@ -172,19 +203,37 @@ export const PriceDayAheadChart = memo(function PriceDayAheadChart({ day, data =
             <ReferenceLine yAxisId="price" y={0} stroke={NEG_COLOR} strokeDasharray="4 4" strokeOpacity={0.6} />
             <Line
               yAxisId="price" type="stepAfter" dataKey="price" dot={false}
-              stroke={PRICE_COLOR} strokeWidth={2} isAnimationActive={false}
+              stroke={PRICE_COLOR} strokeWidth={2.2} isAnimationActive={false}
             />
           </ComposedChart>
         </ResponsiveContainer>
       </div>
 
-      <p className="price-dayahead__gloss">
-        Résidu = consommation − éolien − solaire.
-        {trough && (
-          <> Au plus bas à <strong>{trough.t}</strong> : {fmtGw(trough.residu)} sur {fmtGw(trough.cons)} consommés, prix {fmtEur(trough.price)}.</>
+      <div className="price-dayahead__gloss">
+        {hasResidual && (
+          <span className="price-legend">
+            <span className="price-legend__item">
+              <i className="price-legend__line" style={{ background: PRICE_COLOR }} />prix spot
+            </span>
+            <span className="price-legend__item">
+              <i className="price-legend__box" style={{ background: 'rgba(16,185,129,0.5)' }} />éolien
+            </span>
+            <span className="price-legend__item">
+              <i className="price-legend__box" style={{ background: 'rgba(245,158,11,0.5)' }} />solaire
+            </span>
+            <span className="price-legend__item">
+              <i className="price-legend__box price-legend__box--residu" />résidu de charge
+            </span>
+            <span className="price-legend__note">les trois empilés = consommation</span>
+          </span>
         )}
-        {' '}Plus haut du jour {fmtEur(hi.price)} à {hi.t}, plus bas {fmtEur(lo.price)} à {lo.t}.
-      </p>
+        <span>
+          {trough && (
+            <>Résidu au plus bas à <strong>{trough.t}</strong> : {fmtGw(trough.residu)} sur {fmtGw(trough.cons)} consommés, prix {fmtEur(trough.price)}. </>
+          )}
+          Plus haut du jour {fmtEur(hi.price)} à {hi.t}, plus bas {fmtEur(lo.price)} à {lo.t}.
+        </span>
+      </div>
     </section>
   )
 })

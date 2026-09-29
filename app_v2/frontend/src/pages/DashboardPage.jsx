@@ -669,8 +669,15 @@ export default function DashboardPage() {
   ]
 
   // Full-width toolbar — période + région + màj
+  // The Prix tab plots the whole available history and one fixed day — the
+  // last one the market priced. Neither follows the date window, and the
+  // spot price has no region dimension at all (France is a single bidding
+  // zone), so both controls are hidden there rather than left to look live.
+  const showRangeControls = activeTab !== 'prixnegatifs'
+
   const toolbar = (
     <div className="dash-toolbar">
+      {showRangeControls ? (
       <div style={{ display:'flex', alignItems:'center', gap:6 }}>
         <span className="selector-label">Période</span>
         <div className="date-bar" data-testid="date-range">
@@ -697,7 +704,15 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
-      <RegionSelector regions={regions} selected={selectedRegion} onChange={handleRegionChange} loading={loading} showLabel />
+      ) : (
+        <p className="dash-toolbar__scope">
+          Prix spot France entière — zone de marché unique, pas de découpage régional.
+          Historique complet, indépendant de la période choisie ailleurs.
+        </p>
+      )}
+      {showRangeControls && (
+        <RegionSelector regions={regions} selected={selectedRegion} onChange={handleRegionChange} loading={loading} showLabel />
+      )}
       <div className="dash-toolbar__status">
         {(loading || refreshing) && (
           <span className="refresh-dot" title="Actualisation en cours…" aria-label="Actualisation en cours" data-testid="refresh-indicator" />

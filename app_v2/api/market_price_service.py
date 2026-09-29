@@ -58,12 +58,6 @@ def query_market_price(
     return {"data": data, "total_records": len(data), "request_id": request_id}
 
 
-# Only wind and solar count towards the residual: they are the two sources that
-# produce whatever the weather allows rather than whatever the market asks for,
-# so they are subtracted from demand rather than dispatched against it.
-RESIDUAL_SOURCES = ("eolien", "solaire")
-
-
 def query_day_ahead(
     conn: Any,
     request_id: Optional[str] = None,
@@ -73,9 +67,13 @@ def query_day_ahead(
     consumption and wind+solar output.
 
     Residual load (consumption - wind - solar) is what the market actually
-    prices, so returning the three series together lets the chart show the
-    cause next to the effect without a second round trip or a client-side
-    join across 15 000 rows.
+    prices, so returning the series together lets the chart show the cause
+    next to the effect without a second round trip or a client-side join
+    across 15 000 rows.
+
+    Only wind and solar are subtracted: they are the two sources that produce
+    whatever the weather allows rather than whatever the market asks for, so
+    they come off demand instead of being dispatched against it.
     """
     sqlite_ = is_sqlite(conn)
     ph = placeholder(conn)
@@ -84,7 +82,6 @@ def query_day_ahead(
     tbl_src = "DIM_SOURCE" if sqlite_ else "dim_source"
     tbl_time = "DIM_TIME" if sqlite_ else "dim_time"
     day_expr = "date(t.horodatage)" if sqlite_ else "t.horodatage::date"
-    ren_in = ", ".join(ph for _ in RESIDUAL_SOURCES)
 
     cursor = conn.cursor()
     cursor.execute(
@@ -103,32 +100,41 @@ def query_day_ahead(
         WITH per_region AS (
             SELECT f.id_date, f.id_region,
                    AVG(f.consommation_mw) AS cons_mw,
-                   SUM(CASE WHEN s.source_name IN ({ren_in}) THEN f.valeur_mw ELSE 0 END) AS ren_mw
+                   SUM(CASE WHEN s.source_name = 'eolien'  THEN f.valeur_mw ELSE 0 END) AS eolien_mw,
+                   SUM(CASE WHEN s.source_name = 'solaire' THEN f.valeur_mw ELSE 0 END) AS solaire_mw
             FROM {tbl_flow} f
             JOIN {tbl_src} s ON s.id_source = f.id_source
             GROUP BY f.id_date, f.id_region
         ),
         national AS (
-            SELECT id_date, SUM(cons_mw) AS cons_mw, SUM(ren_mw) AS ren_mw
+            SELECT id_date, SUM(cons_mw) AS cons_mw,
+                   SUM(eolien_mw) AS eolien_mw, SUM(solaire_mw) AS solaire_mw
             FROM per_region GROUP BY id_date
         )
-        SELECT t.horodatage, p.price_eur_mwh, n.cons_mw, n.ren_mw
+        SELECT t.horodatage, p.price_eur_mwh, n.cons_mw, n.eolien_mw, n.solaire_mw
         FROM {tbl_price} p
         JOIN {tbl_time} t ON t.id_date = p.id_date
         LEFT JOIN national n ON n.id_date = p.id_date
         WHERE {day_expr} = {ph}
         ORDER BY t.horodatage ASC
     """
-    cursor.execute(query, list(RESIDUAL_SOURCES) + [day])
+    cursor.execute(query, [day])
 
     data = []
-    for horodatage, price, cons, ren in cursor.fetchall():
+    for horodatage, price, cons, eolien, solaire in cursor.fetchall():
         cons_f = float(cons) if cons is not None else None
-        ren_f = float(ren) if ren is not None else None
+        eol_f = float(eolien) if eolien is not None else None
+        sol_f = float(solaire) if solaire is not None else None
+        # Wind and solar are kept apart rather than summed: the chart stacks
+        # them in the production tab's own colours, and a single "renewable"
+        # total would blend the two into one meaningless band.
+        ren_f = None if (eol_f is None or sol_f is None) else eol_f + sol_f
         data.append({
             "timestamp": str(horodatage),
             "price_eur_mwh": float(price) if price is not None else None,
             "consommation_mw": cons_f,
+            "eolien_mw": eol_f,
+            "solaire_mw": sol_f,
             "renouvelable_mw": ren_f,
             "residu_mw": (cons_f - ren_f) if (cons_f is not None and ren_f is not None) else None,
         })

@@ -23,11 +23,21 @@ const DOWN_COLOR = '#ef4444'
 // with a red bite taken out of it rather than as two facts about that day.
 const ZERO_GUTTER = 2
 
-/** Bar shape that stops short of the zero line instead of resting on it. */
+/**
+ * Bar shape that stops short of the zero line instead of resting on it.
+ *
+ * recharts hands a negative `height` (with `y` on the zero line) for the
+ * downward half of the stack, so the sign has to be normalised here — an
+ * earlier version tested `height > 0` and silently dropped every negative
+ * day from the chart.
+ */
 function GutterBar({ x, y, width, height, fill, downward }) {
-  if (!(height > 0) || !(width > 0)) return null
-  const h = Math.max(0.6, height - ZERO_GUTTER)
-  return <rect x={x} y={downward ? y + ZERO_GUTTER : y} width={width} height={h} fill={fill} />
+  const w = Math.abs(width || 0)
+  const h0 = Math.abs(height || 0)
+  if (!(h0 > 0) || !(w > 0)) return null
+  const top = height < 0 ? y + height : y
+  const h = Math.max(0.6, h0 - ZERO_GUTTER)
+  return <rect x={x} y={downward ? top + ZERO_GUTTER : top} width={w} height={h} fill={fill} />
 }
 
 /** Day key in UTC — the same frame every other chart on the dashboard plots in. */
