@@ -18,12 +18,11 @@ import { CapacityFactorChart } from '../components/CapacityFactorChart.jsx'
 import { MaintenanceMap, normalize as normalizeUnitName } from '../components/MaintenanceMap.jsx'
 import { PriceTrendChart } from '../components/PriceTrendChart.jsx'
 import { PriceHistoryBars } from '../components/PriceHistoryBars.jsx'
-import { PriceClock } from '../components/PriceClock.jsx'
 import { PriceDayAheadChart } from '../components/PriceDayAheadChart.jsx'
 import { cloudScale, cloudScaleBase, OFF_COLORS } from '../components/SourcesCanvasMap.jsx'
 import { useDarkTheme } from '../hooks/useDarkTheme.js'
 import {
-  fetchAllProduction, fetchRegions, fetchMeteo, fetchCapacity, fetchCurtailmentCalendar, fetchCurtailmentRisk,
+  fetchAllProduction, fetchRegions, fetchMeteo, fetchCapacity, fetchCurtailmentRisk,
   fetchMaintenance, fetchProductionUnits, fetchMarketPrice, fetchDayAhead, fetchDataRange,
 } from '../services/api.js'
 import { RegionSelector } from '../components/RegionSelector.jsx'
@@ -37,7 +36,11 @@ import { CapacityChart } from '../components/CapacityChart.jsx'
 const REFRESH_INTERVAL_MS = 15 * 60 * 1000  // 15 minutes
 
 // Prix tab figures before the whole-history series has landed.
-const EMPTY_PRICE_STATS = { avgPriceEurMwh: null, avgDailySpreadEurMwh: null, negativeSlotSharePct: null }
+const EMPTY_PRICE_STATS = {
+  avgPriceEurMwh: null, medianPriceEurMwh: null, avgDailySpreadEurMwh: null,
+  negativeSlotSharePct: null, negDaysHit: null, totalDays: null,
+  negHoursTotal: null, totalHoursQuoted: null,
+}
 
 const SOURCE_LABELS = {
   nucleaire:   'Nucléaire',
@@ -176,13 +179,6 @@ function shiftHorodatage(ts, days) {
 }
 
 /** Day part (YYYY-MM-DD) of a horodatage — what <input type="date"> needs. */
-/** "2026-03-14" -> "14 mars 2026" */
-function formatDayFr(iso) {
-  const d = new Date(iso + 'T00:00:00Z')
-  if (isNaN(d)) return iso
-  return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' })
-}
-
 function dayOf(ts) {
   return ts ? ts.slice(0, 10) : ''
 }
@@ -259,18 +255,13 @@ export default function DashboardPage() {
   const [capacityData, setCapacityData] = useState([])
   const [drillLoading, setDrillLoading] = useState(false)
 
-  // Negative-price calendar: whole-history aggregate, independent of the region/date drill-down
-  const [calendarRange, setCalendarRange] = useState(null)
-  const [calendarStats, setCalendarStats] = useState(null)
-  const [calendarLoading, setCalendarLoading] = useState(true)
-
   // Curtailment risk by region: whole-history, drives the map's default mode —
   // which regions actually drive curtailment (wind+solar surplus during
   // negative-price windows), not just who produces the most.
   const [curtailmentRiskData, setCurtailmentRiskData] = useState([])
 
   // Whole-history spot price — Prix tab. Fetched once and independent of the
-  // toolbar range, like the negative-price calendar: the point of that tab is
+  // toolbar range: the point of that tab is
   // the three-month shape (when prices spike, when they go under zero), which
   // a 24 h default window would hide entirely.
   const [priceHistory, setPriceHistory] = useState([])
@@ -391,20 +382,6 @@ export default function DashboardPage() {
     return () => { cancelled = true }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadData])
-
-  // Negative-price calendar: fetched once, whole history
-  useEffect(() => {
-    let cancelled = false
-    fetchCurtailmentCalendar()
-      .then(result => {
-        if (cancelled) return
-        setCalendarRange(result.range || null)
-        setCalendarStats(result.stats || null)
-      })
-      .catch(() => {})
-      .finally(() => { if (!cancelled) setCalendarLoading(false) })
-    return () => { cancelled = true }
-  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -605,7 +582,10 @@ export default function DashboardPage() {
 
   // Prix tab: two figures the daily bars can't state on their own — how wide
   // a typical day swings, and how much of the history sat under 0 EUR.
-  const { avgPriceEurMwh, avgDailySpreadEurMwh, negativeSlotSharePct } = useMemo(() => {
+  const {
+    avgPriceEurMwh, medianPriceEurMwh, avgDailySpreadEurMwh, negativeSlotSharePct,
+    negDaysHit, totalDays, negHoursTotal, totalHoursQuoted,
+  } = useMemo(() => {
     if (!priceHistory.length) return EMPTY_PRICE_STATS
     const byDay = new Map()
     let sum = 0
@@ -619,15 +599,24 @@ export default function DashboardPage() {
       if (v < 0) neg += 1
       const k = String(r.timestamp).slice(0, 10)
       const d = byDay.get(k)
-      if (!d) byDay.set(k, { min: v, max: v })
-      else { if (v < d.min) d.min = v; if (v > d.max) d.max = v }
+      if (!d) byDay.set(k, { min: v, max: v, neg: v < 0 ? 1 : 0 })
+      else { if (v < d.min) d.min = v; if (v > d.max) d.max = v; if (v < 0) d.neg++ }
     }
     if (!total) return EMPTY_PRICE_STATS
     const spreads = Array.from(byDay.values()).map(d => d.max - d.min)
+    const all = []
+    for (const r of priceHistory) if (r.price_eur_mwh != null) all.push(r.price_eur_mwh)
+    all.sort((a, b) => a - b)
     return {
       avgPriceEurMwh: Math.round((sum / total) * 10) / 10,
+      medianPriceEurMwh: Math.round(all[Math.floor(all.length / 2)] * 10) / 10,
       avgDailySpreadEurMwh: Math.round(spreads.reduce((a, b) => a + b, 0) / spreads.length),
       negativeSlotSharePct: Math.round((1000 * neg) / total) / 10,
+      // The same story counted at two scales: days touched, and hours summed.
+      negDaysHit: Array.from(byDay.values()).filter(d => d.neg > 0).length,
+      totalDays: byDay.size,
+      negHoursTotal: Math.round(neg / 4),
+      totalHoursQuoted: Math.round(total / 4),
     }
   }, [priceHistory])
 
@@ -860,52 +849,64 @@ export default function DashboardPage() {
           </>
         )}
 
-        {/* ── Prix : day-ahead + horloge + chiffres | histogramme pleine largeur ── */}
+        {/* ── Prix : day-ahead sur deux tiers | historique + chiffres ── */}
         {activeTab === 'prixnegatifs' && !error && (
-          <div className="prix-layout">
-            <div className="prix-layout__top">
-              <PriceDayAheadChart
-                day={dayAhead.day}
-                data={dayAhead.data}
-                loading={dayAheadLoading}
-              />
-              <PriceClock data={priceHistory} loading={priceHistoryLoading} />
-              <div className="prix-kpi-stack">
-                <KPICard
-                  title="Prix moyen"
-                  explain="Prix spot day-ahead moyen sur tout l'historique disponible."
-                  value={avgPriceEurMwh ?? '—'} unit="€/MWh"
-                  sublabel="sur tout l'historique"
-                  loading={priceHistoryLoading}
-                />
-                <KPICard
-                  title="Heures à prix négatif"
-                  explain="Total d'heures cumulées à prix négatif sur tout l'historique disponible."
-                  value={calendarStats?.total_hours ?? '—'} unit="h"
-                  sublabel={calendarRange?.start ? `depuis le ${formatDayFr(calendarRange.start)}` : undefined}
-                  loading={calendarLoading || !calendarStats}
-                />
-                <KPICard
-                  title="Amplitude / jour"
-                  explain="Écart moyen entre le prix le plus haut et le plus bas d'une même journée — ce que vaut le pilotage de la consommation dans la journée."
-                  value={avgDailySpreadEurMwh ?? '—'} unit="€/MWh"
-                  sublabel="écart moyen haut / bas"
-                  loading={priceHistoryLoading}
-                />
-                <KPICard
-                  title="Créneaux sous 0 €"
-                  explain="Part des créneaux de 15 min dont le prix spot est négatif, sur tout l'historique disponible."
-                  value={negativeSlotSharePct ?? '—'} unit="%"
-                  sublabel="sur tout l'historique"
-                  loading={priceHistoryLoading}
-                />
-              </div>
-            </div>
+          <div className="prix-grid">
+            <PriceDayAheadChart
+              day={dayAhead.day}
+              data={dayAhead.data}
+              history={priceHistory}
+              loading={dayAheadLoading || priceHistoryLoading}
+            />
 
-            {/* Three months of daily bars need the full width — they are the
-                only thing on the tab that reads as a calendar. */}
-            <div className="prix-layout__bottom">
-              <PriceHistoryBars data={priceHistory} loading={priceHistoryLoading} />
+            <PriceHistoryBars data={priceHistory} loading={priceHistoryLoading} />
+
+            {/* Deux sujets, pas quatre chiffres alignés : les prix négatifs
+                tiennent la colonne de gauche, les deux autres se partagent la
+                droite derrière une barre franche. */}
+            <div className="kpis">
+              <div className="kpiblock">
+                <div className="kpineg">
+                  <span className="kpi__k">Prix négatifs</span>
+                  <div className="negrow">
+                    <span className="negrow__k">Jours concernés</span>
+                    <span className="negrow__v num">
+                      {negDaysHit ?? '—'}<span className="u"> / {totalDays ?? '—'} j</span>
+                    </span>
+                    <span className="negrow__p num">
+                      {negDaysHit != null && totalDays ? `${Math.round((100 * negDaysHit) / totalDays)} %` : '—'} du total
+                    </span>
+                  </div>
+                  <div className="negrow">
+                    <span className="negrow__k">Heures cumulées</span>
+                    <span className="negrow__v num">
+                      {negHoursTotal ?? '—'}
+                      <span className="u"> / {totalHoursQuoted != null ? totalHoursQuoted.toLocaleString('fr-FR') : '—'} h</span>
+                    </span>
+                    <span className="negrow__p num">
+                      {negativeSlotSharePct != null ? `${String(negativeSlotSharePct).replace('.', ',')} %` : '—'} du total
+                    </span>
+                  </div>
+                </div>
+                <div className="kpipairv">
+                  <div className="kpi">
+                    <span className="kpi__k">Prix moyen</span>
+                    <span className="kpi__v num">
+                      {avgPriceEurMwh ?? '—'}<span className="u"> €/MWh</span>
+                    </span>
+                    <span className="kpi__s">
+                      {medianPriceEurMwh != null ? `médiane ${String(medianPriceEurMwh).replace('.', ',')} €` : ''}
+                    </span>
+                  </div>
+                  <div className="kpi">
+                    <span className="kpi__k">Écart de prix / jour</span>
+                    <span className="kpi__v num">
+                      {avgDailySpreadEurMwh ?? '—'}<span className="u"> €/MWh</span>
+                    </span>
+                    <span className="kpi__s">du plus haut au plus bas</span>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         )}

@@ -164,28 +164,19 @@ export const PriceHistoryBars = memo(function PriceHistoryBars({ data = [], load
     )
   }
 
-  // ~8 date ticks whatever the span, so a 3-month history stays readable.
-  const tickInterval = Math.max(0, Math.ceil(rows.length / 8) - 1)
+  // Four date ticks: the block is a third of a column wide, eight overlapped.
+  const tickInterval = Math.max(0, Math.ceil(rows.length / 4) - 1)
 
   return (
     <section className="glass-card chart-card" data-testid="price-history">
       <div className="price-hero__head">
         <h2 className="chart-title" title={explain}>{title}</h2>
-        <div className="price-hero__extremes">
-          <span className="price-extreme price-extreme--up">
-            <span className="price-extreme__value">{fmtEur(hi.max, 2)}/MWh</span>
-            <span className="price-extreme__label">plus haut · {fmtDayShort(hi.day)}</span>
-          </span>
-          <span className="price-extreme price-extreme--down">
-            <span className="price-extreme__value">{fmtEur(lo.min, 2)}/MWh</span>
-            <span className="price-extreme__label">plus bas · {fmtDayShort(lo.day)}</span>
-          </span>
-        </div>
+        <span className="price-hero__meta">{rows.length} jours</span>
       </div>
 
       <div style={{ flex: '1 1 0', minHeight: 0 }}>
         <ResponsiveContainer width="100%" height="100%">
-          <ComposedChart data={rows} margin={{ top: 10, right: 62, left: 0, bottom: 0 }} barCategoryGap="12%">
+          <ComposedChart data={rows} margin={{ top: 22, right: 14, left: 0, bottom: 0 }} barCategoryGap="8%">
             <defs>
               {/* Each bar carries its own gradient box, so both fills are
                   strongest at the extreme end and fade back towards zero. */}
@@ -208,9 +199,9 @@ export const PriceHistoryBars = memo(function PriceHistoryBars({ data = [], load
               tickLine={false}
             />
             <YAxis
-              tick={{ fill: 'var(--color-text-muted)', fontSize: 11 }}
+              tick={{ fill: 'var(--color-text-muted)', fontSize: 10 }}
               unit=" €"
-              width={52}
+              width={44}
               tickLine={false}
             />
             <Tooltip content={<PriceTooltip />} cursor={{ fill: 'var(--color-text)', fillOpacity: 0.06 }} />
@@ -233,16 +224,24 @@ export const PriceHistoryBars = memo(function PriceHistoryBars({ data = [], load
             />
 
             <ReferenceLine y={0} stroke="var(--color-text-muted)" strokeOpacity={0.7} />
+            {/* La valeur est écrite au bout du trait, contre sa barre — reléguée
+                dans l'en-tête, on ne savait pas à quelle barre elle se rapportait. */}
             {traitFor(hi, 'max') && (
               <ReferenceLine
                 segment={traitFor(hi, 'max')} stroke={UP_COLOR} strokeWidth={1.5} strokeOpacity={0.9}
-                label={{ value: fmtEur(hi.max), position: 'right', fill: UP_COLOR, fontSize: 11, fontWeight: 600 }}
+                label={{
+                  value: `${fmtEur(hi.max, 0)} · ${fmtDayShort(hi.day)}`,
+                  position: 'insideTopRight', fill: UP_COLOR, fontSize: 10, fontWeight: 700,
+                }}
               />
             )}
             {traitFor(lo, 'min') && (
               <ReferenceLine
                 segment={traitFor(lo, 'min')} stroke={DOWN_COLOR} strokeWidth={1.5} strokeOpacity={0.9}
-                label={{ value: fmtEur(lo.min), position: 'right', fill: DOWN_COLOR, fontSize: 11, fontWeight: 600 }}
+                label={{
+                  value: `${fmtEur(lo.min, 0)} · ${fmtDayShort(lo.day)}`,
+                  position: 'insideBottomRight', fill: DOWN_COLOR, fontSize: 10, fontWeight: 700,
+                }}
               />
             )}
           </ComposedChart>
