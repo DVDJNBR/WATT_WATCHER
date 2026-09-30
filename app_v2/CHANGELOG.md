@@ -1,3 +1,9 @@
+## [1.45.2](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.45.1...v1.45.2) (2026-09-30)
+
+### Bug Fixes
+
+* **pipeline:** fail loudly on missing ENTSO-E token, fetch tomorrow's prices ([5409049](https://github.com/DVDJNBR/WATT_WATCHER/commit/54090494e5f156843bca0fb95b022fee30718cd7))
+
 ## [1.45.1](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.45.0...v1.45.1) (2026-09-30)
 
 ### Bug Fixes
