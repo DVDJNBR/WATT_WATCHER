@@ -1,3 +1,9 @@
+## [1.46.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.45.3...v1.46.0) (2026-09-30)
+
+### Features
+
+* **dashboard:** move the region picker above the map it drives ([76497dd](https://github.com/DVDJNBR/WATT_WATCHER/commit/76497dd38a788cd9669cc99a2e250eece36397bb))
+
 ## [1.45.3](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.45.2...v1.45.3) (2026-09-30)
 
 ### Bug Fixes
