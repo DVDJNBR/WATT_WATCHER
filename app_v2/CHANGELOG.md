@@ -1,3 +1,9 @@
+## [1.49.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.48.0...v1.49.0) (2026-09-30)
+
+### Features
+
+* **map:** let the cloud cover dim the region borders, in both themes ([7b56400](https://github.com/DVDJNBR/WATT_WATCHER/commit/7b56400efba413c805777040f0d53671664281c1))
+
 ## [1.48.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.47.0...v1.48.0) (2026-09-30)
 
 ### Features
