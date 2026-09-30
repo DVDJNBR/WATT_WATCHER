@@ -215,7 +215,7 @@ body {
   grid-template-columns: minmax(0, 2fr) minmax(320px, 1fr);
   grid-template-rows: auto auto;
   gap: 20px 22px;
-  align-items: start;
+  align-items: stretch;
   min-height: 0;
 }
 .prix-grid > * { min-width: 0; min-height: 0; }
@@ -251,8 +251,11 @@ body {
 .price-hero__right { display: flex; flex-direction: column; align-items: flex-end; gap: 10px; }
 .price-hero__meta { font-size: 0.72rem; color: var(--color-text-muted); white-space: nowrap; }
 
-.price-hero__plot { position: relative; flex: 0 1 auto; min-height: 0; display: flex; }
-.price-hero__svg { width: 100%; height: auto; max-height: min(58vh, 620px); display: block; overflow: visible; }
+/* Le tracé prend tout ce que la carte ne consomme pas. Le viewBox a été
+   rallongé (900x660) pour que son rapport colle à celui de la colonne : trop
+   large, il laissait des bandes vides en haut et en bas. */
+.price-hero__plot { position: relative; flex: 1 1 auto; min-height: 0; display: flex; }
+.price-hero__svg { width: 100%; height: 100%; display: block; overflow: visible; }
 .price-hero__svg text { font-family: var(--font-sans); }
 
 .price-hero__gloss {
@@ -472,17 +475,26 @@ body {
    Deux sujets, pas quatre chiffres alignés. La barre franche sépare les
    colonnes ; le filet fin sépare les deux de droite. Les deux chiffres des
    prix négatifs partagent un titre et n'ont donc rien entre eux. */
-.kpis { display: flex; flex-direction: column; justify-content: flex-end; flex: 1 1 auto; min-height: 0; }
+.kpis { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
 .kpiblock {
   display: grid;
   grid-template-columns: 1fr 1fr;
   border-top: 1px solid var(--color-border);
   padding-top: 20px;
+  flex: 1 1 auto;
+  min-height: 0;
 }
-.kpineg { display: flex; flex-direction: column; gap: 18px; padding-right: 22px; }
+.kpineg {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 18px;
+  padding-right: 22px;
+}
 .kpipairv {
   display: flex;
   flex-direction: column;
+  justify-content: center;
   border-left: 2px solid var(--color-border);
   padding-left: 22px;
 }
@@ -1001,7 +1013,7 @@ body {
 
 .dashboard-content .hero-grid,
 .dashboard-content .hero-grid--single,
-.dashboard-content .prix-layout,
+.dashboard-content .prix-grid,
 .dashboard-content .pbi-layout {
   flex: 1 1 0;
   min-height: 0;
@@ -1027,7 +1039,7 @@ body {
      cascade order is correct — the higher-specificity general rule is above,
      and this media query overrides it at the same specificity but later. */
   .dashboard-content .pbi-layout,
-  .dashboard-content .prix-layout { flex: 0 0 auto; }
+  .dashboard-content .prix-grid { flex: 0 0 auto; }
 }
 
 /* ── Buttons ──────────────────────────────────────────────────────────────── */

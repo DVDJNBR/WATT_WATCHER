@@ -23,7 +23,9 @@
 import { memo, useMemo, useRef, useState } from 'react'
 
 const W = 900
-const H = 560
+// Rapport calé sur celui de la colonne : plus large, le tracé laissait des
+// bandes vides en haut et en bas de sa carte.
+const H = 660
 const PAD = { t: 18, r: 46, b: 34, l: 44 }
 
 /** Minutes since midnight, in the UTC frame every chart here plots in. */
