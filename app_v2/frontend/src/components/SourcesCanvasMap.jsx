@@ -204,6 +204,7 @@ export default function SourcesCanvasMap({ selectedCode = '' }) {
     let _siteCF=[], _weatherGrid=[]
     let _cloudGrid=null, _ugrid=null, _vgrid=null
     let _cloudRasterCanvas=null, _rasterDark=null
+    let _borderCanvas=null
     let uvU=null, uvV=null, uvC=null, _uvW=0, _uvH=0
     let MW2=0, MH2=0, franceMask=null
     let particles=[], spawnPool=[], animRAF=null
@@ -513,27 +514,46 @@ export default function SourcesCanvasMap({ selectedCode = '' }) {
       }
       drawCloudRaster()
 
-      // Frontières et littoral repassés par-dessus le voile. Dessinés dessous,
-      // ils s'effaçaient avec la couverture : sous un ciel couvert on ne savait
-      // plus où s'arrêtait une région, ni où s'arrêtait la France. Ce sont des
-      // repères, pas une donnée météo — ils ne doivent pas dépendre du temps
-      // qu'il fait. Thème sombre seulement : en clair le voile est assez léger
-      // pour que les traits du dessous tiennent déjà.
-      if(dark){
-        // Repasse volontairement faible. Le trait du dessous, lui, est couvert
-        // par le voile : sous un ciel dégagé les deux s'additionnent et la
-        // limite est franche, sous un ciel couvert il ne reste que celui-ci et
-        // elle s'estompe. C'est le voile qui module, aucun calcul par segment
-        // n'est nécessaire. Gris neutre : le teal est la couleur de sélection,
-        // l'employer pour un repère permanent lui ôtait son sens.
+      // Frontières et littoral, repassés par-dessus le voile puis remis sous le
+      // même ciel que la terre. Le trait est dessiné à part, puis érodé par le
+      // voile lui-même en destination-out : chaque pixel perd exactement
+      // l'opacité que la couverture nuageuse y applique. Une région dégagée
+      // garde une limite franche, une région bouchée la voit s'effacer, et le
+      // dégradé entre les deux est celui des nuages — pas une moyenne par
+      // région. Dessiner le trait uniquement sous le voile l'effaçait d'un coup
+      // sous un ciel couvert ; le laisser constant au-dessus le rendait
+      // insensible au temps qu'il fait. Les deux thèmes passent par ici.
+      //
+      // Gris neutre : le teal est la couleur de sélection, l'employer pour un
+      // repère permanent lui ôtait son sens.
+      {
+        const bc=_borderCanvas||(_borderCanvas=document.createElement('canvas'))
+        if(bc.width!==canvas.width||bc.height!==canvas.height){
+          bc.width=canvas.width; bc.height=canvas.height
+        }
+        const bx=bc.getContext('2d')
+        bx.setTransform(1,0,0,1,0,0); bx.clearRect(0,0,bc.width,bc.height)
+        bx.setTransform(dpr,0,0,dpr,0,0)
+        // Encre claire sur fond sombre, sombre sur fond clair : c'est le même
+        // trait, lu dans les deux sens.
+        const borderInk = dark ? '255,255,255' : '20,20,22'
         Object.keys(regionPaths).forEach(code=>{
           const dimmed = !!(selCode && code !== selCode)
-          ctx.strokeStyle = dimmed ? 'rgba(255,255,255,.04)' : 'rgba(255,255,255,.10)'
-          ctx.lineWidth=0.8; ctx.stroke(regionPaths[code])
+          bx.strokeStyle = `rgba(${borderInk},${dimmed ? .10 : .26})`
+          bx.lineWidth=0.8; bx.stroke(regionPaths[code])
         })
-        ctx.strokeStyle='rgba(255,255,255,.18)'
-        ctx.lineWidth=1; ctx.stroke(francePath)
-        // La région sélectionnée garde le teal : c'est un état, pas un repère.
+        bx.strokeStyle=`rgba(${borderInk},.34)`
+        bx.lineWidth=1; bx.stroke(francePath)
+        if(_cloudRasterCanvas){
+          bx.globalCompositeOperation='destination-out'
+          bx.imageSmoothingEnabled=false
+          bx.drawImage(_cloudRasterCanvas,0,0,W,H)
+          bx.globalCompositeOperation='source-over'
+        }
+        ctx.save(); ctx.setTransform(1,0,0,1,0,0); ctx.drawImage(bc,0,0); ctx.restore()
+
+        // La région sélectionnée garde le teal, et reste hors du masque :
+        // c'est un état, pas un repère, et il doit tenir par tous les temps.
         if(selCode && regionPaths[selCode]){
           ctx.strokeStyle='rgba(45,212,191,0.60)'
           ctx.lineWidth=1.5; ctx.stroke(regionPaths[selCode])
