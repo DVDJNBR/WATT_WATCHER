@@ -35,7 +35,11 @@ def run(job_id: str, bronze: Any, silver: Any) -> dict:
     try:
         entsoe_token = os.environ.get("ENTSOE_API_TOKEN", "")
         if not entsoe_token:
-            return {"status": "skipped", "reason": "no ENTSOE_API_TOKEN"}
+            # Loud on purpose: a missing token used to return "skipped", which the
+            # daily pipeline reported as success — the stage was dead for six weeks
+            # before anyone noticed the data had stopped.
+            logger.error("[%s] ENTSOE_API_TOKEN not configured — stage cannot run", job_id)
+            return {"status": "failure", "error": "ENTSOE_API_TOKEN not configured"}
 
         now = datetime.now(timezone.utc)
         # Wide window on purpose: outage periods can span weeks (a refuelling
