@@ -22,7 +22,7 @@ function isUnderMaintenance(unitName, maintenanceTokens) {
   return maintenanceTokens.some(token => token && (norm.includes(token) || token.includes(norm)))
 }
 
-export const MaintenanceMap = memo(function MaintenanceMap({ maintenanceEvents = [], loading = false }) {
+export const MaintenanceMap = memo(function MaintenanceMap({ maintenanceEvents = [], region = '', loading = false }) {
   const [units, setUnits] = useState([])
   const [unitsLoading, setUnitsLoading] = useState(true)
   const [hovered, setHovered] = useState(null)
@@ -36,8 +36,12 @@ export const MaintenanceMap = memo(function MaintenanceMap({ maintenanceEvents =
     return () => { cancelled = true }
   }, [])
 
+  // Quand une région est choisie, la carte ne montre que ses postes : laisser
+  // les pins nationaux alors que la liste et les compteurs sont filtrés ferait
+  // lire les rouges d'une autre région comme les siens.
+  const shownUnits = region ? units.filter(u => u.region === region) : units
   const maintenanceTokens = maintenanceEvents.map(e => normalize(e.unit_name)).filter(Boolean)
-  const flaggedCount = units.filter(u => isUnderMaintenance(u.name, maintenanceTokens)).length
+  const flaggedCount = shownUnits.filter(u => isUnderMaintenance(u.name, maintenanceTokens)).length
 
   return (
     <section className="glass-card map-card" data-testid="maintenance-map">
@@ -63,7 +67,7 @@ export const MaintenanceMap = memo(function MaintenanceMap({ maintenanceEvents =
                     }} />
                 ))}
               </Geographies>
-              {units.map(unit => {
+              {shownUnits.map(unit => {
                 const flagged = isUnderMaintenance(unit.name, maintenanceTokens)
                 return (
                   <Marker key={unit.name} coordinates={[unit.lon, unit.lat]}
