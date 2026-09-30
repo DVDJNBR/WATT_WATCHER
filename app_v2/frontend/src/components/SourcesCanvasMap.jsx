@@ -520,13 +520,20 @@ export default function SourcesCanvasMap({ selectedCode = '' }) {
       // qu'il fait. Thème sombre seulement : en clair le voile est assez léger
       // pour que les traits du dessous tiennent déjà.
       if(dark){
+        // Repasse volontairement faible. Le trait du dessous, lui, est couvert
+        // par le voile : sous un ciel dégagé les deux s'additionnent et la
+        // limite est franche, sous un ciel couvert il ne reste que celui-ci et
+        // elle s'estompe. C'est le voile qui module, aucun calcul par segment
+        // n'est nécessaire. Gris neutre : le teal est la couleur de sélection,
+        // l'employer pour un repère permanent lui ôtait son sens.
         Object.keys(regionPaths).forEach(code=>{
           const dimmed = !!(selCode && code !== selCode)
-          ctx.strokeStyle = dimmed ? 'rgba(255,255,255,.07)' : 'rgba(255,255,255,.16)'
+          ctx.strokeStyle = dimmed ? 'rgba(255,255,255,.04)' : 'rgba(255,255,255,.10)'
           ctx.lineWidth=0.8; ctx.stroke(regionPaths[code])
         })
-        ctx.strokeStyle='rgba(45,212,191,0.30)'
+        ctx.strokeStyle='rgba(255,255,255,.18)'
         ctx.lineWidth=1; ctx.stroke(francePath)
+        // La région sélectionnée garde le teal : c'est un état, pas un repère.
         if(selCode && regionPaths[selCode]){
           ctx.strokeStyle='rgba(45,212,191,0.60)'
           ctx.lineWidth=1.5; ctx.stroke(regionPaths[selCode])
