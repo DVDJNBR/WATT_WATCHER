@@ -1,3 +1,9 @@
+## [1.45.1](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.45.0...v1.45.1) (2026-09-30)
+
+### Bug Fixes
+
+* **prices:** namespace-agnostic parser + gap backfill CI job ([3f55984](https://github.com/DVDJNBR/WATT_WATCHER/commit/3f55984c407c77e4abb26881f289bda04411c47d))
+
 ## [1.45.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.44.1...v1.45.0) (2026-09-30)
 
 ### Features
