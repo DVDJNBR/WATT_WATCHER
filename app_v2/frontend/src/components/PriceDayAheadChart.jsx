@@ -212,9 +212,17 @@ export const PriceDayAheadChart = memo(function PriceDayAheadChart({
     })
     .join('')
 
+  // Prices run to the end of the market day; production is metered as it
+  // happens and stops at the last measured slot. The load layer is drawn over
+  // the metered slots only — extending it with `|| 0` dropped the residual line
+  // to zero mid-afternoon, which reads as demand collapsing rather than as data
+  // not being in yet.
+  const loadRows = rows.filter(r => r.residu_mw != null)
+
   const stackPath = (low, high) => {
-    let d = rows.map((r, i) => `${i ? 'L' : 'M'}${x(r.m)} ${yL(high(r))}`).join('')
-    for (let i = rows.length - 1; i >= 0; i--) d += `L${x(rows[i].m)} ${yL(low(rows[i]))}`
+    if (!loadRows.length) return ''
+    let d = loadRows.map((r, i) => `${i ? 'L' : 'M'}${x(r.m)} ${yL(high(r))}`).join('')
+    for (let i = loadRows.length - 1; i >= 0; i--) d += `L${x(loadRows[i].m)} ${yL(low(loadRows[i]))}`
     return `${d}Z`
   }
   const fResid = r => r.residu_mw || 0
@@ -324,7 +332,7 @@ export const PriceDayAheadChart = memo(function PriceDayAheadChart({
             <path className="price-wedge price-wedge--solaire" d={stackPath(fEol, fAll)} />
             <path
               className="price-residline"
-              d={rows.map((r, i) => `${i ? 'L' : 'M'}${x(r.m)} ${yL(fResid(r))}`).join('')}
+              d={loadRows.map((r, i) => `${i ? 'L' : 'M'}${x(r.m)} ${yL(fResid(r))}`).join('')}
             />
             <path className="price-line" d={pricePath} />
           </g>

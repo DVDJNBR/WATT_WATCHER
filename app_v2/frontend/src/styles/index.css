@@ -39,6 +39,13 @@
   --color-charbon:      #6b7280;
   --color-fioul:        #f97316;
 
+  /* Trait des journées de fond du graphique prix. Déclaré ici et pas seulement
+     dans le thème clair : sans valeur en sombre, var() est invalide, `stroke`
+     hérite, et les 179 journées se dessinent en stroke:none — présentes dans le
+     DOM, invisibles à l'écran. Plus clair qu'en thème clair pour tenir sur le
+     fond quasi noir à 0,24 d'opacité. */
+  --color-charbon-line: #8a9099;
+
   /* Typography */
   --font-sans:   'Hanken Grotesk', system-ui, sans-serif;
   --font-display:'Outfit', var(--font-sans);

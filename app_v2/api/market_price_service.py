@@ -83,9 +83,16 @@ def query_day_ahead(
     tbl_time = "DIM_TIME" if sqlite_ else "dim_time"
     day_expr = "date(t.horodatage)" if sqlite_ else "t.horodatage::date"
 
+    # The most recent priced day that also has production: prices now run one
+    # day ahead of the meter (ENTSO-E publishes tomorrow's day-ahead around
+    # 12:45 CET), and picking the newest priced day outright landed on a day
+    # with no consumption or wind/solar at all — the residual-load layer, half
+    # the point of this chart, drew a flat line on zero. Tomorrow's prices are
+    # still served by /v1/prices/regional and show up in the history layer.
     cursor = conn.cursor()
     cursor.execute(
         f"SELECT {day_expr} FROM {tbl_price} p JOIN {tbl_time} t ON t.id_date = p.id_date "
+        f"WHERE EXISTS (SELECT 1 FROM {tbl_flow} f WHERE f.id_date = p.id_date) "
         f"ORDER BY t.horodatage DESC LIMIT 1"
     )
     row = cursor.fetchone()
@@ -108,13 +115,21 @@ def query_day_ahead(
         ),
         national AS (
             SELECT id_date, SUM(cons_mw) AS cons_mw,
-                   SUM(eolien_mw) AS eolien_mw, SUM(solaire_mw) AS solaire_mw
+                   SUM(eolien_mw) AS eolien_mw, SUM(solaire_mw) AS solaire_mw,
+                   COUNT(*) AS region_count
             FROM per_region GROUP BY id_date
-        )
+        ),
+        -- The newest slot is usually partial: régions report a few minutes
+        -- apart, so summing it gives a national total missing two or three
+        -- régions. Plotted, that reads as demand falling off a cliff at the
+        -- end of the day. Only slots with the full complement of régions are
+        -- returned as national figures.
+        full_slots AS (SELECT MAX(region_count) AS n FROM national)
         SELECT t.horodatage, p.price_eur_mwh, n.cons_mw, n.eolien_mw, n.solaire_mw
         FROM {tbl_price} p
         JOIN {tbl_time} t ON t.id_date = p.id_date
         LEFT JOIN national n ON n.id_date = p.id_date
+                             AND n.region_count = (SELECT n FROM full_slots)
         WHERE {day_expr} = {ph}
         ORDER BY t.horodatage ASC
     """
