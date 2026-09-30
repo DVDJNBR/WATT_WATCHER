@@ -1,3 +1,9 @@
+## [1.48.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.47.0...v1.48.0) (2026-09-30)
+
+### Features
+
+* **map:** keep France readable under heavy cloud in dark theme ([c2a40e1](https://github.com/DVDJNBR/WATT_WATCHER/commit/c2a40e11435a9d7cc7526964c6e356dae90538a6))
+
 ## [1.47.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.46.0...v1.47.0) (2026-09-30)
 
 ### Features
