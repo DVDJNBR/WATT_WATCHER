@@ -62,12 +62,22 @@ const CLOUD_BANDS    = Math.round(100/CLOUD_STEP)  // 8: 0–12.5 %, 12.5–25 %
 // the final black band — overcast reads as a distinct mass rather than as one
 // more step. At 1 the ladder is evenly spaced again.
 const CLOUD_GAMMA    = 0.6
+// Le voile sombre n'est pas noir et ne va pas jusqu'à l'opacité pleine. Les
+// deux vont ensemble : à 100 % de couverture, un noir opaque amenait la terre
+// exactement à la luminosité du fond de page, et la France disparaissait au
+// lieu de s'assombrir. Un bleu-ardoise plafonné garde une teinte et un reste de
+// clarté, donc une silhouette, tout en restant le barreau le plus lourd de
+// l'échelle. Le thème clair procède déjà ainsi (voile [40,52,80] plafonné).
+const DARK_VEIL_RGB  = [14,18,30]
+const DARK_MAX_ALPHA = 225   // sur 255 — 0,88 d'opacité au plus couvert
 /** Black-veil alpha (0–1) for a cloud-cover percentage, per the ladder above. */
 function cloudAlpha(cover){
   const band=Math.max(0,Math.min(CLOUD_BANDS-1,Math.floor(cover/CLOUD_STEP)))
   const t=band/(CLOUD_BANDS-1)
   return 1-Math.pow(1-t,CLOUD_GAMMA)
 }
+/** Opacité réellement peinte en thème sombre, plafond compris. */
+function darkVeilAlpha(cover){ return cloudAlpha(cover)*DARK_MAX_ALPHA/255 }
 
 /**
  * The cloud ladder as swatches, clear sky first — for the legend gauge.
@@ -95,7 +105,9 @@ export function cloudScale(dark){
     return {
       from: Math.round(band*CLOUD_STEP),
       to:   Math.round((band+1)*CLOUD_STEP),
-      color: dark ? `rgba(0,0,0,${a.toFixed(3)})` : `rgba(40,52,80,${(a*110/255).toFixed(3)})`,
+      color: dark
+        ? `rgba(${DARK_VEIL_RGB.join(',')},${(a*DARK_MAX_ALPHA/255).toFixed(3)})`
+        : `rgba(40,52,80,${(a*110/255).toFixed(3)})`,
     }
   })
 }
@@ -260,14 +272,14 @@ export default function SourcesCanvasMap({ selectedCode = '' }) {
       //    wide, so they read as crisp curves rather than staircases.
       const img=ox.getImageData(0,0,RW,RH); const px=img.data
       const MAX_ALPHA=110  // light: slate-blue wash, deeper than the old 80
-      const [cr,cg,cb]=dark?[0,0,0]:[40,52,80]
+      const [cr,cg,cb]=dark?DARK_VEIL_RGB:[40,52,80]
       for(let i=0;i<RW*RH;i++){
         const o=i*4
         const cover=px[o]/2.55
         // Dark follows the banded veil (transparent at clear sky, black at
         // full cover); light keeps the simple linear wash.
         const alpha=dark
-          ? Math.round(255*cloudAlpha(cover))
+          ? Math.round(255*darkVeilAlpha(cover))
           : Math.round(MAX_ALPHA*cloudAlpha(cover))
         px[o]=cr;px[o+1]=cg;px[o+2]=cb;px[o+3]=alpha
       }
@@ -366,7 +378,8 @@ export default function SourcesCanvasMap({ selectedCode = '' }) {
       const tone=(255*DARK_BASE_L/100)/(CLOUD_BANDS-1)
       // Luminance the map actually shows here, clouds included.
       const localL=dark
-        ? (255*DARK_BASE_L/100)*(1-cloudAlpha(cover))
+        ? (255*DARK_BASE_L/100)*(1-darkVeilAlpha(cover))
+          + ((DARK_VEIL_RGB[0]+DARK_VEIL_RGB[1]+DARK_VEIL_RGB[2])/3)*darkVeilAlpha(cover)
         : LIGHT_PAPER_L+(LIGHT_WASH_L-LIGHT_PAPER_L)*(MAX_WASH_A*cloudAlpha(cover))
       const dir=dark?1:-1
       let L=localL+dir*tone*(WIND_TONES+(t-0.5)*WIND_TRAIL_SPREAD)
@@ -499,6 +512,27 @@ export default function SourcesCanvasMap({ selectedCode = '' }) {
         ctx.stroke(regionPaths[selCode])
       }
       drawCloudRaster()
+
+      // Frontières et littoral repassés par-dessus le voile. Dessinés dessous,
+      // ils s'effaçaient avec la couverture : sous un ciel couvert on ne savait
+      // plus où s'arrêtait une région, ni où s'arrêtait la France. Ce sont des
+      // repères, pas une donnée météo — ils ne doivent pas dépendre du temps
+      // qu'il fait. Thème sombre seulement : en clair le voile est assez léger
+      // pour que les traits du dessous tiennent déjà.
+      if(dark){
+        Object.keys(regionPaths).forEach(code=>{
+          const dimmed = !!(selCode && code !== selCode)
+          ctx.strokeStyle = dimmed ? 'rgba(255,255,255,.07)' : 'rgba(255,255,255,.16)'
+          ctx.lineWidth=0.8; ctx.stroke(regionPaths[code])
+        })
+        ctx.strokeStyle='rgba(45,212,191,0.30)'
+        ctx.lineWidth=1; ctx.stroke(francePath)
+        if(selCode && regionPaths[selCode]){
+          ctx.strokeStyle='rgba(45,212,191,0.60)'
+          ctx.lineWidth=1.5; ctx.stroke(regionPaths[selCode])
+        }
+      }
+
       ctx.font='500 11px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif'
       ctx.textAlign='center'
       Object.keys(regionCentroids).forEach(code=>{
