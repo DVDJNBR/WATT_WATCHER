@@ -1,3 +1,16 @@
+## [1.45.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.44.1...v1.45.0) (2026-09-30)
+
+### Features
+
+* **dashboard:** name the history layer "Les prix observés" and say what it holds ([38ecddd](https://github.com/DVDJNBR/WATT_WATCHER/commit/38ecddd3de2c4d8d4706465c9921b3479b1ed92c))
+* **dashboard:** rebuild the Prix tab around a daily up/down price history ([a6d61ab](https://github.com/DVDJNBR/WATT_WATCHER/commit/a6d61ab9672d70cd50566c0b969f8c77e0cccc9a))
+* **dashboard:** rebuild the Prix tab from the mockup ([1625cbd](https://github.com/DVDJNBR/WATT_WATCHER/commit/1625cbd4009135406d536b4da698cc9559bd5e08))
+* **dashboard:** recompose the Prix tab around the day-ahead day and a 24 h dial ([faaec8d](https://github.com/DVDJNBR/WATT_WATCHER/commit/faaec8da29a3c1409ab5c14ed638df4e1549a4f3))
+
+### Bug Fixes
+
+* **dashboard:** restore the negative price bars, and spend teal on one series ([cf220d6](https://github.com/DVDJNBR/WATT_WATCHER/commit/cf220d69f38bc818c98580e0efda3ab3e475f4d7))
+
 ## [1.44.1](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.44.0...v1.44.1) (2026-09-25)
 
 ### Bug Fixes
