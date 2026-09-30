@@ -1,3 +1,9 @@
+## [1.44.1](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.44.0...v1.44.1) (2026-09-25)
+
+### Bug Fixes
+
+* **map:** make idle sites recede by luminance, and label them in the legend ([abd6251](https://github.com/DVDJNBR/WATT_WATCHER/commit/abd6251ae2c36db2f59ac4c5b0694784d9fd1927)), closes [#b45309](https://github.com/DVDJNBR/WATT_WATCHER/issues/b45309) [#7e6954](https://github.com/DVDJNBR/WATT_WATCHER/issues/7e6954) [#15401c](https://github.com/DVDJNBR/WATT_WATCHER/issues/15401c) [#547464](https://github.com/DVDJNBR/WATT_WATCHER/issues/547464) [#d8bca7](https://github.com/DVDJNBR/WATT_WATCHER/issues/d8bca7) [#a6c9b7](https://github.com/DVDJNBR/WATT_WATCHER/issues/a6c9b7)
+
 ## [1.44.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.43.0...v1.44.0) (2026-09-25)
 
 ### Features
