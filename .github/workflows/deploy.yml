@@ -132,3 +132,66 @@ jobs:
             git pull origin main
             cd app_v2
             docker compose up --build -d
+
+  # ── Price gap backfill (runs once on push, idempotent, no-op if up to date) ──
+  backfill-prices:
+    name: Backfill missing prices
+    needs: test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Set up Python 3.11
+        run: uv python install 3.11
+
+      - name: Install dependencies
+        working-directory: app_v2
+        run: uv sync --all-extras
+
+      - name: Check for price gap
+        id: gap_check
+        working-directory: app_v2
+        env:
+          SUPABASE_CONNECTION_STRING: ${{ secrets.SUPABASE_CONNECTION_STRING }}
+        run: |
+          # Detect gap: last row older than 3 days ago → backfill needed.
+          # ON CONFLICT(id_date) DO UPDATE makes this safe to re-run anytime.
+          GAP=$(uv run python - <<'EOF'
+          import os, sys
+          from datetime import datetime, timedelta, timezone
+          try:
+              import psycopg2
+              conn = psycopg2.connect(os.environ["SUPABASE_CONNECTION_STRING"])
+              cur = conn.cursor()
+              cur.execute("""
+                  SELECT MAX(t.horodatage)
+                  FROM fact_market_price p
+                  JOIN dim_time t ON p.id_date = t.id_date
+              """)
+              (latest,) = cur.fetchone()
+              conn.close()
+              threshold = datetime.now(timezone.utc) - timedelta(days=3)
+              if latest is None or latest.replace(tzinfo=timezone.utc) < threshold:
+                  print("yes")
+              else:
+                  print("no")
+          except Exception as e:
+              print(f"yes  # check failed: {e}", file=sys.stderr)
+              print("yes")
+          EOF
+          )
+          echo "needed=$GAP" >> "$GITHUB_OUTPUT"
+          echo "Gap detected: $GAP"
+
+      - name: Run price backfill
+        if: steps.gap_check.outputs.needed == 'yes'
+        working-directory: app_v2
+        env:
+          ENTSOE_API_TOKEN: ${{ secrets.ENTSOE_API_TOKEN }}
+          SUPABASE_CONNECTION_STRING: ${{ secrets.SUPABASE_CONNECTION_STRING }}
+        run: uv run python scripts/backfill_prices_gap.py

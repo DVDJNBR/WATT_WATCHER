@@ -62,11 +62,6 @@ PSR_TYPE_LABELS = {
     "B18": "wind_offshore", "B19": "wind_onshore", "B20": "other",
 }
 
-# ENTSO-E's IEC 62325 namespace — the exact URI is stable across document
-# types/versions in practice but pinned here rather than wildcarded, since a
-# silent namespace mismatch would make every find() below return None.
-_NS = {"ns": "urn:iec62325.351:tc57wg16:451-3:publicationdocument:7:3"}
-
 _RESOLUTION_STEP = {
     "PT60M": timedelta(hours=1),
     "PT30M": timedelta(minutes=30),
@@ -481,7 +476,15 @@ class EntsoeClient:
 
     @staticmethod
     def _parse_price_document(xml_text: str) -> list[dict]:
-        """Parse an A44 Publication_MarketDocument into flat price records."""
+        """Parse an A44 Publication_MarketDocument into flat price records.
+
+        Uses namespace-agnostic {*} wildcards (same pattern as _parse_flow_document
+        and _parse_unavailability_document) rather than a pinned namespace URI.
+        Previously pinned to _NS = urn:iec62325.351:tc57wg16:451-3:publicationdocument:7:3;
+        if ENTSO-E bumped that URI the selector silently returned nothing and the stage
+        perpetually reported {"status": "empty"} with no error — namespace drift is now
+        surfaced as a warning instead.
+        """
         try:
             root = ET.fromstring(xml_text)
         except ET.ParseError as exc:
@@ -496,28 +499,39 @@ class EntsoeClient:
             raise EntsoeClientError(f"ENTSO-E rejected the request: {reason}")
 
         records: list[dict] = []
-        for period in root.findall(".//ns:TimeSeries/ns:Period", _NS):
-            start_str = period.findtext("ns:timeInterval/ns:start", namespaces=_NS)
-            resolution = period.findtext("ns:resolution", namespaces=_NS)
-            step = _RESOLUTION_STEP.get(resolution or "")
-            if not start_str or step is None:
-                logger.warning(
-                    "Skipping Period with unhandled resolution %r", resolution
-                )
-                continue
-
-            period_start = datetime.strptime(start_str, "%Y-%m-%dT%H:%MZ").replace(
-                tzinfo=timezone.utc
+        time_series = root.findall(".//{*}TimeSeries")
+        if not time_series:
+            # Got a non-Acknowledgement document but no TimeSeries — log the
+            # root tag so a namespace mismatch is immediately visible in logs.
+            logger.warning(
+                "_parse_price_document: no TimeSeries found in document with root tag %r "
+                "(possible namespace change — check raw XML if prices stay empty)",
+                root.tag,
             )
 
-            for point in period.findall("ns:Point", _NS):
-                position_str = point.findtext("ns:position", namespaces=_NS)
-                price_str = point.findtext("ns:price.amount", namespaces=_NS)
-                if position_str is None or price_str is None:
+        for ts_elem in time_series:
+            for period in ts_elem.findall("{*}Period"):
+                start_str = period.findtext("{*}timeInterval/{*}start")
+                resolution = period.findtext("{*}resolution")
+                step = _RESOLUTION_STEP.get(resolution or "")
+                if not start_str or step is None:
+                    logger.warning(
+                        "Skipping Period with unhandled resolution %r", resolution
+                    )
                     continue
-                position = int(position_str)
-                ts = period_start + step * (position - 1)
-                records.append({"timestamp": ts, "price_eur_mwh": float(price_str)})
+
+                period_start = datetime.strptime(start_str, "%Y-%m-%dT%H:%MZ").replace(
+                    tzinfo=timezone.utc
+                )
+
+                for point in period.findall("{*}Point"):
+                    position_str = point.findtext("{*}position")
+                    price_str = point.findtext("{*}price.amount")
+                    if position_str is None or price_str is None:
+                        continue
+                    position = int(position_str)
+                    ts = period_start + step * (position - 1)
+                    records.append({"timestamp": ts, "price_eur_mwh": float(price_str)})
 
         logger.info("Parsed %d price points from ENTSO-E response", len(records))
         return records
