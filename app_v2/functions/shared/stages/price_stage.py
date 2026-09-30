@@ -36,16 +36,23 @@ def run(
         import os
         entsoe_token = os.environ.get("ENTSOE_API_TOKEN", "")
         if not entsoe_token:
-            return {"status": "skipped", "reason": "no ENTSOE_API_TOKEN"}
+            # Loud on purpose: a missing token used to return "skipped", which the
+            # daily pipeline reported as success — the stage was dead for six weeks
+            # before anyone noticed the data had stopped.
+            logger.error("[%s] ENTSOE_API_TOKEN not configured — stage cannot run", job_id)
+            return {"status": "failure", "error": "ENTSOE_API_TOKEN not configured"}
 
         now = datetime.now(timezone.utc)
         if period_end is None:
-            period_end = now
+            # Reach into tomorrow: ENTSO-E publishes the next market day's
+            # day-ahead prices around 12:45 CET. A period_end of "now" cut them
+            # off, so the dashboard never showed the day people actually plan for.
+            period_end = now + timedelta(days=1)
         if period_start is None:
-            # 26h lookback comfortably covers the current market day regardless
-            # of DST offset; ON CONFLICT(id_date) DO UPDATE below makes
-            # re-fetching overlapping slots on every run harmless.
-            period_start = period_end - timedelta(hours=26)
+            # 26h lookback from now (not from period_end) comfortably covers the
+            # current market day regardless of DST offset; ON CONFLICT(id_date)
+            # DO UPDATE below makes re-fetching overlapping slots harmless.
+            period_start = now - timedelta(hours=26)
         client = EntsoeClient(api_token=entsoe_token)
         price_records = client.fetch_day_ahead_prices(period_start, period_end)
         if price_records:

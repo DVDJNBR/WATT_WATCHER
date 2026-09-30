@@ -82,7 +82,17 @@ def run_daily_pipeline(job_id: str | None = None, local_mode: bool = False) -> d
     results["stages"]["price"] = price_stage.run(job_id, bronze, silver)
     results["stages"]["outages"] = outages_stage.run(job_id, bronze, silver)
     results["stages"]["cross_border"] = cross_border_stage.run(job_id, bronze, silver)
-    results["status"] = "success"
+
+    # Every stage here is independent — one failing shouldn't stop the others —
+    # but the run itself is a failure, and must say so. Reporting success while
+    # three stages wrote nothing is how the ENTSO-E gap went unnoticed.
+    failed = [name for name, r in results["stages"].items() if r.get("status") == "failure"]
+    if failed:
+        logger.error("[%s] daily pipeline: stages failed: %s", job_id, ", ".join(failed))
+        results["status"] = "failure"
+        results["failed_stages"] = failed
+    else:
+        results["status"] = "success"
     return results
 
 
