@@ -699,9 +699,6 @@ export default function DashboardPage() {
           Historique complet, indépendant de la période choisie ailleurs.
         </p>
       )}
-      {showRangeControls && (
-        <RegionSelector regions={regions} selected={selectedRegion} onChange={handleRegionChange} loading={loading} showLabel />
-      )}
       <div className="dash-toolbar__status">
         {(loading || refreshing) && (
           <span className="refresh-dot" title="Actualisation en cours…" aria-label="Actualisation en cours" data-testid="refresh-indicator" />
@@ -710,6 +707,16 @@ export default function DashboardPage() {
           <span className="last-updated" data-testid="last-updated">Màj {formatTime(lastUpdated)}</span>
         )}
       </div>
+    </div>
+  )
+
+  // Le sélecteur de région vit au-dessus de la carte, pas dans la barre du
+  // haut : c'est la carte qu'il pilote, et la carte est ce qu'on regarde en
+  // le manipulant. Posé à l'autre bout de l'écran, il se lisait comme un
+  // filtre global alors qu'il ne touche ni le prix spot ni la maintenance.
+  const regionPicker = (
+    <div className="map-head">
+      <RegionSelector regions={regions} selected={selectedRegion} onChange={handleRegionChange} loading={loading} showLabel />
     </div>
   )
 
@@ -827,6 +834,7 @@ export default function DashboardPage() {
                 />
               </div>
               <div className="pbi-layout__right">
+                {regionPicker}
                 <div className="pbi-layout__map-wrap">
                   <FranceMap
                     regions={regions}
@@ -963,6 +971,7 @@ export default function DashboardPage() {
                   loading={maintenanceLoading}
                 />
               </div>
+              {regionPicker}
               <div className="pbi-layout__map-wrap">
                 <MaintenanceMap maintenanceEvents={maintenanceEvents} loading={maintenanceLoading} />
               </div>

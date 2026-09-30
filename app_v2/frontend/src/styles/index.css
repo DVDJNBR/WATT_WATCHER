@@ -213,6 +213,22 @@ body {
   display: grid;
 }
 
+/* Sélecteur de région, posé juste au-dessus de la carte qu'il pilote. Aligné
+   à droite : il suit le bord de la carte plutôt que de flotter au milieu. */
+.map-head {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  flex: 0 0 auto;
+  padding: 0 0 8px;
+}
+/* Le sélecteur s'empile verticalement par défaut ; sur une seule ligne
+   au-dessus de la carte, le libellé se lit à côté du menu, pas au-dessus. */
+.map-head .region-selector {
+  flex-direction: row;
+  gap: 8px;
+}
+
 /* ── Prix tab ─────────────────────────────────────────────────────────────
    Le day-ahead tient la colonne de gauche sur toute la hauteur : sa boîte ne
    bouge plus quand on change de couche. L'historique et les chiffres
