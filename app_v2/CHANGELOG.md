@@ -1,3 +1,9 @@
+## [1.47.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.46.0...v1.47.0) (2026-09-30)
+
+### Features
+
+* **dashboard:** apply the region filter to maintenance too ([7fe171b](https://github.com/DVDJNBR/WATT_WATCHER/commit/7fe171b214d82c3c82424548f73cd931c2bd044c))
+
 ## [1.46.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.45.3...v1.46.0) (2026-09-30)
 
 ### Features
