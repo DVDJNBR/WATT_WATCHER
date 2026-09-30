@@ -557,13 +557,25 @@ export default function DashboardPage() {
     })
   }, [maintenanceEvents, allUnits])
 
-  const maintenanceEventCount = maintenanceEvents.length
-  const maintenanceTotalMw = useMemo(
-    () => maintenanceEvents.reduce((s, e) => s + (e.unavailable_mw || 0), 0),
-    [maintenanceEvents]
+  const selectedRegionName = regions.find(r => r.code_insee === selectedRegion)?.region
+
+  // La région filtre l'onglet entier, maintenance comprise. Un événement dont
+  // l'unité n'a pas été retrouvée dans le registre géolocalisé n'a pas de
+  // région : il sort du décompte dès qu'une région est choisie, faute de
+  // pouvoir l'attribuer — il reste visible sur « Toutes ».
+  const maintenanceForRegion = useMemo(
+    () => selectedRegionName
+      ? maintenanceEventsWithRegion.filter(e => e.region === selectedRegionName)
+      : maintenanceEventsWithRegion,
+    [maintenanceEventsWithRegion, selectedRegionName]
   )
 
-  const selectedRegionName = regions.find(r => r.code_insee === selectedRegion)?.region
+  const maintenanceEventCount = maintenanceForRegion.length
+  const maintenanceTotalMw = useMemo(
+    () => maintenanceForRegion.reduce((s, e) => s + (e.unavailable_mw || 0), 0),
+    [maintenanceForRegion]
+  )
+
   const latestConsommation = consommationSparkData.length ? consommationSparkData[consommationSparkData.length - 1].v : null
   const soldeMw = latestConsommation != null ? totalMw - latestConsommation : null
 
@@ -934,13 +946,13 @@ export default function DashboardPage() {
               <h2 className="chart-title" title="Événements d'indisponibilité de production (planifiés ou non) publiés par ENTSO-E, en cours ou à venir.">Événements de maintenance en cours</h2>
               {maintenanceLoading ? (
                 <div className="skeleton" style={{ height: 260 }} />
-              ) : maintenanceEventsWithRegion.length === 0 ? (
+              ) : maintenanceForRegion.length === 0 ? (
                 <div className="empty-state">
                   <p className="empty-state__title">Aucun événement</p>
                 </div>
               ) : (
                 <div style={{ overflowY: 'auto', maxHeight: 320 }}>
-                  {maintenanceEventsWithRegion.slice(0, 30).map(evt => (
+                  {maintenanceForRegion.slice(0, 30).map(evt => (
                     <div key={evt.event_id} style={{
                       display: 'flex', justifyContent: 'space-between', gap: 10,
                       padding: '8px 0', borderBottom: '1px solid var(--color-border)', fontSize: '0.8rem',
@@ -973,7 +985,11 @@ export default function DashboardPage() {
               </div>
               {regionPicker}
               <div className="pbi-layout__map-wrap">
-                <MaintenanceMap maintenanceEvents={maintenanceEvents} loading={maintenanceLoading} />
+                <MaintenanceMap
+                  maintenanceEvents={maintenanceForRegion}
+                  region={selectedRegionName}
+                  loading={maintenanceLoading}
+                />
               </div>
             </div>
           </div>
