@@ -88,7 +88,7 @@ function buildContext(history) {
 
 const LAYERS = [
   { id: 'charge', label: 'Le résidu de charge', swatch: 'price-tog__sw--load' },
-  { id: 'histo', label: 'Les autres journées', swatch: 'price-tog__sw--hist' },
+  { id: 'histo', label: 'Comparatif historique', swatch: 'price-tog__sw--hist' },
 ]
 
 const HINT_COMMON =

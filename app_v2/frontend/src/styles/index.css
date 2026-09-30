@@ -374,7 +374,7 @@ body {
    deux couches sont présentes mais en retrait — le day-ahead domine sans
    qu'on ait à les effacer. Le bouton remonte celle qu'on demande ; l'autre ne
    bouge pas, elle était déjà basse. */
-.price-plot .price-ghostday { stroke-opacity: 0.055; }
+.price-plot .price-ghostday { stroke-opacity: 0.1; }
 .price-plot .price-wedge--residu { fill-opacity: 0.03; }
 .price-plot .price-wedge--eolien { fill-opacity: 0.06; }
 .price-plot .price-wedge--solaire { fill-opacity: 0.07; }
@@ -484,20 +484,19 @@ body {
   flex: 1 1 auto;
   min-height: 0;
 }
-.kpineg {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 18px;
-  padding-right: 22px;
-}
+/* Deux rangs égaux de chaque côté, et chaque chiffre centré dans le sien :
+   centrer le groupe laissait les deux valeurs collées au milieu du bloc au
+   lieu de tenir chacune sa zone. */
 .kpipairv {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  border-left: 2px solid var(--color-border);
-  padding-left: 22px;
+  display: grid;
+  grid-template-rows: 1fr 1fr;
+  min-height: 0;
 }
+/* Le titre reste en tête, hors de la grille : compté comme un rang, il
+   dévorait la moitié de la colonne et poussait le second chiffre dehors. */
+.kpineg { display: flex; flex-direction: column; min-height: 0; padding-right: 22px; }
+.kpineg__rows { display: grid; grid-template-rows: 1fr 1fr; flex: 1 1 auto; min-height: 0; }
+.kpipairv { border-left: 2px solid var(--color-border); padding-left: 22px; }
 
 .kpi__k {
   font-size: 0.68rem;
@@ -506,7 +505,14 @@ body {
   color: var(--color-text-muted);
   margin-bottom: 2px;
 }
-.kpi { display: flex; flex-direction: column; gap: 1px; padding: 0 0 16px; }
+.kpi {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 1px;
+  padding: 0 0 16px;
+  min-height: 0;
+}
 .kpi + .kpi { border-top: 1px solid var(--color-border); padding: 16px 0 0; }
 .kpi__v {
   font-family: var(--font-display);
@@ -519,7 +525,7 @@ body {
 .kpi__v .u { font-size: 0.8rem; font-weight: 400; color: var(--color-text-muted); letter-spacing: 0; }
 .kpi__s { font-size: 0.68rem; color: var(--color-text-muted); margin-top: 4px; }
 
-.negrow { display: flex; flex-direction: column; gap: 1px; }
+.negrow { display: flex; flex-direction: column; justify-content: center; gap: 1px; min-height: 0; }
 .negrow__k { font-size: 0.68rem; color: var(--color-text-muted); }
 .negrow__v {
   font-family: var(--font-display);

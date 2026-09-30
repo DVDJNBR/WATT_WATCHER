@@ -868,6 +868,7 @@ export default function DashboardPage() {
               <div className="kpiblock">
                 <div className="kpineg">
                   <span className="kpi__k">Prix négatifs</span>
+                  <div className="kpineg__rows">
                   <div className="negrow">
                     <span className="negrow__k">Jours concernés</span>
                     <span className="negrow__v num">
@@ -886,6 +887,7 @@ export default function DashboardPage() {
                     <span className="negrow__p num">
                       {negativeSlotSharePct != null ? `${String(negativeSlotSharePct).replace('.', ',')} %` : '—'} du total
                     </span>
+                  </div>
                   </div>
                 </div>
                 <div className="kpipairv">
