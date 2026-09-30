@@ -1,3 +1,9 @@
+## [1.45.3](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.45.2...v1.45.3) (2026-09-30)
+
+### Bug Fixes
+
+* **prix:** restore the day-ahead chart's two context layers ([e103bce](https://github.com/DVDJNBR/WATT_WATCHER/commit/e103bce127556b7b933ef7d64a4408b80ed6ea97))
+
 ## [1.45.2](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.45.1...v1.45.2) (2026-09-30)
 
 ### Bug Fixes
