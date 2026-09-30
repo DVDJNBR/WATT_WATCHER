@@ -14,7 +14,7 @@
   --color-text:         #f2f2f0;
   --color-text-muted:   #9a9a9e;
   --color-accent:       #2dd4bf;
-  --color-accent-glow:  rgba(45,212,191,0.22);
+  --color-accent-glow:  rgba(45,212,191,0.7);
 
   /* Pipeline source colours (Pipeline page) — decoupled from the energy-mix
      palette below on purpose: this is "which system produced this data",
@@ -70,7 +70,8 @@
   --color-text:      #1c1b1a;
   --color-text-muted:#5c5a56; /* ~6.8:1 sur #f7f5f2 — WCAG AA */
   --color-accent:    #0f9c8f;
-  --color-accent-glow: rgba(15,156,143,0.16);
+  --color-accent-glow: rgba(15,156,143,0.45);
+  --color-charbon-line: #6b7280;
   --glass-bg:        rgba(255,255,255,0.72);
   --glass-border:    rgba(0,0,0,0.08);
 }
@@ -203,6 +204,342 @@ body {
   flex: 1 1 auto;
   min-height: 0;
   display: grid;
+}
+
+/* ── Prix tab ─────────────────────────────────────────────────────────────
+   Le day-ahead tient la colonne de gauche sur toute la hauteur : sa boîte ne
+   bouge plus quand on change de couche. L'historique et les chiffres
+   s'empilent dans le tiers restant. */
+.prix-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(320px, 1fr);
+  grid-template-rows: auto auto;
+  gap: 20px 22px;
+  align-items: stretch;
+  min-height: 0;
+}
+.prix-grid > * { min-width: 0; min-height: 0; }
+.price-hero { grid-row: 1 / span 2; align-self: stretch; }
+/* recharts mesure la hauteur de son parent : dans une rangée `auto` il n'en
+   trouve aucune et s'écrase. L'historique a donc besoin d'un plancher. */
+.prix-grid > .chart-card:not(.price-hero) { min-height: 310px; }
+
+@media (max-width: 1024px) {
+  .prix-grid { grid-template-columns: 1fr; grid-template-rows: none; }
+  .price-hero { grid-row: auto; }
+}
+
+/* ── Le hero ──────────────────────────────────────────────────────────── */
+.price-hero { display: flex; flex-direction: column; padding: 4px 2px 10px; }
+.price-hero__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  flex: 0 0 auto;
+}
+.price-hero__kicker {
+  font-size: 0.66rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--color-accent);
+  font-weight: 600;
+  margin: 0 0 2px;
+}
+.price-hero .chart-title { display: flex; align-items: center; font-size: 1.05rem; }
+.price-hero__right { display: flex; flex-direction: column; align-items: flex-end; gap: 10px; }
+.price-hero__meta { font-size: 0.72rem; color: var(--color-text-muted); white-space: nowrap; }
+
+/* Le tracé prend tout ce que la carte ne consomme pas. Le viewBox a été
+   rallongé (900x660) pour que son rapport colle à celui de la colonne : trop
+   large, il laissait des bandes vides en haut et en bas. */
+.price-hero__plot { position: relative; flex: 1 1 auto; min-height: 0; display: flex; }
+.price-hero__svg { width: 100%; height: 100%; display: block; overflow: visible; }
+.price-hero__svg text { font-family: var(--font-sans); }
+
+.price-hero__gloss {
+  flex: 0 0 auto;
+  margin: 4px 0 0;
+  font-size: 0.72rem;
+  line-height: 1.45;
+  color: var(--color-text-muted);
+}
+.price-hero__gloss strong { color: var(--color-text); font-weight: 600; }
+
+/* ── Bascules de couche ───────────────────────────────────────────────────
+   Exclusives entre elles mais désactivables : cliquer la couche active la
+   retire. Un groupe radio ne sait pas faire ça, d'où aria-pressed. Le « + »
+   porte l'affordance — il annonce qu'on ajoute quelque chose, et devient
+   « − » une fois la couche posée. */
+.price-tog { display: inline-flex; gap: 8px; }
+.price-tog__b {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-width: 1px;
+  border-radius: 999px;
+  font: inherit;
+  font-size: 0.75rem;
+  /* La graisse ne change jamais d'un état à l'autre : elle élargirait le
+     libellé, ce qui repousserait le graphique. */
+  font-weight: 600;
+  padding: 6px 13px 6px 9px;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: border-color var(--transition), background var(--transition), color var(--transition);
+}
+.price-tog__b:hover {
+  color: var(--color-text);
+  border-color: var(--color-text-muted);
+  background: var(--color-surface-2);
+}
+/* box-shadow plutôt qu'outline : un outline avec offset réserve de la place
+   dans le flux et décale le graphique au moment du focus. */
+.price-tog__b:focus-visible { outline: none; box-shadow: 0 0 0 1.5px var(--color-accent); }
+.price-tog__b[aria-pressed="true"] {
+  background: var(--color-surface-2);
+  border-color: var(--color-text);
+  color: var(--color-text);
+}
+
+.price-tog__sign { position: relative; width: 11px; height: 11px; flex: 0 0 auto; opacity: 0.8; }
+.price-tog__sign::before,
+.price-tog__sign::after {
+  content: '';
+  position: absolute;
+  background: currentColor;
+  border-radius: 1px;
+  transition: transform var(--transition), opacity var(--transition);
+}
+.price-tog__sign::before { left: 0; right: 0; top: 5px; height: 1.5px; }
+.price-tog__sign::after { top: 0; bottom: 0; left: 5px; width: 1.5px; }
+.price-tog__b[aria-pressed="true"] .price-tog__sign { opacity: 1; }
+.price-tog__b[aria-pressed="true"] .price-tog__sign::after { transform: scaleY(0); opacity: 0; }
+
+.price-tog__sw { width: 9px; height: 9px; border-radius: 2px; flex: 0 0 auto; opacity: 0.5; }
+.price-tog__b[aria-pressed="true"] .price-tog__sw { opacity: 1; }
+.price-tog__sw--hist { background: var(--color-charbon-line); }
+.price-tog__sw--load {
+  background: linear-gradient(
+    to bottom,
+    var(--color-solaire) 0 40%,
+    var(--color-eolien) 40% 72%,
+    var(--color-text) 72% 100%
+  );
+}
+
+/* ── Marques du graphique ─────────────────────────────────────────────── */
+.price-ax { fill: var(--color-text-muted); font-size: 11px; }
+.price-gridline { stroke: #888; stroke-opacity: 0.15; stroke-width: 1; }
+.price-zeroline { stroke: var(--color-text-muted); stroke-opacity: 0.6; stroke-width: 1; stroke-dasharray: 4 4; }
+.price-annotline { stroke: var(--color-text-muted); stroke-opacity: 0.55; stroke-width: 1; stroke-dasharray: 3 3; }
+
+/* Le seul élément qui a droit au teal, et le seul qui a droit à un halo. */
+.price-line {
+  fill: none;
+  stroke: var(--color-accent);
+  stroke-width: 3;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+  filter: drop-shadow(0 0 3px var(--color-accent-glow)) drop-shadow(0 0 12px var(--color-accent-glow));
+}
+.price-end { fill: var(--color-accent); stroke: var(--color-surface); stroke-width: 2; }
+.price-end__label { fill: var(--color-accent); font-weight: 700; font-size: 12px; }
+
+/* La seule courbe de charge à suivre : celle qui bouge comme le prix. */
+.price-residline {
+  fill: none;
+  stroke: var(--color-text);
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+  stroke-linejoin: round;
+}
+.price-wedge { stroke: none; }
+.price-wedge--residu { fill: var(--color-text-muted); }
+.price-wedge--eolien { fill: var(--color-eolien); }
+.price-wedge--solaire { fill: var(--color-solaire); }
+/* Gris charbon : nettement plus froid et plus sombre que le blanc du résidu,
+   qu'elles croisent en permanence. */
+.price-ghostday {
+  fill: none;
+  stroke: var(--color-charbon-line);
+  stroke-width: 0.8;
+  vector-effect: non-scaling-stroke;
+}
+
+/* Trois paliers de densité, déclarés ici et nulle part ailleurs. Au repos les
+   deux couches sont présentes mais en retrait — le day-ahead domine sans
+   qu'on ait à les effacer. Le bouton remonte celle qu'on demande ; l'autre ne
+   bouge pas, elle était déjà basse. */
+.price-plot .price-ghostday { stroke-opacity: 0.1; }
+.price-plot .price-wedge--residu { fill-opacity: 0.03; }
+.price-plot .price-wedge--eolien { fill-opacity: 0.06; }
+.price-plot .price-wedge--solaire { fill-opacity: 0.07; }
+.price-plot .price-residline { stroke-opacity: 0.26; }
+.price-plot .price-ghostday,
+.price-plot .price-wedge,
+.price-plot .price-residline {
+  transition: stroke-opacity var(--transition), fill-opacity var(--transition), stroke-width var(--transition);
+}
+.price-plot.is-histo .price-ghostday { stroke-opacity: 0.24; }
+.price-plot.is-charge .price-wedge--residu { fill-opacity: 0.07; }
+.price-plot.is-charge .price-wedge--eolien { fill-opacity: 0.26; }
+.price-plot.is-charge .price-wedge--solaire { fill-opacity: 0.28; }
+.price-plot.is-charge .price-residline { stroke-opacity: 1; stroke-width: 2.2; }
+
+/* ── Légende ──────────────────────────────────────────────────────────── */
+.price-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 14px;
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
+  margin-top: auto;
+  padding-top: 8px;
+  flex: 0 0 auto;
+}
+.price-legend__i { display: inline-flex; align-items: center; gap: 5px; }
+.price-legend__line { width: 14px; height: 2px; flex-shrink: 0; }
+.price-legend__line--resid { background: var(--color-text); opacity: 0.9; }
+.price-legend__line--ghost { background: var(--color-charbon-line); }
+.price-legend__box { width: 10px; height: 10px; flex-shrink: 0; }
+.price-legend__sep { width: 1px; height: 11px; background: var(--color-border); }
+.price-legend strong { color: var(--color-text); font-weight: 600; }
+
+/* ── Infobulle à deux lectures ────────────────────────────────────────── */
+.price-tip { max-width: 290px; white-space: normal; }
+.price-tip__h {
+  margin-top: 5px;
+  padding-top: 4px;
+  border-top: 1px solid var(--color-border);
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--color-text-muted);
+}
+.price-tip__s { font-size: 0.7rem; line-height: 1.4; }
+
+/* ── L'ampoule ────────────────────────────────────────────────────────────
+   Pas un point d'interrogation : celui-ci annonce une aide sur l'interface,
+   alors qu'ici c'est la lecture du graphique qui s'explique. */
+.hint {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  margin-left: 6px;
+  background: none;
+  border: none;
+  border-radius: 50%;
+  color: var(--color-text-muted);
+  cursor: help;
+  position: relative;
+  flex: 0 0 auto;
+}
+.hint:hover, .hint:focus-visible { color: var(--color-accent); background: var(--color-surface-2); }
+.hint:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 1px; }
+.hint svg { width: 14px; height: 14px; display: block; }
+.hint__body {
+  position: absolute;
+  z-index: 60;
+  left: 0;
+  top: calc(100% + 8px);
+  width: 330px;
+  max-width: 70vw;
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 10px 13px;
+  text-align: left;
+  font-size: 0.72rem;
+  line-height: 1.5;
+  color: var(--color-text-muted);
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity var(--transition);
+  pointer-events: none;
+}
+.hint:hover .hint__body, .hint:focus-visible .hint__body { opacity: 1; visibility: visible; }
+
+/* ── Les chiffres ─────────────────────────────────────────────────────────
+   Deux sujets, pas quatre chiffres alignés. La barre franche sépare les
+   colonnes ; le filet fin sépare les deux de droite. Les deux chiffres des
+   prix négatifs partagent un titre et n'ont donc rien entre eux. */
+.kpis { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
+.kpiblock {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border-top: 1px solid var(--color-border);
+  padding-top: 20px;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+/* Deux rangs égaux de chaque côté, et chaque chiffre centré dans le sien :
+   centrer le groupe laissait les deux valeurs collées au milieu du bloc au
+   lieu de tenir chacune sa zone. */
+.kpipairv {
+  display: grid;
+  grid-template-rows: 1fr 1fr;
+  min-height: 0;
+}
+/* Le titre reste en tête, hors de la grille : compté comme un rang, il
+   dévorait la moitié de la colonne et poussait le second chiffre dehors. */
+.kpineg { display: flex; flex-direction: column; min-height: 0; padding-right: 22px; }
+.kpineg__rows { display: grid; grid-template-rows: 1fr 1fr; flex: 1 1 auto; min-height: 0; }
+.kpipairv { border-left: 2px solid var(--color-border); padding-left: 22px; }
+
+.kpi__k {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--color-text-muted);
+  margin-bottom: 2px;
+}
+.kpi {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 1px;
+  padding: 0 0 16px;
+  min-height: 0;
+}
+.kpi + .kpi { border-top: 1px solid var(--color-border); padding: 16px 0 0; }
+.kpi__v {
+  font-family: var(--font-display);
+  font-size: 1.85rem;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  color: var(--color-text);
+}
+.kpi__v .u { font-size: 0.8rem; font-weight: 400; color: var(--color-text-muted); letter-spacing: 0; }
+.kpi__s { font-size: 0.68rem; color: var(--color-text-muted); margin-top: 4px; }
+
+.negrow { display: flex; flex-direction: column; justify-content: center; gap: 1px; min-height: 0; }
+.negrow__k { font-size: 0.68rem; color: var(--color-text-muted); }
+.negrow__v {
+  font-family: var(--font-display);
+  font-size: 1.85rem;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+.negrow__v .u { font-size: 0.8rem; font-weight: 400; color: var(--color-text-muted); }
+.negrow__p { font-size: 0.75rem; font-weight: 600; color: #ef4444; margin-top: 3px; }
+
+@media (max-width: 1024px) {
+  .kpis { justify-content: flex-start; }
+  .kpiblock { padding-top: 14px; }
 }
 
 /* ── Controls row (below the map) — période / région / màj, horizontal ── */
@@ -682,6 +1019,7 @@ body {
 
 .dashboard-content .hero-grid,
 .dashboard-content .hero-grid--single,
+.dashboard-content .prix-grid,
 .dashboard-content .pbi-layout {
   flex: 1 1 0;
   min-height: 0;
@@ -706,7 +1044,8 @@ body {
   /* pbi-layout declared here (after .dashboard-content .pbi-layout) so the
      cascade order is correct — the higher-specificity general rule is above,
      and this media query overrides it at the same specificity but later. */
-  .dashboard-content .pbi-layout { flex: 0 0 auto; }
+  .dashboard-content .pbi-layout,
+  .dashboard-content .prix-grid { flex: 0 0 auto; }
 }
 
 /* ── Buttons ──────────────────────────────────────────────────────────────── */

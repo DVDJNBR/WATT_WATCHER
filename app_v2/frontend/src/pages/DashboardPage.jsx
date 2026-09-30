@@ -12,17 +12,18 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { KPICard } from '../components/KPICard.jsx'
 import { FranceMap } from '../components/FranceMap.jsx'
-import { CurtailmentCalendar } from '../components/CurtailmentCalendar.jsx'
 import { HistoryChart } from '../components/HistoryChart.jsx'
 import { computeCarbonIntensity } from '../components/CarbonGauge.jsx'
 import { CapacityFactorChart } from '../components/CapacityFactorChart.jsx'
 import { MaintenanceMap, normalize as normalizeUnitName } from '../components/MaintenanceMap.jsx'
 import { PriceTrendChart } from '../components/PriceTrendChart.jsx'
+import { PriceHistoryBars } from '../components/PriceHistoryBars.jsx'
+import { PriceDayAheadChart } from '../components/PriceDayAheadChart.jsx'
 import { cloudScale, cloudScaleBase, OFF_COLORS } from '../components/SourcesCanvasMap.jsx'
 import { useDarkTheme } from '../hooks/useDarkTheme.js'
 import {
-  fetchAllProduction, fetchRegions, fetchMeteo, fetchCapacity, fetchCurtailmentCalendar, fetchCurtailmentRisk,
-  fetchMaintenance, fetchProductionUnits, fetchMarketPrice, fetchDataRange,
+  fetchAllProduction, fetchRegions, fetchMeteo, fetchCapacity, fetchCurtailmentRisk,
+  fetchMaintenance, fetchProductionUnits, fetchMarketPrice, fetchDayAhead, fetchDataRange,
 } from '../services/api.js'
 import { RegionSelector } from '../components/RegionSelector.jsx'
 import { MeteoChart } from '../components/MeteoChart.jsx'
@@ -33,6 +34,13 @@ import { CapacityChart } from '../components/CapacityChart.jsx'
 // the circular-dep resolution and causes a TDZ crash.
 
 const REFRESH_INTERVAL_MS = 15 * 60 * 1000  // 15 minutes
+
+// Prix tab figures before the whole-history series has landed.
+const EMPTY_PRICE_STATS = {
+  avgPriceEurMwh: null, medianPriceEurMwh: null, avgDailySpreadEurMwh: null,
+  negativeSlotSharePct: null, negDaysHit: null, totalDays: null,
+  negHoursTotal: null, totalHoursQuoted: null,
+}
 
 const SOURCE_LABELS = {
   nucleaire:   'Nucléaire',
@@ -247,21 +255,22 @@ export default function DashboardPage() {
   const [capacityData, setCapacityData] = useState([])
   const [drillLoading, setDrillLoading] = useState(false)
 
-  // Negative-price calendar: whole-history aggregate, independent of the region/date drill-down
-  const [calendarDays, setCalendarDays] = useState([])
-  const [calendarRange, setCalendarRange] = useState(null)
-  const [calendarStats, setCalendarStats] = useState(null)
-  const [calendarLoading, setCalendarLoading] = useState(true)
-
   // Curtailment risk by region: whole-history, drives the map's default mode —
   // which regions actually drive curtailment (wind+solar surplus during
   // negative-price windows), not just who produces the most.
   const [curtailmentRiskData, setCurtailmentRiskData] = useState([])
 
-  // Day-ahead spot price over time — Consommation tab. National (no region
-  // filter), follows the shared date range like production/météo.
-  const [marketPriceData, setMarketPriceData] = useState([])
-  const [priceLoading, setPriceLoading] = useState(true)
+  // Whole-history spot price — Prix tab. Fetched once and independent of the
+  // toolbar range: the point of that tab is
+  // the three-month shape (when prices spike, when they go under zero), which
+  // a 24 h default window would hide entirely.
+  const [priceHistory, setPriceHistory] = useState([])
+  const [priceHistoryLoading, setPriceHistoryLoading] = useState(true)
+
+  // Last priced day, with the national consumption and wind+solar of the same
+  // slots — the Prix tab's hero. Served pre-joined by /v1/prices/day-ahead.
+  const [dayAhead, setDayAhead] = useState({ day: null, data: [] })
+  const [dayAheadLoading, setDayAheadLoading] = useState(true)
 
   // Maintenance events — Capacité tab
   const [maintenanceEvents, setMaintenanceEvents] = useState([])
@@ -374,21 +383,6 @@ export default function DashboardPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadData])
 
-  // Negative-price calendar: fetched once, whole history
-  useEffect(() => {
-    let cancelled = false
-    fetchCurtailmentCalendar()
-      .then(result => {
-        if (cancelled) return
-        setCalendarDays(result.days || [])
-        setCalendarRange(result.range || null)
-        setCalendarStats(result.stats || null)
-      })
-      .catch(() => {})
-      .finally(() => { if (!cancelled) setCalendarLoading(false) })
-    return () => { cancelled = true }
-  }, [])
-
   useEffect(() => {
     let cancelled = false
     fetchCurtailmentRisk()
@@ -407,18 +401,27 @@ export default function DashboardPage() {
     return () => { cancelled = true }
   }, [])
 
-  // Day-ahead spot price — national, refetched when the shared date range
-  // changes (same range as production/météo; independent of region since
-  // price has no region dimension).
+  // Whole-history spot price — fetched once, no date params. ~15 k 15-min
+  // rows over three months, which is small enough to reduce client-side into
+  // the Prix tab's daily bars and 24 h profile without a dedicated endpoint.
   useEffect(() => {
     let cancelled = false
-    setPriceLoading(true)
-    fetchMarketPrice({ startDate, endDate })
-      .then(result => { if (!cancelled) setMarketPriceData(result.data || []) })
-      .catch(() => { if (!cancelled) setMarketPriceData([]) })
-      .finally(() => { if (!cancelled) setPriceLoading(false) })
+    fetchMarketPrice({ limit: 50000 })
+      .then(result => { if (!cancelled) setPriceHistory(result.data || []) })
+      .catch(() => { if (!cancelled) setPriceHistory([]) })
+      .finally(() => { if (!cancelled) setPriceHistoryLoading(false) })
     return () => { cancelled = true }
-  }, [startDate, endDate])
+  }, [])
+
+  // Day-ahead hero — fetched once, independent of the toolbar range.
+  useEffect(() => {
+    let cancelled = false
+    fetchDayAhead()
+      .then(result => { if (!cancelled) setDayAhead({ day: result.day || null, data: result.data || [] }) })
+      .catch(() => { if (!cancelled) setDayAhead({ day: null, data: [] }) })
+      .finally(() => { if (!cancelled) setDayAheadLoading(false) })
+    return () => { cancelled = true }
+  }, [])
 
   // Region change: drill down into a specific region (or reset to global view)
   const handleRegionChange = useCallback(async (code) => {
@@ -466,7 +469,9 @@ export default function DashboardPage() {
   }, [selectedRegion, startDate, endDate, loadData])
 
   // Compute per-region totals + carbon intensity for choropleth (latest point per region)
-  const { regionTotals, regionConsommation, regionCarbon, regionSources } = useMemo(() => {
+  // regionCarbon is still computed inside the memo (FranceMap's carbon mode
+  // reads it) but nothing on the dashboard renders that mode today.
+  const { regionTotals, regionConsommation, regionSources } = useMemo(() => {
     const latest = {}
     for (const r of globalData) {
       if (!latest[r.code_insee] || r.timestamp > latest[r.code_insee].timestamp) {
@@ -575,12 +580,45 @@ export default function DashboardPage() {
   )
 
 
-  // Prix tab: 2nd chiffre — average spot price over the selected period
-  const avgPriceEurMwh = useMemo(() => {
-    const vals = marketPriceData.map(d => d.price_eur_mwh).filter(v => v != null)
-    if (!vals.length) return null
-    return Math.round((vals.reduce((s, v) => s + v, 0) / vals.length) * 100) / 100
-  }, [marketPriceData])
+  // Prix tab: two figures the daily bars can't state on their own — how wide
+  // a typical day swings, and how much of the history sat under 0 EUR.
+  const {
+    avgPriceEurMwh, medianPriceEurMwh, avgDailySpreadEurMwh, negativeSlotSharePct,
+    negDaysHit, totalDays, negHoursTotal, totalHoursQuoted,
+  } = useMemo(() => {
+    if (!priceHistory.length) return EMPTY_PRICE_STATS
+    const byDay = new Map()
+    let sum = 0
+    let neg = 0
+    let total = 0
+    for (const r of priceHistory) {
+      const v = r.price_eur_mwh
+      if (v == null) continue
+      sum += v
+      total += 1
+      if (v < 0) neg += 1
+      const k = String(r.timestamp).slice(0, 10)
+      const d = byDay.get(k)
+      if (!d) byDay.set(k, { min: v, max: v, neg: v < 0 ? 1 : 0 })
+      else { if (v < d.min) d.min = v; if (v > d.max) d.max = v; if (v < 0) d.neg++ }
+    }
+    if (!total) return EMPTY_PRICE_STATS
+    const spreads = Array.from(byDay.values()).map(d => d.max - d.min)
+    const all = []
+    for (const r of priceHistory) if (r.price_eur_mwh != null) all.push(r.price_eur_mwh)
+    all.sort((a, b) => a - b)
+    return {
+      avgPriceEurMwh: Math.round((sum / total) * 10) / 10,
+      medianPriceEurMwh: Math.round(all[Math.floor(all.length / 2)] * 10) / 10,
+      avgDailySpreadEurMwh: Math.round(spreads.reduce((a, b) => a + b, 0) / spreads.length),
+      negativeSlotSharePct: Math.round((1000 * neg) / total) / 10,
+      // The same story counted at two scales: days touched, and hours summed.
+      negDaysHit: Array.from(byDay.values()).filter(d => d.neg > 0).length,
+      totalDays: byDay.size,
+      negHoursTotal: Math.round(neg / 4),
+      totalHoursQuoted: Math.round(total / 4),
+    }
+  }, [priceHistory])
 
   const [activeTab, setActiveTab] = useState('production')
 
@@ -620,8 +658,15 @@ export default function DashboardPage() {
   ]
 
   // Full-width toolbar — période + région + màj
+  // The Prix tab plots the whole available history and one fixed day — the
+  // last one the market priced. Neither follows the date window, and the
+  // spot price has no region dimension at all (France is a single bidding
+  // zone), so both controls are hidden there rather than left to look live.
+  const showRangeControls = activeTab !== 'prixnegatifs'
+
   const toolbar = (
     <div className="dash-toolbar">
+      {showRangeControls ? (
       <div style={{ display:'flex', alignItems:'center', gap:6 }}>
         <span className="selector-label">Période</span>
         <div className="date-bar" data-testid="date-range">
@@ -648,7 +693,15 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
-      <RegionSelector regions={regions} selected={selectedRegion} onChange={handleRegionChange} loading={loading} showLabel />
+      ) : (
+        <p className="dash-toolbar__scope">
+          Prix spot France entière — zone de marché unique, pas de découpage régional.
+          Historique complet, indépendant de la période choisie ailleurs.
+        </p>
+      )}
+      {showRangeControls && (
+        <RegionSelector regions={regions} selected={selectedRegion} onChange={handleRegionChange} loading={loading} showLabel />
+      )}
       <div className="dash-toolbar__status">
         {(loading || refreshing) && (
           <span className="refresh-dot" title="Actualisation en cours…" aria-label="Actualisation en cours" data-testid="refresh-indicator" />
@@ -796,50 +849,65 @@ export default function DashboardPage() {
           </>
         )}
 
-        {/* ── Prix : prix spot + calendrier | sélecteur + carte export/import + 2 chiffres ── */}
+        {/* ── Prix : day-ahead sur deux tiers | historique + chiffres ── */}
         {activeTab === 'prixnegatifs' && !error && (
-          <div className="pbi-layout">
-            <div className="pbi-layout__left pbi-layout__left--no-kpi">
-              <PriceTrendChart data={marketPriceData} loading={priceLoading} />
-              {/* hideStats=false — its own built-in stats (heures à prix
-                  négatif + record) are literally "fréquence et intensité",
-                  no need to duplicate them in a KPI row above too. */}
-              <CurtailmentCalendar
-                days={calendarDays}
-                range={calendarRange}
-                stats={calendarStats}
-                loading={calendarLoading || !calendarStats}
-                compact
-              />
-            </div>
-            <div className="pbi-layout__right">
-              <div className="pbi-layout__kpi-row pbi-layout__kpi-row--compact">
-                <KPICard
-                  title="Heures à prix négatif"
-                  explain="Total d'heures cumulées à prix négatif sur tout l'historique disponible."
-                  value={calendarStats?.total_hours ?? '—'} unit="h"
-                  sublabel={calendarRange?.start ? `Depuis le ${calendarRange.start}` : undefined}
-                  loading={calendarLoading || !calendarStats}
-                />
-                <KPICard
-                  title="Prix moyen"
-                  explain="Prix spot day-ahead moyen sur la période sélectionnée."
-                  value={avgPriceEurMwh ?? '—'} unit="€/MWh"
-                  loading={priceLoading}
-                />
-              </div>
-              <div className="pbi-layout__map-wrap">
-                <FranceMap
-                  regions={regions}
-                  regionTotals={regionTotals}
-                  regionConsommation={regionConsommation}
-                  regionCarbon={regionCarbon}
-                  selectedCode={selectedRegion}
-                  onSelect={handleRegionChange}
-                  loading={loading}
-                  mode="balance"
-                  availableModes={['balance']}
-                />
+          <div className="prix-grid">
+            <PriceDayAheadChart
+              day={dayAhead.day}
+              data={dayAhead.data}
+              history={priceHistory}
+              loading={dayAheadLoading || priceHistoryLoading}
+            />
+
+            <PriceHistoryBars data={priceHistory} loading={priceHistoryLoading} />
+
+            {/* Deux sujets, pas quatre chiffres alignés : les prix négatifs
+                tiennent la colonne de gauche, les deux autres se partagent la
+                droite derrière une barre franche. */}
+            <div className="kpis">
+              <div className="kpiblock">
+                <div className="kpineg">
+                  <span className="kpi__k">Prix négatifs</span>
+                  <div className="kpineg__rows">
+                  <div className="negrow">
+                    <span className="negrow__k">Jours concernés</span>
+                    <span className="negrow__v num">
+                      {negDaysHit ?? '—'}<span className="u"> / {totalDays ?? '—'} j</span>
+                    </span>
+                    <span className="negrow__p num">
+                      {negDaysHit != null && totalDays ? `${Math.round((100 * negDaysHit) / totalDays)} %` : '—'} du total
+                    </span>
+                  </div>
+                  <div className="negrow">
+                    <span className="negrow__k">Heures cumulées</span>
+                    <span className="negrow__v num">
+                      {negHoursTotal ?? '—'}
+                      <span className="u"> / {totalHoursQuoted != null ? totalHoursQuoted.toLocaleString('fr-FR') : '—'} h</span>
+                    </span>
+                    <span className="negrow__p num">
+                      {negativeSlotSharePct != null ? `${String(negativeSlotSharePct).replace('.', ',')} %` : '—'} du total
+                    </span>
+                  </div>
+                  </div>
+                </div>
+                <div className="kpipairv">
+                  <div className="kpi">
+                    <span className="kpi__k">Prix moyen</span>
+                    <span className="kpi__v num">
+                      {avgPriceEurMwh ?? '—'}<span className="u"> €/MWh</span>
+                    </span>
+                    <span className="kpi__s">
+                      {medianPriceEurMwh != null ? `médiane ${String(medianPriceEurMwh).replace('.', ',')} €` : ''}
+                    </span>
+                  </div>
+                  <div className="kpi">
+                    <span className="kpi__k">Écart de prix / jour</span>
+                    <span className="kpi__v num">
+                      {avgDailySpreadEurMwh ?? '—'}<span className="u"> €/MWh</span>
+                    </span>
+                    <span className="kpi__s">du plus haut au plus bas</span>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
