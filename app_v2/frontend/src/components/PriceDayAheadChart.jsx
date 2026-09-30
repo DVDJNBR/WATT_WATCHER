@@ -43,6 +43,12 @@ function hhmm(ts) {
 const fmtEur = (v, d = 2) => (v == null ? '—' : `${v.toFixed(d).replace('.', ',')} €`)
 const fmtGw = mw => (mw == null ? '—' : `${(mw / 1000).toFixed(1).replace('.', ',')} GW`)
 
+function fmtDayShort(iso) {
+  const d = new Date(`${iso}T00:00:00Z`)
+  if (isNaN(d)) return iso
+  return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', timeZone: 'UTC' })
+}
+
 function fmtDayLong(iso) {
   if (!iso) return ''
   const d = new Date(`${iso}T00:00:00Z`)
@@ -72,23 +78,26 @@ function buildContext(history) {
     bySlot.get(m).push(v)
   }
   const days = []
-  for (const pts of byDay.values()) {
+  const kept = []
+  for (const [d, pts] of byDay) {
     // Partial days would draw a truncated line across the plot.
     if (pts.length <= 76) continue
     pts.sort((a, b) => a[0] - b[0])
     days.push(pts)
+    kept.push(d)
   }
+  kept.sort()
   const slots = new Map()
   for (const [m, vals] of bySlot) {
     const s = [...vals].sort((a, b) => a - b)
     slots.set(m, { p10: quantile(s, 0.1), p50: quantile(s, 0.5), p90: quantile(s, 0.9) })
   }
-  return { days, slots }
+  return { days, slots, span: kept.length ? { from: kept[0], to: kept[kept.length - 1] } : null }
 }
 
 const LAYERS = [
   { id: 'charge', label: 'Le résidu de charge', swatch: 'price-tog__sw--load' },
-  { id: 'histo', label: 'Comparatif historique', swatch: 'price-tog__sw--hist' },
+  { id: 'histo', label: 'Les prix observés', swatch: 'price-tog__sw--hist' },
 ]
 
 const HINT_COMMON =
@@ -105,10 +114,22 @@ const HINTS = {
     "la production éolienne et solaire. Le coin coloré au-dessus est précisément ce que la météo a " +
     "retiré. Seul le résidu se négocie sur le marché, et c'est pour cela qu'il monte et descend " +
     "avec le prix. " + HINT_COMMON,
-  histo:
-    "Chaque trait pâle est une autre journée de l'historique, sur le même axe de 24 h. La " +
-    "dispersion est montrée telle quelle, sans statistique intermédiaire : la position de la " +
-    "journée cotée dans le peloton se lit directement. " + HINT_COMMON,
+  histo: null,   // dépend des données : construit par hintHisto()
+}
+
+/**
+ * Le libellé « prix observés » doit dire de quoi il est fait : combien de
+ * journées, et sur quelle fenêtre. Sans ça, rien ne distingue un relevé d'une
+ * norme calculée.
+ */
+function hintHisto(days, span) {
+  const window = span ? ` — du ${span.from} au ${span.to}` : ''
+  return (
+    `Chaque trait pâle est une journée réellement cotée, tracée sur le même axe de 24 h : ` +
+    `les ${days} journées complètes les plus récentes de l'historique${window}. ` +
+    `Ce sont des relevés, pas une moyenne — la dispersion est montrée telle quelle, et la ` +
+    `position de la journée cotée dans le peloton se lit directement. ` + HINT_COMMON
+  )
 }
 
 /**
@@ -168,6 +189,10 @@ export const PriceDayAheadChart = memo(function PriceDayAheadChart({
   }
 
   const { x, yP, yL, lMax, pMax, pMin, ticks } = geom
+  const spanLabel = context.span && {
+    from: fmtDayShort(context.span.from),
+    to: fmtDayShort(context.span.to),
+  }
   const last = rows[rows.length - 1]
   const hi = rows.reduce((a, b) => (b.price_eur_mwh > a.price_eur_mwh ? b : a))
   const lo = rows.reduce((a, b) => (b.price_eur_mwh < a.price_eur_mwh ? b : a))
@@ -224,7 +249,11 @@ export const PriceDayAheadChart = memo(function PriceDayAheadChart({
                 <path d="M9 18h6M10 22h4" />
                 <path d="M12 2a7 7 0 0 0-4 12.7V18h8v-3.3A7 7 0 0 0 12 2Z" />
               </svg>
-              <span className="hint__body">{HINTS[layer]}</span>
+              <span className="hint__body">
+                {layer === 'histo'
+                  ? hintHisto(context.days.length, spanLabel)
+                  : HINTS[layer]}
+              </span>
             </button>
           </h2>
         </div>
