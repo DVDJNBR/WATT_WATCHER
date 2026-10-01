@@ -256,3 +256,8 @@ docs/*_report.md
 # Local dev database snapshots (multi-MB, seeded from Supabase)
 dev.sqlite
 dev.sqlite.bak
+
+# Maquettes de travail — itérations visuelles sur l'app, pas du code livré.
+# Lourdes (logos inlinés en data URI) et réécrites en permanence : elles n'ont
+# rien à faire dans l'historique.
+mockups/
