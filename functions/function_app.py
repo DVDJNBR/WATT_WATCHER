@@ -117,13 +117,40 @@ if AZURE_FUNCTIONS_AVAILABLE:
         run_on_startup=False,
     )
     def meteo_grid_refresh(timer: func.TimerRequest) -> None:
-        """Fetch 352-point weather grid from open-meteo and upsert to Supabase."""
+        """
+        Fetch 352-point weather grid from open-meteo and upsert to Supabase.
+
+        Bronze-archived like every other source (raw proof of what the API
+        returned), but intentionally stops there: the grid is a live map
+        cache keyed by (lat, lon), not an administrative region, so it has
+        no home in the Silver/Gold star schema — see meteo_regional_refresh
+        below for the météo source that does go all the way to Gold.
+        """
         try:
             rows = fetch_meteo_grid()
+            storage_account = os.environ.get("STORAGE_ACCOUNT_NAME")
+            bronze = BronzeStorage(storage_account_name=storage_account)
+            bronze.write_json(rows, source="meteo", sub_path="grid", filename_prefix="meteo_grid")
             supabase_upsert("meteo_grid", rows, on_conflict="lat,lon")
             logger.info("meteo_grid_refresh: %d points written to Supabase", len(rows))
         except Exception as exc:
             logger.error("meteo_grid_refresh failed: %s", exc, exc_info=True)
+
+    # ── Open-Meteo regional ingestion timer — Bronze → Silver → Gold ────────
+    # Mirrors rte_ingestion below: until this existed, regional météo only
+    # ran when someone manually hit /v1/admin/pipeline/run, and even then it
+    # skipped Bronze entirely (see run_meteo_regional_ingestion).
+
+    @app.timer_trigger(
+        schedule="0 */15 * * * *",  # every 15 minutes, aligned with RTE ingestion
+        arg_name="timer",
+        run_on_startup=False,
+    )
+    def meteo_regional_refresh(timer: func.TimerRequest) -> None:
+        """Timer-triggered Open-Meteo regional ingestion to Bronze → Silver → Gold."""
+        job_id = str(uuid.uuid4())
+        logger.info("Starting Open-Meteo regional ingestion job: %s", job_id)
+        run_meteo_regional_ingestion(job_id=job_id)
 
     # ── Story 1.1: RTE ingestion timer ──────────────────────────────────────
 
@@ -156,7 +183,7 @@ if AZURE_FUNCTIONS_AVAILABLE:
         )
         try:
             records = scraper.scrape_from_url()
-            path = bronze.write_json(records, source="maintenance")
+            path = bronze.write_json(records, source="maintenance", filename_prefix="entsoe_outages")
             logger.info("[%s] Scraped %d maintenance events → %s", job_id, len(records), path)
         except Exception as exc:
             logger.error("[%s] Maintenance scraping failed: %s", job_id, exc, exc_info=True)
@@ -183,7 +210,7 @@ if AZURE_FUNCTIONS_AVAILABLE:
                 cursor.execute(f"SELECT * FROM {table}")  # noqa: S608
                 cols = [col[0] for col in cursor.description]
                 snapshot[table] = [dict(zip(cols, row)) for row in cursor.fetchall()]
-            path = bronze.write_json(snapshot, source="infra")
+            path = bronze.write_json(snapshot, source="infra", filename_prefix="reference_snapshot")
             logger.info("[%s] SQL snapshot written → %s", job_id, path)
         except Exception as exc:
             logger.error("[%s] SQL snapshot failed: %s", job_id, exc, exc_info=True)
@@ -1190,6 +1217,76 @@ def run_ingestion(
         )
 
 
+def run_meteo_regional_ingestion(
+    job_id: str | None = None,
+    local_mode: bool = False,
+) -> dict:
+    """
+    Open-Meteo regional ingestion — Bronze → Silver → Gold, same shape as
+    run_ingestion() for RTE. Until this existed, regional météo only ran
+    inside the manually-triggered run_full_pipeline and never touched Bronze
+    (see Stage 4 above, which now shares load_meteo_to_gold with this path).
+
+    Args:
+        job_id: Unique job identifier.
+        local_mode: If True, write to local filesystem instead of ADLS.
+
+    Returns:
+        Audit log entry dict.
+    """
+    job_id = job_id or str(uuid.uuid4())
+
+    storage_account = os.environ.get("STORAGE_ACCOUNT_NAME") if not local_mode else None
+    bronze = BronzeStorage(
+        storage_account_name=storage_account,
+        local_mode=local_mode,
+    )
+    audit = AuditLogger(source="open_meteo_regional", bronze_storage=bronze)
+
+    try:
+        from pathlib import Path as _Path
+        from shared.open_meteo_client import fetch_meteo_all_regions
+        from shared.transformations.meteo_silver import transform_meteo_to_silver, write_meteo_silver
+        from shared.gold.meteo_fact_loader import load_meteo_to_gold
+
+        records = fetch_meteo_all_regions(past_days=3)
+
+        if not records:
+            logger.info("No records returned from Open-Meteo")
+            return audit.log_success(record_count=0, job_id=job_id)
+
+        # Write raw JSON to Bronze
+        bronze_path = bronze.write_json(records, source="meteo", sub_path="regional", filename_prefix="meteo_regional")
+        logger.info("Written %d records to %s", len(records), bronze_path)
+
+        # Silver: normalize + partitioned Parquet
+        df_meteo = transform_meteo_to_silver(records)
+        silver_root = _Path(__file__).parent if local_mode else _Path("/tmp")
+        write_meteo_silver(df_meteo, silver_root)
+
+        # Gold: upsert dimensions, load FACT_METEO
+        rows_loaded = 0
+        if not df_meteo.empty:
+            conn = _get_db_connection()
+            try:
+                rows_loaded = load_meteo_to_gold(df_meteo, conn)
+            finally:
+                conn.close()
+
+        return audit.log_success(
+            record_count=len(records),
+            job_id=job_id,
+            details={"bronze_path": bronze_path, "gold_rows": rows_loaded},
+        )
+
+    except Exception as e:
+        logger.error("Unexpected error: %s", e, exc_info=True)
+        return audit.log_failure(
+            error=f"Unexpected: {e}",
+            job_id=job_id,
+        )
+
+
 def run_full_pipeline(
     job_id: str | None = None,
     local_mode: bool = False,
@@ -1320,9 +1417,9 @@ def run_full_pipeline(
     # ── Stage 4: Météo (Open-Meteo) — non-fatal ───────────────────────────────
     logger.info("[%s] Stage 4: Météo ingestion", job_id)
     try:
-        from shared.open_meteo_client import fetch_meteo_all_regions, REGION_CENTROIDS
+        from shared.open_meteo_client import fetch_meteo_all_regions
         from shared.transformations.meteo_silver import transform_meteo_to_silver
-        from shared.gold.dim_loader import DimLoader as _DimLoader
+        from shared.gold.meteo_fact_loader import load_meteo_to_gold
 
         meteo_records = fetch_meteo_all_regions(past_days=3)
         df_meteo = transform_meteo_to_silver(meteo_records)
@@ -1332,64 +1429,7 @@ def run_full_pipeline(
         else:
             conn_m = _get_db_connection()
             try:
-                dim_m = _DimLoader(conn_m)
-                dim_m.ensure_schema()
-                # Upsert regions from centroids
-                dim_m.upsert_regions([
-                    {"code_insee": code, "nom_region": info["name"]}
-                    for code, info in REGION_CENTROIDS.items()
-                ])
-                # Upsert timestamps
-                timestamps_m = df_meteo["timestamp"].dt.strftime("%Y-%m-%dT%H:%M:00").tolist()
-                dim_m.upsert_time(timestamps_m)
-
-                import sqlite3 as _sqlite3_m
-                is_sqlite_m = isinstance(conn_m, _sqlite3_m.Connection)
-                ph_m = "?" if is_sqlite_m else "%s"
-                tbl_mt = "FACT_METEO" if is_sqlite_m else "fact_meteo"
-                tbl_dt = "DIM_TIME"   if is_sqlite_m else "dim_time"
-                tbl_dr = "DIM_REGION" if is_sqlite_m else "dim_region"
-
-                cursor_m = conn_m.cursor()
-                rows_loaded_m = 0
-                for _, row in df_meteo.iterrows():
-                    ts_str = row["timestamp"].strftime("%Y-%m-%dT%H:%M:00")  # type: ignore
-                    cursor_m.execute(
-                        f"SELECT id_date FROM {tbl_dt} WHERE horodatage = {ph_m}", (ts_str,)
-                    )
-                    id_date_r = cursor_m.fetchone()
-                    cursor_m.execute(
-                        f"SELECT id_region FROM {tbl_dr} WHERE code_insee = {ph_m}", (row["region_code"],)
-                    )
-                    id_region_r = cursor_m.fetchone()
-                    if not id_date_r or not id_region_r:
-                        continue
-                    _cloud = row.get("cloudcover_pct")
-                    _cloud = float(_cloud) if _cloud is not None and _cloud == _cloud else None
-                    if is_sqlite_m:
-                        cursor_m.execute(
-                            f"""INSERT INTO {tbl_mt} (id_date, id_region, temperature_c, wind_speed_10m, cloudcover_pct)
-                                VALUES (?, ?, ?, ?, ?)
-                                ON CONFLICT(id_date, id_region) DO UPDATE SET
-                                    temperature_c  = excluded.temperature_c,
-                                    wind_speed_10m = excluded.wind_speed_10m,
-                                    cloudcover_pct = excluded.cloudcover_pct""",
-                            (id_date_r[0], id_region_r[0], row["temperature_c"], row.get("wind_speed_10m"), _cloud),
-                        )
-                    else:
-                        cursor_m.execute(
-                            f"""INSERT INTO {tbl_mt} (id_date, id_region, temperature_c, wind_speed_10m, cloudcover_pct)
-                                VALUES (%s, %s, %s, %s, %s)
-                                ON CONFLICT (id_date, id_region) DO UPDATE SET
-                                    temperature_c  = EXCLUDED.temperature_c,
-                                    wind_speed_10m = EXCLUDED.wind_speed_10m,
-                                    cloudcover_pct = EXCLUDED.cloudcover_pct""",
-                            (id_date_r[0], id_region_r[0], row["temperature_c"], row.get("wind_speed_10m"), _cloud),
-                        )
-                    rows_loaded_m += 1
-                    if rows_loaded_m % 500 == 0:
-                        conn_m.commit()
-                conn_m.commit()
+                rows_loaded_m = load_meteo_to_gold(df_meteo, conn_m)
                 results["stages"]["meteo"] = {"status": "success", "rows": rows_loaded_m}
                 logger.info("[%s] Météo: %d rows loaded", job_id, rows_loaded_m)
             finally:
