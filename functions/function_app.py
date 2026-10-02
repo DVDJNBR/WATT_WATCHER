@@ -118,19 +118,38 @@ if AZURE_FUNCTIONS_AVAILABLE:
     )
     def meteo_grid_refresh(timer: func.TimerRequest) -> None:
         """
-        Fetch 352-point weather grid from open-meteo and upsert to Supabase.
+        Fetch 352-point weather grid from open-meteo — Bronze → Silver → Gold,
+        same shape as every other source. The grid is keyed by (lat, lon),
+        not an INSEE region, so it gets its own dimension (DIM_GRID_POINT)
+        instead of DIM_REGION — see meteo_grid_fact_loader.py.
 
-        Bronze-archived like every other source (raw proof of what the API
-        returned), but intentionally stops there: the grid is a live map
-        cache keyed by (lat, lon), not an administrative region, so it has
-        no home in the Silver/Gold star schema — see meteo_regional_refresh
-        below for the météo source that does go all the way to Gold.
+        FACT_METEO_GRID is upserted in place, not accumulated: no DIM_TIME
+        join, no history. That's the same "always now" semantic the
+        meteo_grid Supabase table already had, now inside the official Gold
+        schema. The direct PostgREST upsert below is kept as-is alongside
+        it — the live map still reads that table, unchanged.
         """
         try:
+            from pathlib import Path as _Path
+            from shared.transformations.meteo_grid_silver import transform_grid_to_silver, write_grid_silver
+            from shared.gold.meteo_grid_fact_loader import load_grid_to_gold
+
             rows = fetch_meteo_grid()
             storage_account = os.environ.get("STORAGE_ACCOUNT_NAME")
             bronze = BronzeStorage(storage_account_name=storage_account)
             bronze.write_json(rows, source="meteo", sub_path="grid", filename_prefix="meteo_grid")
+
+            df_grid = transform_grid_to_silver(rows)
+            write_grid_silver(df_grid, _Path("/tmp"))
+
+            if not df_grid.empty:
+                conn = _get_db_connection()
+                try:
+                    gold_rows = load_grid_to_gold(df_grid, conn)
+                    logger.info("meteo_grid_refresh: %d points loaded into FACT_METEO_GRID", gold_rows)
+                finally:
+                    conn.close()
+
             supabase_upsert("meteo_grid", rows, on_conflict="lat,lon")
             logger.info("meteo_grid_refresh: %d points written to Supabase", len(rows))
         except Exception as exc:
