@@ -20,6 +20,20 @@ from shared.transformations.data_quality import (
 
 logger = logging.getLogger(__name__)
 
+# Raw ODRE CSV names → the canonical names this module's own quality rules
+# and dedup already expect (`code_insee_region`, `puissance_installee_mw`).
+# Without this, `CAPACITY_QUALITY_RULES` and `dedup_cols` below silently
+# no-op — `apply_quality_rules` and the dedup both guard on `col in
+# df.columns`, so a name mismatch fails open, not loud. This module ran for
+# the first time end-to-end only once capacity got a real Bronze/Silver/Gold
+# path instead of a Gold-only shortcut inside the manual admin pipeline, and
+# that first real run is what surfaced the mismatch.
+RENAME_MAP = {
+    "coderegion": "code_insee_region",
+    "region": "libelle_region",
+    "puismaxinstallee": "puissance_installee_mw",
+}
+
 
 def transform_capacity_to_silver(
     bronze_path: str | Path,
@@ -39,8 +53,10 @@ def transform_capacity_to_silver(
     else:
         raise FileNotFoundError(f"Bronze path not found: {bronze_path}")
 
-    # Normalize column names → snake_case
+    # Normalize column names → snake_case, then map ODRE's raw names to the
+    # canonical ones the rest of this function expects.
     df.columns = [c.lower().replace(" ", "_").replace("-", "_") for c in df.columns]
+    df = df.rename(columns=RENAME_MAP)
 
     # Cast numeric columns
     if "puissance_installee_mw" in df.columns:

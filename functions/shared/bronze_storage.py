@@ -80,6 +80,45 @@ class BronzeStorage:
         else:
             return self._write_adls(full_path, content)
 
+    def write_raw(
+        self,
+        content: str,
+        source: str,
+        sub_path: str,
+        filename_prefix: str,
+        extension: str,
+        timestamp: datetime | None = None,
+    ) -> str:
+        """
+        Write pre-formatted raw text to Bronze, unchanged — for sources whose
+        API doesn't return JSON. `write_json` always re-serializes to JSON,
+        which would be dishonest for a source like ODRE that hands back a CSV
+        export: Bronze is the one layer that has to preserve exactly what the
+        source returned, byte for byte, not a JSON re-encoding of it.
+
+        Args:
+            content: Already-formatted text (e.g. a raw CSV response body).
+            source: Data source identifier (e.g. 'odre').
+            sub_path: Sub-directory under source (e.g. 'capacity').
+            filename_prefix: Prefix for the file name.
+            extension: File extension without the dot (e.g. 'csv').
+            timestamp: Timestamp for the file name. Defaults to now.
+
+        Returns:
+            Full path of the written file.
+        """
+        ts = timestamp or datetime.now(timezone.utc)
+        ts_str = ts.strftime("%Y%m%dT%H%M%SZ")
+        date_path = ts.strftime("%Y/%m/%d")
+
+        filename = f"{filename_prefix}_{ts_str}.{extension}"
+        full_path = f"{source}/{sub_path}/{date_path}/{filename}"
+
+        if self.local_mode:
+            return self._write_local(full_path, content)
+        else:
+            return self._write_adls(full_path, content)
+
     def write_audit(
         self,
         audit_entry: dict,

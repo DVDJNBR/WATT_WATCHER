@@ -171,6 +171,24 @@ if AZURE_FUNCTIONS_AVAILABLE:
         logger.info("Starting Open-Meteo regional ingestion job: %s", job_id)
         run_meteo_regional_ingestion(job_id=job_id)
 
+    # ── Capacity ingestion timer — Bronze → Silver → Gold ────────────────────
+    # Daily, not every 15 min: installed capacity is a slow-changing register
+    # (plants get commissioned/decommissioned, not every quarter-hour), so a
+    # live cadence would just hit ODRE for an answer that almost never moved.
+    # Mirrors meteo_regional_refresh's fix — until this existed, capacity had
+    # no schedule at all and skipped Bronze (see run_capacity_ingestion).
+
+    @app.timer_trigger(
+        schedule="0 0 2 * * *",  # every day at 02:00 UTC
+        arg_name="timer",
+        run_on_startup=False,
+    )
+    def capacity_refresh(timer: func.TimerRequest) -> None:
+        """Timer-triggered ODRE capacity ingestion to Bronze → Silver → Gold."""
+        job_id = str(uuid.uuid4())
+        logger.info("Starting ODRE capacity ingestion job: %s", job_id)
+        run_capacity_ingestion(job_id=job_id)
+
     # ── Story 1.1: RTE ingestion timer ──────────────────────────────────────
 
     @app.timer_trigger(
@@ -1306,6 +1324,89 @@ def run_meteo_regional_ingestion(
         )
 
 
+def run_capacity_ingestion(
+    job_id: str | None = None,
+    local_mode: bool = False,
+) -> dict:
+    """
+    ODRE installed-capacity ingestion — Bronze → Silver → Gold, same shape as
+    run_ingestion() for RTE. Until this existed, capacity only ran inside the
+    manually-triggered run_full_pipeline, with no schedule and no Bronze: the
+    API response went straight from memory into Gold.
+
+    Bronze stores ODRE's raw CSV response text, not a JSON re-encoding of it
+    — see BronzeStorage.write_raw. Silver reuses the pre-existing
+    transform_capacity_to_silver() (Story 3.1), which turned out to never
+    have run against real Bronze input before, see capacity_silver.py's
+    RENAME_MAP for what that surfaced.
+
+    Args:
+        job_id: Unique job identifier.
+        local_mode: If True, write to local filesystem instead of ADLS.
+
+    Returns:
+        Audit log entry dict.
+    """
+    job_id = job_id or str(uuid.uuid4())
+
+    storage_account = os.environ.get("STORAGE_ACCOUNT_NAME") if not local_mode else None
+    bronze = BronzeStorage(
+        storage_account_name=storage_account,
+        local_mode=local_mode,
+    )
+    audit = AuditLogger(source="odre_capacity", bronze_storage=bronze)
+
+    try:
+        from pathlib import Path as _Path
+        import requests as _requests
+        from shared.odre_capacity_client import ODRE_URL
+        from shared.transformations.capacity_silver import transform_capacity_to_silver
+        from shared.gold.capacity_fact_loader import load_capacity_to_gold
+
+        resp = _requests.get(ODRE_URL, timeout=60)
+        resp.raise_for_status()
+        csv_text = resp.text
+
+        if not csv_text.strip():
+            logger.info("No data returned from ODRE")
+            return audit.log_success(record_count=0, job_id=job_id)
+
+        # Write raw CSV to Bronze, byte-for-byte what ODRE returned
+        bronze_path = bronze.write_raw(
+            csv_text, source="odre", sub_path="capacity",
+            filename_prefix="capacity_regional", extension="csv",
+        )
+        logger.info("Written capacity CSV to %s", bronze_path)
+
+        # Silver: existing transform, now actually exercised end-to-end
+        silver_root = _Path(__file__).parent if local_mode else _Path("/tmp")
+        silver_result = transform_capacity_to_silver(_Path(bronze_path), silver_root)
+        record_count = silver_result.get("output_rows", 0)
+
+        # Gold: upsert dimensions, load FACT_CAPACITY from what Silver wrote
+        rows_loaded = 0
+        if record_count:
+            conn = _get_db_connection()
+            try:
+                silver_path = silver_root / "silver/reference/capacity/data.parquet"
+                rows_loaded = load_capacity_to_gold(silver_path, conn)
+            finally:
+                conn.close()
+
+        return audit.log_success(
+            record_count=record_count,
+            job_id=job_id,
+            details={"bronze_path": bronze_path, "gold_rows": rows_loaded},
+        )
+
+    except Exception as e:
+        logger.error("Unexpected error: %s", e, exc_info=True)
+        return audit.log_failure(
+            error=f"Unexpected: {e}",
+            job_id=job_id,
+        )
+
+
 def run_full_pipeline(
     job_id: str | None = None,
     local_mode: bool = False,
@@ -1461,84 +1562,13 @@ def run_full_pipeline(
     # ── Stage 5: Capacité installée (ODRE) — non-fatal ────────────────────────
     logger.info("[%s] Stage 5: Capacity ingestion (ODRE)", job_id)
     try:
-        from shared.odre_capacity_client import fetch_capacity
-        from shared.gold.dim_loader import DimLoader as _DimLoader2
-
-        capacity_records = fetch_capacity()
-
-        if not capacity_records:
+        result = run_capacity_ingestion(job_id=job_id, local_mode=local_mode)
+        if result["status"] == "failure":
+            results["stages"]["capacity"] = {"status": "failure", "error": result.get("error_details", "unknown")}
+        elif result["record_count"] == 0:
             results["stages"]["capacity"] = {"status": "empty", "rows": 0}
         else:
-            conn_c = _get_db_connection()
-            try:
-                dim_c = _DimLoader2(conn_c)
-                dim_c.ensure_schema()
-                dim_c.upsert_sources()
-
-                # Upsert regions from capacity records
-                regions_c = {}
-                for rec in capacity_records:
-                    code = rec.get("region_code")
-                    name = rec.get("region_name")
-                    if code and name and code not in regions_c:
-                        regions_c[code] = name
-                if regions_c:
-                    dim_c.upsert_regions([
-                        {"code_insee": code, "nom_region": name}
-                        for code, name in regions_c.items()
-                    ])
-
-                import sqlite3 as _sqlite3_c
-                is_sqlite_c = isinstance(conn_c, _sqlite3_c.Connection)
-                ph_c = "?" if is_sqlite_c else "%s"
-                tbl_cap = "FACT_CAPACITY" if is_sqlite_c else "fact_capacity"
-                tbl_reg = "DIM_REGION"    if is_sqlite_c else "dim_region"
-                tbl_src = "DIM_SOURCE"    if is_sqlite_c else "dim_source"
-
-                cursor_c = conn_c.cursor()
-                rows_loaded_c = 0
-                for rec in capacity_records:
-                    code = rec.get("region_code")
-                    source = rec.get("source_name")
-                    puissance = rec.get("puissance_installee_mw")
-                    annee = rec.get("annee")
-                    if not code or not source:
-                        continue
-                    cursor_c.execute(
-                        f"SELECT id_region FROM {tbl_reg} WHERE code_insee = {ph_c}", (code,)
-                    )
-                    id_reg_r = cursor_c.fetchone()
-                    cursor_c.execute(
-                        f"SELECT id_source FROM {tbl_src} WHERE source_name = {ph_c}", (source,)
-                    )
-                    id_src_r = cursor_c.fetchone()
-                    if not id_reg_r or not id_src_r:
-                        continue
-                    if is_sqlite_c:
-                        cursor_c.execute(
-                            f"""INSERT INTO {tbl_cap}
-                                    (id_region, id_source, puissance_installee_mw, annee)
-                                VALUES (?, ?, ?, ?)
-                                ON CONFLICT(id_region, id_source, annee) DO UPDATE SET
-                                    puissance_installee_mw = excluded.puissance_installee_mw""",
-                            (id_reg_r[0], id_src_r[0], puissance, annee),
-                        )
-                    else:
-                        cursor_c.execute(
-                            f"""INSERT INTO {tbl_cap}
-                                    (id_region, id_source, puissance_installee_mw, annee)
-                                VALUES (%s, %s, %s, %s)
-                                ON CONFLICT (id_region, id_source, annee) DO UPDATE SET
-                                    puissance_installee_mw = EXCLUDED.puissance_installee_mw""",
-                            (id_reg_r[0], id_src_r[0], puissance, annee),
-                        )
-                    rows_loaded_c += 1
-                conn_c.commit()
-                results["stages"]["capacity"] = {"status": "success", "rows": rows_loaded_c}
-                logger.info("[%s] Capacity: %d rows loaded", job_id, rows_loaded_c)
-            finally:
-                conn_c.close()
-
+            results["stages"]["capacity"] = {"status": "success", "rows": result.get("details", {}).get("gold_rows", 0)}
     except Exception as exc:
         logger.error("[%s] Capacity stage failed: %s", job_id, exc, exc_info=True)
         results["stages"]["capacity"] = {"status": "failure", "error": str(exc)}
