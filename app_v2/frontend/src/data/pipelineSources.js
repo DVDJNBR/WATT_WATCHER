@@ -96,7 +96,7 @@ export const SOURCES = [
   },
   {
     id: 'odre-capacity',
-    label: 'ODRE — Capacité installée',
+    label: 'ODRÉ — Capacité installée',
     homepage: 'https://odre.opendatasoft.com',
     color: 'var(--color-source-capacity)',
     glow: 'var(--color-source-capacity-glow)',

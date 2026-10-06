@@ -20,12 +20,12 @@
      palette below on purpose: this is "which system produced this data",
      not "which fuel". RTE covers both production and grid maintenance
      (same network, same colour). */
-  --color-source-rte:           #f97316;
-  --color-source-rte-glow:      rgba(249,115,22,0.22);
-  --color-source-meteo:         #22c55e;
-  --color-source-meteo-glow:    rgba(34,197,94,0.22);
-  --color-source-capacity:      #6366f1;
-  --color-source-capacity-glow: rgba(99,102,241,0.22);
+  --color-source-rte:           #2563eb;
+  --color-source-rte-glow:      rgba(37,99,235,0.22);
+  --color-source-meteo:         #f97316;
+  --color-source-meteo-glow:    rgba(249,115,22,0.22);
+  --color-source-capacity:      #22c55e;
+  --color-source-capacity-glow: rgba(34,197,94,0.22);
   --color-source-price:         #a855f7;
   --color-source-price-glow:    rgba(168,85,247,0.22);
 
