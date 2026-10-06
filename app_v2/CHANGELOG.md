@@ -1,3 +1,9 @@
+## [1.52.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.51.1...v1.52.0) (2026-10-06)
+
+### Features
+
+* **pipeline:** rebuild the diagram as a direct port of the mockup ([9f86f68](https://github.com/DVDJNBR/WATT_WATCHER/commit/9f86f68ae0d0991a05f876a2aa8a38953e1e1fec))
+
 ## [1.51.1](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.51.0...v1.51.1) (2026-10-06)
 
 ### Bug Fixes
