@@ -1,3 +1,9 @@
+## [1.51.1](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.51.0...v1.51.1) (2026-10-06)
+
+### Bug Fixes
+
+* **pipeline:** stop the content-page layout from clipping itself ([6904416](https://github.com/DVDJNBR/WATT_WATCHER/commit/69044160b8b2c9f93ee98915ba857982a5726455))
+
 ## [1.51.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.50.0...v1.51.0) (2026-10-06)
 
 ### Features
