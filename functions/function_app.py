@@ -117,13 +117,77 @@ if AZURE_FUNCTIONS_AVAILABLE:
         run_on_startup=False,
     )
     def meteo_grid_refresh(timer: func.TimerRequest) -> None:
-        """Fetch 352-point weather grid from open-meteo and upsert to Supabase."""
+        """
+        Fetch 352-point weather grid from open-meteo — Bronze → Silver → Gold,
+        same shape as every other source. The grid is keyed by (lat, lon),
+        not an INSEE region, so it gets its own dimension (DIM_GRID_POINT)
+        instead of DIM_REGION — see meteo_grid_fact_loader.py.
+
+        FACT_METEO_GRID is upserted in place, not accumulated: no DIM_TIME
+        join, no history. That's the same "always now" semantic the
+        meteo_grid Supabase table already had, now inside the official Gold
+        schema. The direct PostgREST upsert below is kept as-is alongside
+        it — the live map still reads that table, unchanged.
+        """
         try:
+            from pathlib import Path as _Path
+            from shared.transformations.meteo_grid_silver import transform_grid_to_silver, write_grid_silver
+            from shared.gold.meteo_grid_fact_loader import load_grid_to_gold
+
             rows = fetch_meteo_grid()
+            storage_account = os.environ.get("STORAGE_ACCOUNT_NAME")
+            bronze = BronzeStorage(storage_account_name=storage_account)
+            bronze.write_json(rows, source="meteo", sub_path="grid", filename_prefix="meteo_grid")
+
+            df_grid = transform_grid_to_silver(rows)
+            write_grid_silver(df_grid, _Path("/tmp"))
+
+            if not df_grid.empty:
+                conn = _get_db_connection()
+                try:
+                    gold_rows = load_grid_to_gold(df_grid, conn)
+                    logger.info("meteo_grid_refresh: %d points loaded into FACT_METEO_GRID", gold_rows)
+                finally:
+                    conn.close()
+
             supabase_upsert("meteo_grid", rows, on_conflict="lat,lon")
             logger.info("meteo_grid_refresh: %d points written to Supabase", len(rows))
         except Exception as exc:
             logger.error("meteo_grid_refresh failed: %s", exc, exc_info=True)
+
+    # ── Open-Meteo regional ingestion timer — Bronze → Silver → Gold ────────
+    # Mirrors rte_ingestion below: until this existed, regional météo only
+    # ran when someone manually hit /v1/admin/pipeline/run, and even then it
+    # skipped Bronze entirely (see run_meteo_regional_ingestion).
+
+    @app.timer_trigger(
+        schedule="0 */15 * * * *",  # every 15 minutes, aligned with RTE ingestion
+        arg_name="timer",
+        run_on_startup=False,
+    )
+    def meteo_regional_refresh(timer: func.TimerRequest) -> None:
+        """Timer-triggered Open-Meteo regional ingestion to Bronze → Silver → Gold."""
+        job_id = str(uuid.uuid4())
+        logger.info("Starting Open-Meteo regional ingestion job: %s", job_id)
+        run_meteo_regional_ingestion(job_id=job_id)
+
+    # ── Capacity ingestion timer — Bronze → Silver → Gold ────────────────────
+    # Daily, not every 15 min: installed capacity is a slow-changing register
+    # (plants get commissioned/decommissioned, not every quarter-hour), so a
+    # live cadence would just hit ODRE for an answer that almost never moved.
+    # Mirrors meteo_regional_refresh's fix — until this existed, capacity had
+    # no schedule at all and skipped Bronze (see run_capacity_ingestion).
+
+    @app.timer_trigger(
+        schedule="0 0 2 * * *",  # every day at 02:00 UTC
+        arg_name="timer",
+        run_on_startup=False,
+    )
+    def capacity_refresh(timer: func.TimerRequest) -> None:
+        """Timer-triggered ODRE capacity ingestion to Bronze → Silver → Gold."""
+        job_id = str(uuid.uuid4())
+        logger.info("Starting ODRE capacity ingestion job: %s", job_id)
+        run_capacity_ingestion(job_id=job_id)
 
     # ── Story 1.1: RTE ingestion timer ──────────────────────────────────────
 
@@ -156,7 +220,7 @@ if AZURE_FUNCTIONS_AVAILABLE:
         )
         try:
             records = scraper.scrape_from_url()
-            path = bronze.write_json(records, source="maintenance")
+            path = bronze.write_json(records, source="maintenance", filename_prefix="entsoe_outages")
             logger.info("[%s] Scraped %d maintenance events → %s", job_id, len(records), path)
         except Exception as exc:
             logger.error("[%s] Maintenance scraping failed: %s", job_id, exc, exc_info=True)
@@ -183,7 +247,7 @@ if AZURE_FUNCTIONS_AVAILABLE:
                 cursor.execute(f"SELECT * FROM {table}")  # noqa: S608
                 cols = [col[0] for col in cursor.description]
                 snapshot[table] = [dict(zip(cols, row)) for row in cursor.fetchall()]
-            path = bronze.write_json(snapshot, source="infra")
+            path = bronze.write_json(snapshot, source="infra", filename_prefix="reference_snapshot")
             logger.info("[%s] SQL snapshot written → %s", job_id, path)
         except Exception as exc:
             logger.error("[%s] SQL snapshot failed: %s", job_id, exc, exc_info=True)
@@ -1190,6 +1254,159 @@ def run_ingestion(
         )
 
 
+def run_meteo_regional_ingestion(
+    job_id: str | None = None,
+    local_mode: bool = False,
+) -> dict:
+    """
+    Open-Meteo regional ingestion — Bronze → Silver → Gold, same shape as
+    run_ingestion() for RTE. Until this existed, regional météo only ran
+    inside the manually-triggered run_full_pipeline and never touched Bronze
+    (see Stage 4 above, which now shares load_meteo_to_gold with this path).
+
+    Args:
+        job_id: Unique job identifier.
+        local_mode: If True, write to local filesystem instead of ADLS.
+
+    Returns:
+        Audit log entry dict.
+    """
+    job_id = job_id or str(uuid.uuid4())
+
+    storage_account = os.environ.get("STORAGE_ACCOUNT_NAME") if not local_mode else None
+    bronze = BronzeStorage(
+        storage_account_name=storage_account,
+        local_mode=local_mode,
+    )
+    audit = AuditLogger(source="open_meteo_regional", bronze_storage=bronze)
+
+    try:
+        from pathlib import Path as _Path
+        from shared.open_meteo_client import fetch_meteo_all_regions
+        from shared.transformations.meteo_silver import transform_meteo_to_silver, write_meteo_silver
+        from shared.gold.meteo_fact_loader import load_meteo_to_gold
+
+        records = fetch_meteo_all_regions(past_days=3)
+
+        if not records:
+            logger.info("No records returned from Open-Meteo")
+            return audit.log_success(record_count=0, job_id=job_id)
+
+        # Write raw JSON to Bronze
+        bronze_path = bronze.write_json(records, source="meteo", sub_path="regional", filename_prefix="meteo_regional")
+        logger.info("Written %d records to %s", len(records), bronze_path)
+
+        # Silver: normalize + partitioned Parquet
+        df_meteo = transform_meteo_to_silver(records)
+        silver_root = _Path(__file__).parent if local_mode else _Path("/tmp")
+        write_meteo_silver(df_meteo, silver_root)
+
+        # Gold: upsert dimensions, load FACT_METEO
+        rows_loaded = 0
+        if not df_meteo.empty:
+            conn = _get_db_connection()
+            try:
+                rows_loaded = load_meteo_to_gold(df_meteo, conn)
+            finally:
+                conn.close()
+
+        return audit.log_success(
+            record_count=len(records),
+            job_id=job_id,
+            details={"bronze_path": bronze_path, "gold_rows": rows_loaded},
+        )
+
+    except Exception as e:
+        logger.error("Unexpected error: %s", e, exc_info=True)
+        return audit.log_failure(
+            error=f"Unexpected: {e}",
+            job_id=job_id,
+        )
+
+
+def run_capacity_ingestion(
+    job_id: str | None = None,
+    local_mode: bool = False,
+) -> dict:
+    """
+    ODRE installed-capacity ingestion — Bronze → Silver → Gold, same shape as
+    run_ingestion() for RTE. Until this existed, capacity only ran inside the
+    manually-triggered run_full_pipeline, with no schedule and no Bronze: the
+    API response went straight from memory into Gold.
+
+    Bronze stores ODRE's raw CSV response text, not a JSON re-encoding of it
+    — see BronzeStorage.write_raw. Silver reuses the pre-existing
+    transform_capacity_to_silver() (Story 3.1), which turned out to never
+    have run against real Bronze input before, see capacity_silver.py's
+    RENAME_MAP for what that surfaced.
+
+    Args:
+        job_id: Unique job identifier.
+        local_mode: If True, write to local filesystem instead of ADLS.
+
+    Returns:
+        Audit log entry dict.
+    """
+    job_id = job_id or str(uuid.uuid4())
+
+    storage_account = os.environ.get("STORAGE_ACCOUNT_NAME") if not local_mode else None
+    bronze = BronzeStorage(
+        storage_account_name=storage_account,
+        local_mode=local_mode,
+    )
+    audit = AuditLogger(source="odre_capacity", bronze_storage=bronze)
+
+    try:
+        from pathlib import Path as _Path
+        import requests as _requests
+        from shared.odre_capacity_client import ODRE_URL
+        from shared.transformations.capacity_silver import transform_capacity_to_silver
+        from shared.gold.capacity_fact_loader import load_capacity_to_gold
+
+        resp = _requests.get(ODRE_URL, timeout=60)
+        resp.raise_for_status()
+        csv_text = resp.text
+
+        if not csv_text.strip():
+            logger.info("No data returned from ODRE")
+            return audit.log_success(record_count=0, job_id=job_id)
+
+        # Write raw CSV to Bronze, byte-for-byte what ODRE returned
+        bronze_path = bronze.write_raw(
+            csv_text, source="odre", sub_path="capacity",
+            filename_prefix="capacity_regional", extension="csv",
+        )
+        logger.info("Written capacity CSV to %s", bronze_path)
+
+        # Silver: existing transform, now actually exercised end-to-end
+        silver_root = _Path(__file__).parent if local_mode else _Path("/tmp")
+        silver_result = transform_capacity_to_silver(_Path(bronze_path), silver_root)
+        record_count = silver_result.get("output_rows", 0)
+
+        # Gold: upsert dimensions, load FACT_CAPACITY from what Silver wrote
+        rows_loaded = 0
+        if record_count:
+            conn = _get_db_connection()
+            try:
+                silver_path = silver_root / "silver/reference/capacity/data.parquet"
+                rows_loaded = load_capacity_to_gold(silver_path, conn)
+            finally:
+                conn.close()
+
+        return audit.log_success(
+            record_count=record_count,
+            job_id=job_id,
+            details={"bronze_path": bronze_path, "gold_rows": rows_loaded},
+        )
+
+    except Exception as e:
+        logger.error("Unexpected error: %s", e, exc_info=True)
+        return audit.log_failure(
+            error=f"Unexpected: {e}",
+            job_id=job_id,
+        )
+
+
 def run_full_pipeline(
     job_id: str | None = None,
     local_mode: bool = False,
@@ -1320,9 +1537,9 @@ def run_full_pipeline(
     # ── Stage 4: Météo (Open-Meteo) — non-fatal ───────────────────────────────
     logger.info("[%s] Stage 4: Météo ingestion", job_id)
     try:
-        from shared.open_meteo_client import fetch_meteo_all_regions, REGION_CENTROIDS
+        from shared.open_meteo_client import fetch_meteo_all_regions
         from shared.transformations.meteo_silver import transform_meteo_to_silver
-        from shared.gold.dim_loader import DimLoader as _DimLoader
+        from shared.gold.meteo_fact_loader import load_meteo_to_gold
 
         meteo_records = fetch_meteo_all_regions(past_days=3)
         df_meteo = transform_meteo_to_silver(meteo_records)
@@ -1332,64 +1549,7 @@ def run_full_pipeline(
         else:
             conn_m = _get_db_connection()
             try:
-                dim_m = _DimLoader(conn_m)
-                dim_m.ensure_schema()
-                # Upsert regions from centroids
-                dim_m.upsert_regions([
-                    {"code_insee": code, "nom_region": info["name"]}
-                    for code, info in REGION_CENTROIDS.items()
-                ])
-                # Upsert timestamps
-                timestamps_m = df_meteo["timestamp"].dt.strftime("%Y-%m-%dT%H:%M:00").tolist()
-                dim_m.upsert_time(timestamps_m)
-
-                import sqlite3 as _sqlite3_m
-                is_sqlite_m = isinstance(conn_m, _sqlite3_m.Connection)
-                ph_m = "?" if is_sqlite_m else "%s"
-                tbl_mt = "FACT_METEO" if is_sqlite_m else "fact_meteo"
-                tbl_dt = "DIM_TIME"   if is_sqlite_m else "dim_time"
-                tbl_dr = "DIM_REGION" if is_sqlite_m else "dim_region"
-
-                cursor_m = conn_m.cursor()
-                rows_loaded_m = 0
-                for _, row in df_meteo.iterrows():
-                    ts_str = row["timestamp"].strftime("%Y-%m-%dT%H:%M:00")  # type: ignore
-                    cursor_m.execute(
-                        f"SELECT id_date FROM {tbl_dt} WHERE horodatage = {ph_m}", (ts_str,)
-                    )
-                    id_date_r = cursor_m.fetchone()
-                    cursor_m.execute(
-                        f"SELECT id_region FROM {tbl_dr} WHERE code_insee = {ph_m}", (row["region_code"],)
-                    )
-                    id_region_r = cursor_m.fetchone()
-                    if not id_date_r or not id_region_r:
-                        continue
-                    _cloud = row.get("cloudcover_pct")
-                    _cloud = float(_cloud) if _cloud is not None and _cloud == _cloud else None
-                    if is_sqlite_m:
-                        cursor_m.execute(
-                            f"""INSERT INTO {tbl_mt} (id_date, id_region, temperature_c, wind_speed_10m, cloudcover_pct)
-                                VALUES (?, ?, ?, ?, ?)
-                                ON CONFLICT(id_date, id_region) DO UPDATE SET
-                                    temperature_c  = excluded.temperature_c,
-                                    wind_speed_10m = excluded.wind_speed_10m,
-                                    cloudcover_pct = excluded.cloudcover_pct""",
-                            (id_date_r[0], id_region_r[0], row["temperature_c"], row.get("wind_speed_10m"), _cloud),
-                        )
-                    else:
-                        cursor_m.execute(
-                            f"""INSERT INTO {tbl_mt} (id_date, id_region, temperature_c, wind_speed_10m, cloudcover_pct)
-                                VALUES (%s, %s, %s, %s, %s)
-                                ON CONFLICT (id_date, id_region) DO UPDATE SET
-                                    temperature_c  = EXCLUDED.temperature_c,
-                                    wind_speed_10m = EXCLUDED.wind_speed_10m,
-                                    cloudcover_pct = EXCLUDED.cloudcover_pct""",
-                            (id_date_r[0], id_region_r[0], row["temperature_c"], row.get("wind_speed_10m"), _cloud),
-                        )
-                    rows_loaded_m += 1
-                    if rows_loaded_m % 500 == 0:
-                        conn_m.commit()
-                conn_m.commit()
+                rows_loaded_m = load_meteo_to_gold(df_meteo, conn_m)
                 results["stages"]["meteo"] = {"status": "success", "rows": rows_loaded_m}
                 logger.info("[%s] Météo: %d rows loaded", job_id, rows_loaded_m)
             finally:
@@ -1402,84 +1562,13 @@ def run_full_pipeline(
     # ── Stage 5: Capacité installée (ODRE) — non-fatal ────────────────────────
     logger.info("[%s] Stage 5: Capacity ingestion (ODRE)", job_id)
     try:
-        from shared.odre_capacity_client import fetch_capacity
-        from shared.gold.dim_loader import DimLoader as _DimLoader2
-
-        capacity_records = fetch_capacity()
-
-        if not capacity_records:
+        result = run_capacity_ingestion(job_id=job_id, local_mode=local_mode)
+        if result["status"] == "failure":
+            results["stages"]["capacity"] = {"status": "failure", "error": result.get("error_details", "unknown")}
+        elif result["record_count"] == 0:
             results["stages"]["capacity"] = {"status": "empty", "rows": 0}
         else:
-            conn_c = _get_db_connection()
-            try:
-                dim_c = _DimLoader2(conn_c)
-                dim_c.ensure_schema()
-                dim_c.upsert_sources()
-
-                # Upsert regions from capacity records
-                regions_c = {}
-                for rec in capacity_records:
-                    code = rec.get("region_code")
-                    name = rec.get("region_name")
-                    if code and name and code not in regions_c:
-                        regions_c[code] = name
-                if regions_c:
-                    dim_c.upsert_regions([
-                        {"code_insee": code, "nom_region": name}
-                        for code, name in regions_c.items()
-                    ])
-
-                import sqlite3 as _sqlite3_c
-                is_sqlite_c = isinstance(conn_c, _sqlite3_c.Connection)
-                ph_c = "?" if is_sqlite_c else "%s"
-                tbl_cap = "FACT_CAPACITY" if is_sqlite_c else "fact_capacity"
-                tbl_reg = "DIM_REGION"    if is_sqlite_c else "dim_region"
-                tbl_src = "DIM_SOURCE"    if is_sqlite_c else "dim_source"
-
-                cursor_c = conn_c.cursor()
-                rows_loaded_c = 0
-                for rec in capacity_records:
-                    code = rec.get("region_code")
-                    source = rec.get("source_name")
-                    puissance = rec.get("puissance_installee_mw")
-                    annee = rec.get("annee")
-                    if not code or not source:
-                        continue
-                    cursor_c.execute(
-                        f"SELECT id_region FROM {tbl_reg} WHERE code_insee = {ph_c}", (code,)
-                    )
-                    id_reg_r = cursor_c.fetchone()
-                    cursor_c.execute(
-                        f"SELECT id_source FROM {tbl_src} WHERE source_name = {ph_c}", (source,)
-                    )
-                    id_src_r = cursor_c.fetchone()
-                    if not id_reg_r or not id_src_r:
-                        continue
-                    if is_sqlite_c:
-                        cursor_c.execute(
-                            f"""INSERT INTO {tbl_cap}
-                                    (id_region, id_source, puissance_installee_mw, annee)
-                                VALUES (?, ?, ?, ?)
-                                ON CONFLICT(id_region, id_source, annee) DO UPDATE SET
-                                    puissance_installee_mw = excluded.puissance_installee_mw""",
-                            (id_reg_r[0], id_src_r[0], puissance, annee),
-                        )
-                    else:
-                        cursor_c.execute(
-                            f"""INSERT INTO {tbl_cap}
-                                    (id_region, id_source, puissance_installee_mw, annee)
-                                VALUES (%s, %s, %s, %s)
-                                ON CONFLICT (id_region, id_source, annee) DO UPDATE SET
-                                    puissance_installee_mw = EXCLUDED.puissance_installee_mw""",
-                            (id_reg_r[0], id_src_r[0], puissance, annee),
-                        )
-                    rows_loaded_c += 1
-                conn_c.commit()
-                results["stages"]["capacity"] = {"status": "success", "rows": rows_loaded_c}
-                logger.info("[%s] Capacity: %d rows loaded", job_id, rows_loaded_c)
-            finally:
-                conn_c.close()
-
+            results["stages"]["capacity"] = {"status": "success", "rows": result.get("details", {}).get("gold_rows", 0)}
     except Exception as exc:
         logger.error("[%s] Capacity stage failed: %s", job_id, exc, exc_info=True)
         results["stages"]["capacity"] = {"status": "failure", "error": str(exc)}

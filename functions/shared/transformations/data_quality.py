@@ -49,6 +49,12 @@ RTE_QUALITY_RULES: dict[str, NullStrategy] = {
 
 CAPACITY_QUALITY_RULES: dict[str, NullStrategy] = {
     "code_insee_region": NullStrategy.DROP,
+    # ODRE's export carries rows for region codes 5/7/8 with no name at all
+    # (pre-2016 codes retired by the region merger, still present in the
+    # aggregate register) — found by running this against the real API for
+    # the first time; DIM_REGION.nom_region is NOT NULL, so these rows have
+    # to go rather than crash the Gold load.
+    "libelle_region": NullStrategy.DROP,
     "puissance_installee_mw": NullStrategy.FILL_ZERO,
 }
 
