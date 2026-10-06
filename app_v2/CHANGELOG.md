@@ -1,3 +1,13 @@
+## [1.50.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.49.0...v1.50.0) (2026-10-06)
+
+### Features
+
+* **pipeline:** add source and Azure service logos for the Pipeline tab ([7617ef8](https://github.com/DVDJNBR/WATT_WATCHER/commit/7617ef82a85c789a2f5569098dc47c22840fff74)), closes [#19191c](https://github.com/DVDJNBR/WATT_WATCHER/issues/19191c)
+* **pipeline:** put ODRE capacity ingestion through Bronze/Silver/Gold ([a6fba3f](https://github.com/DVDJNBR/WATT_WATCHER/commit/a6fba3f2072ed807eda76d3c93e9277c861b2067))
+* **pipeline:** put Open-Meteo regional ingestion through Bronze/Silver/Gold ([b7bfeec](https://github.com/DVDJNBR/WATT_WATCHER/commit/b7bfeec28ee7cc4a19d2dcabdb1c67d47c7852ca))
+* **pipeline:** recolor sources to match real logos, fix ODRÉ accent ([caa0908](https://github.com/DVDJNBR/WATT_WATCHER/commit/caa090803b7c470a6f55111993aacf0058e3c32f))
+* **pipeline:** route the weather grid through Bronze/Silver/Gold too ([3253052](https://github.com/DVDJNBR/WATT_WATCHER/commit/325305266878f9ce06d6bce9c6323920e3afd0a3))
+
 ## [1.49.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.48.0...v1.49.0) (2026-09-30)
 
 ### Features
