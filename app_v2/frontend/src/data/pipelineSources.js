@@ -10,11 +10,11 @@
  */
 
 export const STAGES = [
-  { kind: 'bronze',    label: 'Bronze',    sub: 'brut' },
-  { kind: 'silver',    label: 'Silver',    sub: 'nettoyé' },
-  { kind: 'gold',      label: 'Gold',      sub: 'structuré' },
-  { kind: 'api',       label: 'API',       sub: 'REST' },
-  { kind: 'dashboard', label: 'Dashboard', sub: 'voir en direct' },
+  { kind: 'bronze',    label: 'Bronze' },
+  { kind: 'silver',    label: 'Silver' },
+  { kind: 'gold',      label: 'Gold' },
+  { kind: 'api',       label: 'Endpoints' },
+  { kind: 'dashboard', label: 'Dashboard' },
 ]
 
 export const SOURCES = [
@@ -22,6 +22,14 @@ export const SOURCES = [
     id: 'rte-production',
     label: 'RTE eCO2mix',
     homepage: 'https://www.rte-france.com/eco2mix',
+    lede: [
+      { text: 'Toutes les 15 minutes, le ' }, { text: 'JSON', cls: 'tech' }, { text: " brut de l'" }, { text: 'API', cls: 'tech' },
+      { text: ' RTE eCO2mix, concernant la ' }, { text: 'production', cls: 'data' }, { text: ', la ' }, { text: 'consommation', cls: 'data' },
+      { text: ' et le ' }, { text: 'mix énergétique', cls: 'data' }, { text: ' régional, est stocké tel quel dans le ' }, { text: 'Data Lake', cls: 'storage' },
+      { text: ', où il est nettoyé. Il est ensuite agrégé en ' }, { text: 'schéma en étoile', cls: 'tech' }, { text: ' dans la ' }, { text: 'base de données', cls: 'storage' },
+      { text: ", puis exposé par l'" }, { text: 'API', cls: 'tech' }, { text: ' et affiché sur la ' }, { text: 'carte des centrales', cls: 'data' },
+      { text: " et l'" }, { text: 'historique de consommation', cls: 'data' }, { text: ' du tableau de bord.' },
+    ],
     logo: '/logos/rte.png',
     color: 'var(--color-source-rte)',
     glow: 'var(--color-source-rte-glow)',
@@ -70,6 +78,14 @@ export const SOURCES = [
     id: 'open-meteo',
     label: 'Open-Meteo',
     homepage: 'https://open-meteo.com',
+    lede: [
+      { text: 'Toutes les 15 minutes, le ' }, { text: 'JSON', cls: 'tech' }, { text: " brut de l'" }, { text: 'API', cls: 'tech' },
+      { text: ' Open-Meteo, concernant la ' }, { text: 'température', cls: 'data' }, { text: ', le ' }, { text: 'vent', cls: 'data' },
+      { text: ' et la ' }, { text: 'nébulosité', cls: 'data' }, { text: ' par région, est stocké tel quel dans le ' }, { text: 'Data Lake', cls: 'storage' },
+      { text: ', où il est nettoyé. Il est ensuite agrégé en ' }, { text: 'schéma en étoile', cls: 'tech' }, { text: ' dans la ' }, { text: 'base de données', cls: 'storage' },
+      { text: ", puis exposé par l'" }, { text: 'API', cls: 'tech' }, { text: ' et affiché sur la ' }, { text: 'carte de France', cls: 'data' },
+      { text: ' et le ' }, { text: 'graphique météo régional', cls: 'data' }, { text: ' du tableau de bord.' },
+    ],
     logo: '/logos/open-meteo.png',
     color: 'var(--color-source-meteo)',
     glow: 'var(--color-source-meteo-glow)',
@@ -113,6 +129,14 @@ export const SOURCES = [
     id: 'odre-capacity',
     label: 'ODRÉ — Capacité installée',
     homepage: 'https://odre.opendatasoft.com',
+    lede: [
+      { text: 'Quotidiennement, le ' }, { text: 'CSV', cls: 'tech' }, { text: " brut de l'" }, { text: 'API', cls: 'tech' },
+      { text: ' ODRÉ, concernant la ' }, { text: 'capacité installée', cls: 'data' }, { text: ' par ' }, { text: 'région', cls: 'data' },
+      { text: ' et par ' }, { text: 'filière', cls: 'data' }, { text: ', est stocké tel quel dans le ' }, { text: 'Data Lake', cls: 'storage' },
+      { text: ', où il est nettoyé. Il est ensuite agrégé en ' }, { text: 'schéma en étoile', cls: 'tech' }, { text: ' dans la ' }, { text: 'base de données', cls: 'storage' },
+      { text: ", puis exposé par l'" }, { text: 'API', cls: 'tech' }, { text: ' et affiché sur le ' }, { text: 'graphique de production', cls: 'data' },
+      { text: ' des différentes sources du tableau de bord.' },
+    ],
     logo: '/logos/odre.svg',
     logoDark: '/logos/odre-dark.svg',
     color: 'var(--color-source-capacity)',
@@ -151,6 +175,13 @@ export const SOURCES = [
     id: 'rte-maintenance',
     label: 'Maintenance réseau (RTE)',
     homepage: 'https://www.services-rte.com',
+    lede: [
+      { text: 'Toutes les 15 minutes, le ' }, { text: 'JSON', cls: 'tech' }, { text: " brut de l'" }, { text: 'API', cls: 'tech' },
+      { text: ' RTE Services, concernant les ' }, { text: 'arrêts et maintenances programmés', cls: 'data' }, { text: ' du réseau, est stocké tel quel dans le ' },
+      { text: 'Data Lake', cls: 'storage' }, { text: ', où il est nettoyé. Il est ensuite chargé dans une ' }, { text: 'table', cls: 'tech' },
+      { text: ' de la ' }, { text: 'base de données', cls: 'storage' }, { text: ", puis exposé par l'" }, { text: 'API', cls: 'tech' },
+      { text: ' et affiché en ' }, { text: 'alerte', cls: 'data' }, { text: ' sur le tableau de bord.' },
+    ],
     logo: '/logos/rte.png',
     color: 'var(--color-source-rte)',
     glow: 'var(--color-source-rte-glow)',
@@ -194,7 +225,13 @@ export const SOURCES = [
     glow: 'var(--color-source-price-glow)',
     visitedCount: 3,
     dwell: [1300, 1300],
-    note: "Table Gold seule — pas encore d'API/dashboard en direct pour cette donnée, elle sert au calibrage du seuil « excédent export ».",
+    lede: [
+      { text: 'Quotidiennement, le ' }, { text: 'JSON', cls: 'tech' }, { text: " brut de l'" }, { text: 'API', cls: 'tech' },
+      { text: ' ENTSO-E, concernant le ' }, { text: 'prix de marché day-ahead', cls: 'data' }, { text: ', est stocké tel quel dans le ' },
+      { text: 'Data Lake', cls: 'storage' }, { text: ', où il est nettoyé puis agrégé en table dans la ' }, { text: 'base de données', cls: 'storage' },
+      { text: " — pas encore d'" }, { text: 'API', cls: 'tech' }, { text: ' ni de dashboard en direct pour cette donnée : elle sert au ' },
+      { text: 'calibrage du seuil « excédent export »', cls: 'data' }, { text: '.' },
+    ],
     previews: {
       bronze: {
         kind: 'json',

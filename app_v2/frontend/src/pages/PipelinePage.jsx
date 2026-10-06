@@ -35,11 +35,6 @@ export default function PipelinePage() {
     <main id="main-content" className="app-main content-page">
       <section className="glass-card content-card">
         <p className="content-kicker">Pipeline de données</p>
-        <p>
-          Cinq sources publiques, un nettoyage automatisé, une base prête à
-          l'emploi. Choisis une source pour suivre son chemin :
-        </p>
-
         <PipelineDiagram />
       </section>
 

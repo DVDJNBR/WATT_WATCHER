@@ -1,61 +1,37 @@
 /**
- * PreviewPanel — format-appropriate content for whichever stage the
- * pipeline diagram's indicator currently sits on: condensed JSON for
- * Bronze, a one-row mini-table for Silver/Gold, a route badge for API.
+ * PreviewPanel — format-appropriate content for a pipeline stage: condensed
+ * JSON for Bronze, a transposed mini-table for Silver/Gold, a route for API.
+ * Tables are transposed (one row per column, name left / value right)
+ * because one row of real data read sideways is as wide as the sum of its
+ * headers — transposed, it's the width of the longest name plus value.
  */
 import { JsonBlock } from '../JsonBlock.jsx'
 
 function BronzePreview({ preview }) {
   if (preview.kind === 'csv') {
-    return (
-      <>
-        <p className="preview-panel__path">{preview.path}</p>
-        <pre className="content-codeblock json-block--compact">
-          {preview.header}
-          {'\n'}
-          {preview.row}
-        </pre>
-      </>
-    )
+    return <pre className="content-codeblock">{preview.header}{'\n'}{preview.row}</pre>
   }
-  return (
-    <>
-      <p className="preview-panel__path">{preview.path}</p>
-      <JsonBlock data={preview.data} compact />
-    </>
-  )
+  return <JsonBlock data={preview.data} compact />
 }
 
-function MiniTable({ table, columns, row }) {
+function MiniTable({ table, columns, row, caption = false }) {
   return (
-    <table className="content-table content-table--stats preview-panel__table preview-panel__table--mini">
-      <caption>{table}</caption>
-      <thead>
-        <tr>{columns.map(c => <th key={c}>{c}</th>)}</tr>
-      </thead>
+    <table className="pipeline-table">
+      {caption && <caption>{table}</caption>}
       <tbody>
-        <tr>{row.map((v, i) => <td key={i}>{String(v)}</td>)}</tr>
+        {columns.map((c, i) => (
+          <tr key={c}>
+            <th scope="row">{c}</th>
+            <td>{String(row[i])}</td>
+          </tr>
+        ))}
       </tbody>
     </table>
   )
 }
 
 function TablePreview({ preview }) {
-  return (
-    <>
-      <p className="preview-panel__path">{preview.table ? `Table : ${preview.table}` : preview.path}</p>
-      <div className="preview-panel__table-wrap">
-        <table className="content-table content-table--stats preview-panel__table">
-          <thead>
-            <tr>{preview.columns.map(c => <th key={c}>{c}</th>)}</tr>
-          </thead>
-          <tbody>
-            <tr>{preview.row.map((v, i) => <td key={i}>{String(v)}</td>)}</tr>
-          </tbody>
-        </table>
-      </div>
-    </>
-  )
+  return <MiniTable {...preview} />
 }
 
 // StarPreview — Gold's data isn't one flat row, it's a fact table resolved
@@ -65,21 +41,21 @@ function TablePreview({ preview }) {
 // carry over — the grouping alone still says "these belong together".
 function StarPreview({ preview }) {
   return (
-    <div className="preview-panel__star">
-      <MiniTable {...preview.fact} />
-      <div className="preview-panel__star-dims">
-        {preview.dims.map(dim => <MiniTable key={dim.table} {...dim} />)}
+    <div className="pipeline-star">
+      <MiniTable {...preview.fact} caption />
+      <div className="pipeline-star__dims">
+        {preview.dims.map(dim => <MiniTable key={dim.table} {...dim} caption />)}
       </div>
     </div>
   )
 }
 
 function ApiPreview({ preview }) {
+  const [verb, path] = preview.route.split(' ')
   return (
-    <p className="preview-panel__route">
-      <span className="method-badge">GET</span>
-      <code>{preview.route.replace(/^GET /, '')}</code>
-    </p>
+    <pre className="content-codeblock pipeline-route">
+      <span className="pipeline-http-verb">{verb}</span> {path}
+    </pre>
   )
 }
 
@@ -87,21 +63,8 @@ const RENDERERS = { json: BronzePreview, csv: BronzePreview, table: TablePreview
 
 export function PreviewPanel({ source, stageKind }) {
   const preview = source.previews[stageKind]
-
-  if (!preview) {
-    return (
-      <p className="preview-panel__empty">
-        {stageKind === 'dashboard'
-          ? 'Cette source alimente le dashboard — clique le nœud pour y aller.'
-          : "Pas (encore) exposée à cette étape."}
-      </p>
-    )
-  }
+  if (!preview) return null
 
   const Renderer = RENDERERS[preview.kind]
-  return (
-    <div className="preview-panel__content">
-      <Renderer preview={preview} />
-    </div>
-  )
+  return <Renderer preview={preview} />
 }
