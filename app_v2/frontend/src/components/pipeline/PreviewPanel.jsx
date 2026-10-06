@@ -26,6 +26,20 @@ function BronzePreview({ preview }) {
   )
 }
 
+function MiniTable({ table, columns, row }) {
+  return (
+    <table className="content-table content-table--stats preview-panel__table preview-panel__table--mini">
+      <caption>{table}</caption>
+      <thead>
+        <tr>{columns.map(c => <th key={c}>{c}</th>)}</tr>
+      </thead>
+      <tbody>
+        <tr>{row.map((v, i) => <td key={i}>{String(v)}</td>)}</tr>
+      </tbody>
+    </table>
+  )
+}
+
 function TablePreview({ preview }) {
   return (
     <>
@@ -44,6 +58,22 @@ function TablePreview({ preview }) {
   )
 }
 
+// StarPreview — Gold's data isn't one flat row, it's a fact table resolved
+// against its dimensions. Shown as a cluster (fact + its dims), not linked
+// by crow's-foot lines to a specific key: a connector draws block-to-block,
+// not key-to-key, so the precise FK lines from the original mockup don't
+// carry over — the grouping alone still says "these belong together".
+function StarPreview({ preview }) {
+  return (
+    <div className="preview-panel__star">
+      <MiniTable {...preview.fact} />
+      <div className="preview-panel__star-dims">
+        {preview.dims.map(dim => <MiniTable key={dim.table} {...dim} />)}
+      </div>
+    </div>
+  )
+}
+
 function ApiPreview({ preview }) {
   return (
     <p className="preview-panel__route">
@@ -53,7 +83,7 @@ function ApiPreview({ preview }) {
   )
 }
 
-const RENDERERS = { json: BronzePreview, csv: BronzePreview, table: TablePreview, api: ApiPreview }
+const RENDERERS = { json: BronzePreview, csv: BronzePreview, table: TablePreview, star: StarPreview, api: ApiPreview }
 
 export function PreviewPanel({ source, stageKind }) {
   const preview = source.previews[stageKind]

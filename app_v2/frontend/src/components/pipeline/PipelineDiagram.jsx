@@ -1,8 +1,17 @@
 /**
- * PipelineDiagram — the data journey as a source-by-source animation.
+ * PipelineDiagram — the data journey as a source-by-source animated flow.
  * Pick a source; a single indicator travels Bronze → Silver → Gold → API →
  * Dashboard (most sources) or stops at Gold (ENTSO-E prices, which have no
- * live API route yet). Each arrival lights up the matching preview below.
+ * live API route yet). Each stage holds its colour once reached — it isn't
+ * a progress bar, it's a trace of what this source's data just passed
+ * through — and its preview sits right beside it, not in a separate panel.
+ *
+ * Bronze/Silver/Gold/API/Dashboard are grouped under the real Azure
+ * services that host them (ADLS Gen2 / SQL Server / Function Apps / Static
+ * Web Apps) — this reflects the certification-era (v1) architecture this
+ * portfolio piece is built to explain, not the cost-trimmed v2 deployment
+ * actually serving this page today (see `watt_watcher_unazureing` —
+ * deliberate, not stale).
  */
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -11,25 +20,40 @@ import { usePrefersReducedMotion } from '../../hooks/usePrefersReducedMotion.js'
 import { PreviewPanel } from './PreviewPanel.jsx'
 
 const DEFAULT_DWELL_MS = 1300
+const BEAD_TRAVEL_MS = 500
 
 function StageIcon({ kind }) {
   switch (kind) {
     case 'bronze':
-      return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="M4 8h16M4 8v10a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1V8M4 8l2-4h12l2 4" strokeLinecap="round" strokeLinejoin="round" /></svg>
     case 'silver':
-      return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M4 6h6M4 10h4M4 14h6M4 18h4" /><path d="M13 6h7v12h-7z" /></svg>
+      return <img className="pipeline-stage__icon-img" src="/logos/azure/storage-container.svg" alt="" aria-hidden="true" />
     case 'gold':
-      return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><ellipse cx="12" cy="6" rx="7" ry="2.5" /><path d="M5 6v6c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5V6" /><path d="M5 12v6c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5v-6" /></svg>
+      return <img className="pipeline-stage__icon-img" src="/logos/azure/sql-database.svg" alt="" aria-hidden="true" />
     case 'api':
-      return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M8 4 3 12l5 8M16 4l5 8-5 8" /></svg>
+      return <img className="pipeline-stage__icon-img" src="/logos/azure/function-apps.svg" alt="" aria-hidden="true" />
+    case 'dashboard':
+      return <img className="pipeline-stage__icon-img" src="/logos/azure/dashboard.svg" alt="" aria-hidden="true" />
     default:
-      return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="19" x2="5" y2="11" /><line x1="12" y1="19" x2="12" y2="5" /><line x1="19" y1="19" x2="19" y2="14" /></svg>
+      return null
   }
 }
 
-function StageNode({ stage, index, visited, current, source, onDashboardClick }) {
+function ServiceCard({ icon, title, children }) {
+  return (
+    <div className="pipeline-service">
+      <p className="pipeline-service__head">
+        <img className="pipeline-service__icon" src={icon} alt="" aria-hidden="true" />
+        <span className="pipeline-service__title">{title}</span>
+      </p>
+      <div className="pipeline-service__body">{children}</div>
+    </div>
+  )
+}
+
+function StageNode({ stage, inScope, passed, current, source, onDashboardClick }) {
   const isDashboard = stage.kind === 'dashboard'
-  const style = current ? { '--stage-color': source.color, '--stage-glow': source.glow } : undefined
+  const style = passed ? { '--stage-color': source.color, '--stage-glow': source.glow } : undefined
+  const preview = source.previews[stage.kind]
 
   const content = (
     <>
@@ -41,28 +65,53 @@ function StageNode({ stage, index, visited, current, source, onDashboardClick })
   )
 
   const className = 'pipeline-stage'
-    + (visited ? '' : ' pipeline-stage--muted')
+    + (inScope ? '' : ' pipeline-stage--muted')
+    + (passed ? ' pipeline-stage--passed' : '')
     + (current ? ' pipeline-stage--current' : '')
     + (isDashboard ? ' pipeline-stage--link' : '')
 
-  if (isDashboard) {
-    return (
-      <button type="button" className={className} style={style} onClick={onDashboardClick} title="Aller au dashboard">
-        {content}
-      </button>
-    )
-  }
-  return <div className={className} style={style}>{content}</div>
+  const node = isDashboard
+    ? <button type="button" className={className} style={style} onClick={onDashboardClick} title="Aller au dashboard">{content}</button>
+    : <div className={className} style={style}>{content}</div>
+
+  return (
+    <div className="pipeline-stage-row">
+      {node}
+      {preview && (
+        <div className="pipeline-stage-row__preview">
+          <PreviewPanel source={source} stageKind={stage.kind} />
+        </div>
+      )}
+    </div>
+  )
 }
 
-function Connector({ traveled, source, cableKey }) {
+function Connector({ traveled, source, cableKey, reducedMotion, inline }) {
   const [open, setOpen] = useState(false)
   const note = cableKey && CABLE_NOTES[cableKey]
   const style = traveled ? { '--stage-color': source.color } : undefined
+  const beadRef = useRef(null)
+
+  useEffect(() => {
+    const bead = beadRef.current
+    if (!bead) return
+    bead.getAnimations().forEach(a => a.cancel())
+    if (!traveled || reducedMotion) return
+    bead.animate([
+      { offset: 0, left: '0%', top: '0%', opacity: 0 },
+      { offset: 0.15, left: '0%', top: '0%', opacity: 1 },
+      { offset: 0.85, opacity: 1 },
+      { offset: 1, left: '100%', top: '100%', opacity: 0 },
+    ], { duration: BEAD_TRAVEL_MS, easing: 'linear' })
+  }, [traveled, reducedMotion])
 
   return (
-    <div className={'pipeline-connector' + (traveled ? ' pipeline-connector--traveled' : '')} style={style}>
+    <div
+      className={'pipeline-connector' + (traveled ? ' pipeline-connector--traveled' : '') + (inline ? ' pipeline-connector--inline' : '')}
+      style={style}
+    >
       <span className="pipeline-connector__line" aria-hidden="true" />
+      <i className="pipeline-connector__bead" ref={beadRef} aria-hidden="true" />
       {note && (
         <button
           type="button"
@@ -93,7 +142,14 @@ function SourceToggle({ source, active, onSelect }) {
       onClick={() => onSelect(source.id)}
       aria-pressed={active}
     >
-      <span className="source-toggle__dot" aria-hidden="true" />
+      {source.logo
+        ? (
+          <span className="source-toggle__logo-wrap" aria-hidden="true">
+            <img className="source-toggle__logo source-toggle__logo--light" src={source.logo} alt="" />
+            <img className="source-toggle__logo source-toggle__logo--dark" src={source.logoDark || source.logo} alt="" />
+          </span>
+        )
+        : <span className="source-toggle__dot" aria-hidden="true" />}
       {source.label}
     </button>
   )
@@ -128,7 +184,14 @@ export function PipelineDiagram() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedId, reducedMotion])
 
-  const currentKind = STAGES[stageIndex].kind
+  const stageProps = (index) => ({
+    stage: STAGES[index],
+    index,
+    inScope: index < source.visitedCount,
+    passed: index <= stageIndex,
+    current: stageIndex === index,
+    source,
+  })
 
   return (
     <div className="pipeline-diagram">
@@ -143,33 +206,28 @@ export function PipelineDiagram() {
           {source.note && <p className="pipeline-diagram__source-note">{source.note}</p>}
 
           <div className="pipeline-diagram__track">
-            <div className="data-lake-group">
-              <span className="data-lake-group__label">Data lake — ADLS Gen2</span>
-              <div className="data-lake-group__stages">
-                <StageNode stage={STAGES[0]} index={0} visited={0 < source.visitedCount} current={stageIndex === 0} source={source} />
-                <Connector traveled={stageIndex >= 1} source={source} cableKey="cleaning" />
-                <StageNode stage={STAGES[1]} index={1} visited={1 < source.visitedCount} current={stageIndex === 1} source={source} />
-              </div>
-            </div>
+            <Connector key={source.id} traveled source={source} reducedMotion={reducedMotion} />
 
-            <Connector traveled={stageIndex >= 2} source={source} cableKey="aggregation" />
-            <StageNode stage={STAGES[2]} index={2} visited={2 < source.visitedCount} current={stageIndex === 2} source={source} />
-            <Connector traveled={stageIndex >= 3 && 3 < source.visitedCount} source={source} />
-            <StageNode stage={STAGES[3]} index={3} visited={3 < source.visitedCount} current={stageIndex === 3} source={source} />
-            <Connector traveled={stageIndex >= 4 && 4 < source.visitedCount} source={source} />
-            <StageNode
-              stage={STAGES[4]}
-              index={4}
-              visited={4 < source.visitedCount}
-              current={stageIndex === 4}
-              source={source}
-              onDashboardClick={() => navigate('/')}
-            />
-          </div>
+            <ServiceCard icon="/logos/azure/storage-accounts.svg" title="ADLS Gen 2">
+              <StageNode {...stageProps(0)} />
+              <Connector traveled={1 <= stageIndex} source={source} cableKey="cleaning" reducedMotion={reducedMotion} inline />
+              <StageNode {...stageProps(1)} />
+            </ServiceCard>
 
-          <div className="preview-panel">
-            <p className="preview-panel__stage-label">{STAGES[stageIndex].label}</p>
-            <PreviewPanel source={source} stageKind={currentKind} />
+            <Connector traveled={2 <= stageIndex} source={source} cableKey="aggregation" reducedMotion={reducedMotion} />
+            <ServiceCard icon="/logos/azure/sql-server.svg" title="SQL Server">
+              <StageNode {...stageProps(2)} />
+            </ServiceCard>
+
+            <Connector traveled={3 <= stageIndex && 3 < source.visitedCount} source={source} reducedMotion={reducedMotion} />
+            <ServiceCard icon="/logos/azure/function-apps.svg" title="Function Apps">
+              <StageNode {...stageProps(3)} />
+            </ServiceCard>
+
+            <Connector traveled={4 <= stageIndex && 4 < source.visitedCount} source={source} reducedMotion={reducedMotion} />
+            <ServiceCard icon="/logos/azure/static-web-apps.svg" title="Static Web Apps">
+              <StageNode {...stageProps(4)} onDashboardClick={() => navigate('/')} />
+            </ServiceCard>
           </div>
         </div>
       </div>

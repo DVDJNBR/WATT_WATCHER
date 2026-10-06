@@ -2191,6 +2191,12 @@ input[type="date"] {
   flex-shrink: 0;
 }
 
+.source-toggle__logo-wrap { position: relative; width: 18px; height: 18px; flex-shrink: 0; }
+.source-toggle__logo { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+.source-toggle__logo--light { display: none; }
+[data-theme="light"] .source-toggle__logo--light { display: block; }
+[data-theme="light"] .source-toggle__logo--dark { display: none; }
+
 .pipeline-diagram__source-note {
   margin-top: 8px;
   font-size: 0.78rem;
@@ -2200,30 +2206,43 @@ input[type="date"] {
 
 .pipeline-diagram__track {
   display: flex;
-  align-items: stretch;
+  align-items: center;
   margin-top: 24px;
   overflow-x: auto;
   padding-bottom: 4px;
 }
 
-.data-lake-group {
+/* ── Service card ─────────────────────────────────────────────────────────
+   One per Azure resource (ADLS Gen 2 / SQL Server / Function Apps / Static
+   Web Apps) — the v1, certification-era architecture this diagram is built
+   to explain (see the file header comment). Wraps one or two stage rows. */
+.pipeline-service {
+  flex: 0 0 auto;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-2);
+}
+
+.pipeline-service__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.pipeline-service__icon { width: 18px; height: 18px; flex-shrink: 0; object-fit: contain; }
+.pipeline-service__title { font-size: 0.74rem; font-weight: 600; }
+
+.pipeline-service__body {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: 10px;
-  border: 1px dashed var(--color-border);
-  background: rgba(255,255,255,0.02);
+  gap: 8px;
+  padding: 10px 12px;
 }
 
-.data-lake-group__label {
-  font-size: 0.62rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--color-text-muted);
-}
-
-.data-lake-group__stages { display: flex; align-items: stretch; }
+/* ── Stage row — chip + its data preview, side by side ──────────────────── */
+.pipeline-stage-row { display: flex; align-items: flex-start; gap: 10px; }
 
 .pipeline-stage {
   position: relative;
@@ -2232,21 +2251,37 @@ input[type="date"] {
   align-items: center;
   justify-content: center;
   gap: 3px;
-  min-width: 104px;
-  padding: 14px 10px;
+  flex: 0 0 auto;
+  min-width: 96px;
+  padding: 12px 10px;
   border: 1px solid var(--color-border);
-  background: var(--color-surface-2);
+  background: var(--color-bg);
   color: var(--color-text);
   text-align: center;
   font: inherit;
   appearance: none;
   cursor: default;
-  transition: border-color var(--transition), color var(--transition);
+  outline: 1px solid transparent;
+  transition: border-color var(--transition), outline-color var(--transition), color var(--transition);
 }
 
 .pipeline-stage--muted { opacity: 0.35; }
 
-.pipeline-stage--current { border-color: var(--stage-color); color: var(--stage-color); }
+/* Held, not just current: once the data has passed a stage it stays lit in
+   that source's colour until a different source is picked (state resets
+   declaratively on source switch — see `stageIndex` in PipelineDiagram —
+   no stale animation to cancel, unlike the original vanilla-JS mockup). */
+.pipeline-stage--passed {
+  border-color: var(--stage-color);
+  outline-color: var(--stage-color);
+  color: var(--stage-color);
+}
+.pipeline-stage--passed .pipeline-stage__glow { opacity: 0.4; filter: blur(12px); }
+
+.pipeline-stage--current {
+  outline-width: 1.5px;
+}
+.pipeline-stage--current .pipeline-stage__glow { opacity: 1; filter: blur(20px); }
 
 .pipeline-stage--link { cursor: pointer; }
 .pipeline-stage--link:hover { border-color: var(--color-accent); }
@@ -2254,43 +2289,67 @@ input[type="date"] {
 
 .pipeline-stage__glow {
   position: absolute;
-  inset: -12px;
+  inset: -10px;
   border-radius: 999px;
   background: var(--stage-glow, transparent);
   filter: blur(16px);
   opacity: 0;
-  transition: opacity var(--transition);
+  transition: opacity var(--transition), filter var(--transition);
   pointer-events: none;
 }
 
-.pipeline-stage--current .pipeline-stage__glow { opacity: 1; }
-
-.pipeline-stage__icon { position: relative; }
-.pipeline-stage__icon svg { width: 20px; height: 20px; display: block; }
+.pipeline-stage__icon { position: relative; display: flex; }
+.pipeline-stage__icon-img { width: 20px; height: 20px; display: block; }
 .pipeline-stage__label { position: relative; font-size: 0.8rem; font-weight: 600; }
 .pipeline-stage__sub {
   position: relative;
   font-size: 0.66rem;
   color: var(--color-text-muted);
 }
-.pipeline-stage--current .pipeline-stage__sub { color: inherit; opacity: 0.75; }
+.pipeline-stage--passed .pipeline-stage__sub { color: inherit; opacity: 0.75; }
 
+.pipeline-stage-row__preview { flex: 1; min-width: 0; padding-top: 2px; }
+
+/* ── Connector — the trait itself IS the bead's travel path ──────────────
+   `left`/`top` are animated together in JS (0% → 100% of this box, see
+   `Connector` in PipelineDiagram.jsx) — whichever axis has room to move
+   dominates visually, so the exact same animation works for the flat
+   (--inline) vertical connector inside the ADLS card too, no branching. */
 .pipeline-connector {
   position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
-  flex: 0 0 30px;
+  flex: 1 1 30px;
+  min-width: 20px;
 }
+
+.pipeline-connector--inline { flex: 0 0 18px; min-width: 0; align-self: center; }
 
 .pipeline-connector__line {
   width: 100%;
-  height: 2px;
+  height: 1px;
   background: var(--color-border);
   transition: background var(--transition);
 }
 
+.pipeline-connector--inline .pipeline-connector__line { width: 1px; height: 100%; }
+
 .pipeline-connector--traveled .pipeline-connector__line { background: var(--stage-color); }
+
+.pipeline-connector__bead {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 7px;
+  height: 7px;
+  margin: -3.5px 0 0 -3.5px;
+  border-radius: 50%;
+  background: var(--stage-color, var(--color-accent));
+  border: 1px solid var(--color-bg);
+  opacity: 0;
+  pointer-events: none;
+}
 
 .pipeline-connector__note-toggle {
   position: absolute;
@@ -2336,55 +2395,51 @@ input[type="date"] {
   color: var(--color-accent);
 }
 
-.preview-panel {
-  margin-top: 24px;
-  padding-top: 16px;
-  border-top: 1px solid var(--color-border);
-}
-
-.preview-panel__stage-label {
-  font-size: 0.68rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--color-text-muted);
-  margin-bottom: 8px;
-}
-
 .preview-panel__path {
   font-family: ui-monospace, 'SF Mono', Menlo, monospace;
-  font-size: 0.72rem;
+  font-size: 0.68rem;
   color: var(--color-text-muted);
   margin-bottom: 6px;
   word-break: break-all;
 }
 
 .preview-panel__table-wrap { overflow-x: auto; }
-.preview-panel__table { margin-top: 0; min-width: 420px; }
+.preview-panel__table { margin-top: 0; font-size: 0.72rem; }
 
 .preview-panel__route {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 0.85rem;
+  font-size: 0.8rem;
 }
 
 .preview-panel__empty {
   color: var(--color-text-muted);
-  font-size: 0.85rem;
+  font-size: 0.8rem;
   font-style: italic;
+}
+
+/* ── Star cluster — Gold's fact table + its dimensions, grouped ─────────── */
+.preview-panel__star { display: flex; align-items: flex-start; gap: 8px; flex-wrap: wrap; }
+.preview-panel__star-dims { display: flex; flex-direction: column; gap: 6px; }
+.preview-panel__table--mini { font-size: 0.68rem; }
+.preview-panel__table--mini caption {
+  text-align: left;
+  font-size: 0.6rem;
+  letter-spacing: 0.03em;
+  color: var(--color-text-muted);
+  padding-bottom: 2px;
 }
 
 @media (max-width: 1024px) {
   .pipeline-diagram__body { flex-direction: column; }
   .source-toggle-col { flex-direction: row; flex-wrap: wrap; flex-basis: auto; width: 100%; }
-  .pipeline-diagram__track,
-  .data-lake-group__stages {
-    flex-direction: column;
-    overflow-x: visible;
-  }
-  .pipeline-connector { flex: 0 0 30px; width: 100%; }
-  .pipeline-connector__line { width: 2px; height: 100%; }
+  .pipeline-diagram__track { flex-direction: column; align-items: stretch; overflow-x: visible; }
+  .pipeline-service__body { flex-direction: column; }
+  .pipeline-stage-row { flex-direction: column; }
+  .pipeline-connector { flex: 0 0 24px; width: 100%; }
+  .pipeline-connector--inline { flex-basis: 18px; }
+  .pipeline-connector__line { width: 1px; height: 100%; margin: 0 auto; }
   .pipeline-connector__note-toggle { top: 50%; left: -22px; transform: translateY(-50%); }
   .pipeline-connector__note { left: 28px; top: 50%; transform: translateY(-50%); }
   .pipeline-stage { width: 100%; }
