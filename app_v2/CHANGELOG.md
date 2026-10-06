@@ -1,3 +1,9 @@
+## [1.51.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.50.0...v1.51.0) (2026-10-06)
+
+### Features
+
+* **pipeline:** reproduce the validated mockup in the real diagram ([37a96b3](https://github.com/DVDJNBR/WATT_WATCHER/commit/37a96b332341a7889d049aa1ca9f8b45d906ac4c))
+
 ## [1.50.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.49.0...v1.50.0) (2026-10-06)
 
 ### Features
