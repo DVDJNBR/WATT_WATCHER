@@ -33,8 +33,7 @@ const API_ROUTES = [
 export default function PipelinePage() {
   return (
     <main id="main-content" className="app-main content-page">
-      <section className="glass-card content-card">
-        <p className="content-kicker">Pipeline de données</p>
+      <section className="glass-card content-card content-card--pipeline">
         <PipelineDiagram />
       </section>
 

@@ -1955,6 +1955,36 @@ input[type="date"] {
   padding: 28px 32px;
 }
 
+/* The diagram's natural width (five source tiles → four Azure service
+   cards, each with its data preview) runs well past the 1340px prose
+   column other content-cards use — in the validated mockup it floats
+   free on the page, unconstrained. Break this one card out to the
+   viewport so the diagram gets room to breathe instead of permanently
+   showing a horizontal scrollbar; `.pipeline-scene`'s own overflow-x
+   stays as the fallback for anything still narrower than that. */
+@media (min-width: 900px) {
+  .content-card--pipeline {
+    width: 100vw;
+    max-width: 1680px;
+    margin-left: 50%;
+    margin-right: 0;
+    transform: translateX(-50%);
+  }
+}
+
+/* No glass-card frame on the diagram itself — it isn't prose, the frame
+   just boxed in a schematic that reads better floating free. */
+.content-card--pipeline {
+  border: none;
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+.content-card--pipeline:hover { box-shadow: none; }
+@media (min-width: 900px) {
+  .content-card--pipeline:hover { transform: translateX(-50%); }
+}
+
 .content-kicker {
   font-size: 0.75rem;
   font-weight: 600;
@@ -2152,18 +2182,46 @@ input[type="date"] {
   font-weight: 600;
 }
 
+
 /* ── Pipeline diagram (source-by-source animated flow) ──────────────────────
-   Direct port of app_v2/mockups/pipeline-block.html — same class grammar,
-   same measurements, same animation model (outline+box-shadow flash via the
-   Web Animations API, bead travelling 0%→100% of its own connector box).
-   `.pipeline-*` prefix throughout to stay clear of the page's own `.node`-
-   or `.container`-shaped utility classes. */
+   Direct port of the VALIDATED mockup — app_v2/mockups/
+   pipeline-block.pre-css-rewrite.bak.html, not the later full-CSS-rewrite
+   sibling file. Fixed 1150px geometry (five source tiles, four Azure
+   service cards at hand-tuned widths so the row totals exactly 1150px),
+   data previews absolutely positioned in a strip below the row rather than
+   inline next to their chip, and real connector paths — a single SVG layer
+   whose `d` is computed from each block's measured position
+   (`measureScene`/`layoutChains` in PipelineDiagram.jsx), not guessed.
+   Deliberately NOT responsive past the horizontal-scroll fallback below
+   760px: the mockup itself scoped true responsiveness as separate future
+   work, and a fixed-pixel diagram that reflows per block size is a
+   different, bigger component than this one. */
+
+:root {
+  --flow-rte-soft:      rgba(37,99,235,0.42);
+  --flow-rte-gone:      rgba(37,99,235,0);
+  --flow-rte-faint:     rgba(37,99,235,0.3);
+  --flow-meteo-soft:    rgba(249,115,22,0.42);
+  --flow-meteo-gone:    rgba(249,115,22,0);
+  --flow-meteo-faint:   rgba(249,115,22,0.3);
+  --flow-capacity-soft: rgba(34,197,94,0.42);
+  --flow-capacity-gone: rgba(34,197,94,0);
+  --flow-capacity-faint:rgba(34,197,94,0.3);
+  --flow-price-soft:    rgba(168,85,247,0.42);
+  --flow-price-gone:    rgba(168,85,247,0);
+  --flow-price-faint:   rgba(168,85,247,0.3);
+
+  --pipeline-flow:      var(--color-source-rte);
+  --pipeline-flow-soft: var(--flow-rte-soft);
+  --pipeline-flow-gone: var(--flow-rte-gone);
+}
 
 .pipeline-diagram { margin-top: 16px; }
 
 .pipeline-lede {
-  max-width: 640px;
-  margin: 0 0 20px;
+  max-width: 560px;
+  margin: 0 auto 24px;
+  text-align: center;
   font-size: 0.86rem;
   line-height: 1.6;
   color: var(--color-text-muted);
@@ -2171,21 +2229,56 @@ input[type="date"] {
 }
 .pipeline-lede--swapping { opacity: 0; }
 .pipeline-lede__tech { color: var(--color-text); font-weight: 600; }
-.pipeline-lede__data { color: var(--color-accent); font-weight: 600; }
+.pipeline-lede__data { color: var(--pipeline-flow); font-weight: 600; }
 .pipeline-lede__storage { font-style: italic; }
 
-.pipeline-scene { width: 100%; overflow-x: auto; padding-bottom: 4px; }
-.pipeline-scene__row { display: flex; align-items: center; min-width: max-content; }
+/* Scrolls as a whole below ~1216px of available card width (1150px scene +
+   edge breathing room) — the mockup's own fixed-geometry scope limit, not a
+   bug: see the file-header note above. */
+.pipeline-scene-scroll { width: 100%; overflow-x: auto; padding-bottom: 4px; }
+
+.pipeline-scene {
+  position: relative;
+  width: 1150px;
+  max-width: none;
+  margin: 0 auto;
+}
+
+.pipeline-flow { position: absolute; left: 0; top: 0; width: 1150px; height: 450px; pointer-events: none; overflow: visible; z-index: 1; }
+.pipeline-chain { stroke: var(--color-border); stroke-width: 1; fill: none; }
+.pipeline-chain--src:not(.is-active) { stroke: var(--color-border); opacity: 1; }
+.pipeline-chain--rte   { stroke: var(--color-source-rte); }
+.pipeline-chain--meteo { stroke: var(--color-source-meteo); }
+.pipeline-chain--capacity { stroke: var(--color-source-capacity); }
+.pipeline-chain--price { stroke: var(--color-source-price); }
+.pipeline-chain--trail { stroke: var(--pipeline-flow-gone); stroke-width: 1.4; stroke-linecap: round; fill: none; }
+
+.pipeline-beads { position: absolute; left: 0; top: 0; width: 1150px; height: 450px; pointer-events: none; z-index: 1; }
+.pipeline-bead {
+  position: absolute; left: -5px; top: -5px;
+  width: 10px; height: 10px; border-radius: 50%;
+  background: var(--pipeline-flow); border: 1px solid var(--color-bg); opacity: 0;
+}
+
+/* Deliberately NOT positioned/z-indexed: a static element paints below any
+   positioned one regardless of z-index sign, which is exactly what lets
+   the connector lines in .pipeline-flow/.pipeline-links show OVER a store
+   card's background for the stretch of line that crosses into it, and
+   disappear only under the actual chip (.pipeline-node/.pipeline-container
+   below, z-index:2) — not under the whole card. Promoting this row itself
+   would hide that entire crossing stretch under every card's background. */
+.pipeline-scene__row { display: flex; align-items: center; min-height: 264px; }
+.pipeline-gap { flex: 0 0 auto; width: 10px; }
+.pipeline-gap--bus { width: 36px; }
 
 .pipeline-sources { align-self: flex-start; display: flex; flex-direction: column; gap: 8px; }
 
-/* ── Source tile ─────────────────────────────────────────────────────────
-   A <button> that picks which source the scene shows — not a link, the
-   click doesn't navigate. Fixed width so the five tiles line up. */
 .pipeline-node {
   display: block;
   width: 145px;
   flex: 0 0 auto;
+  position: relative;
+  z-index: 2;
   background: var(--color-surface-2);
   border: 1px solid var(--color-border);
   border-radius: 4px;
@@ -2210,53 +2303,47 @@ input[type="date"] {
   border-color: var(--pipeline-src);
   box-shadow: inset 0 0 0 1px var(--pipeline-src);
 }
-.pipeline-node__body { display: flex; align-items: center; gap: 9px; padding: 10px 12px; }
+.pipeline-node__body { display: flex; align-items: center; gap: 11px; padding: 12px 13px; }
 .pipeline-node__dot {
   width: 9px; height: 9px; flex: 0 0 auto; border-radius: 50%;
   border: 1.5px solid var(--pipeline-src); background: transparent;
 }
 .pipeline-node--active .pipeline-node__dot { background: var(--pipeline-src); }
-.pipeline-node__icon { position: relative; width: 20px; height: 20px; flex: 0 0 auto; }
-.pipeline-node__icon-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+.pipeline-node__icon { position: relative; width: 34px; height: 34px; flex: 0 0 auto; display: grid; place-items: center; }
+.pipeline-node__icon-img { position: absolute; inset: 0; width: 100%; height: 100%; max-height: 26px; margin: auto; object-fit: contain; display: block; }
 .pipeline-node__icon-img--light { display: block; }
 .pipeline-node__icon-img--dark { display: none; }
 [data-theme="light"] .pipeline-node__icon-img--light { display: none; }
 [data-theme="light"] .pipeline-node__icon-img--dark { display: block; }
-.pipeline-node__title { font-size: 0.8rem; font-weight: 600; line-height: 1.25; letter-spacing: -0.005em; }
+.pipeline-node__title { font-size: 0.86rem; font-weight: 600; line-height: 1.25; letter-spacing: -0.005em; }
 
-/* ── Service card — one per Azure resource (ADLS Gen 2 / SQL Server /
-   Function App / Static Web Apps), the v1 certification-era architecture
-   this diagram is built to explain (see the file header comment). ───────── */
 .pipeline-store {
+  position: relative;
   flex: 0 0 auto;
   background: var(--color-surface-2);
   border: 1px solid var(--color-border);
   border-radius: 4px;
   box-shadow: 0 1px 2px rgba(0,0,0,0.3);
 }
+.pipeline-store--adls { width: 388px; }
+.pipeline-store--sql  { width: 196px; }
+.pipeline-store--fn   { width: 205px; }
+.pipeline-store--swa  { width: 150px; }
 .pipeline-store__head {
-  margin: 0; display: flex; align-items: center; gap: 10px;
-  padding: 10px 12px;
+  margin: 0; display: flex; align-items: center; gap: 11px;
+  padding: 12px 13px;
   border-bottom: 1px solid var(--color-border);
 }
-.pipeline-store__icon { width: 28px; height: 28px; flex: 0 0 auto; display: grid; place-items: center; }
-.pipeline-store__icon img { width: 20px; height: 20px; display: block; object-fit: contain; }
-.pipeline-store__title { font-size: 0.8rem; font-weight: 600; line-height: 1.25; letter-spacing: -0.005em; }
-.pipeline-store__list { margin: 0; padding: 10px 12px 11px 20px; list-style: none; display: flex; gap: 28px; }
-.pipeline-store__list--stack { flex-direction: column; align-items: start; gap: 4px; padding-left: 14px; }
+.pipeline-store__icon { width: 34px; height: 34px; flex: 0 0 auto; display: grid; place-items: center; }
+.pipeline-store__icon img { width: 24px; height: 24px; display: block; object-fit: contain; }
+.pipeline-store__title { font-size: 0.86rem; font-weight: 600; line-height: 1.25; letter-spacing: -0.005em; }
+.pipeline-store__list { margin: 0; padding: 10px 13px 12px 23px; list-style: none; display: flex; gap: 32px; }
 
-/* ── Layer — a chip (container) plus its data preview, side by side ─────── */
-.pipeline-layer { display: flex; align-items: flex-start; gap: 10px; }
-.pipeline-layer--muted { opacity: 0.35; }
-
-/* Container row: same grammar as the source tile — thin outline, 3px
-   radius, an icon column so titles line up. Two deliberate gaps from the
-   tile: it isn't a link (no lift on hover, an architecture resource
-   doesn't move under the pointer except Dashboard, which really does
-   navigate), and bronze/silver/gold carry a coloured medal on the left
-   edge instead of a border colour — the only colour a container has. */
 .pipeline-container {
-  display: flex; align-items: center; gap: 7px;
+  position: relative;
+  z-index: 2;
+  display: flex; align-items: center; gap: 8px;
+  width: 160px;
   padding: 6px 9px;
   background: var(--color-bg);
   color: var(--color-text);
@@ -2267,76 +2354,45 @@ input[type="date"] {
   text-align: left;
   outline: 1.5px solid transparent;
 }
-.pipeline-container[data-layer="bronze"] { --pipeline-layer: #a9643a; }
-.pipeline-container[data-layer="silver"] { --pipeline-layer: #9aa4b1; }
-.pipeline-container[data-layer="gold"]   { --pipeline-layer: #d4a017; }
-[data-theme="light"] .pipeline-container[data-layer="bronze"] { --pipeline-layer: #9c5a30; }
-[data-theme="light"] .pipeline-container[data-layer="silver"] { --pipeline-layer: #6b7482; }
-[data-theme="light"] .pipeline-container[data-layer="gold"]   { --pipeline-layer: #9a7209; }
 .pipeline-container--wide { width: auto; }
 .pipeline-container--link { cursor: pointer; appearance: none; margin: 0; }
 .pipeline-container--link:hover { border-color: var(--color-accent); }
 .pipeline-container--link:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
-.pipeline-container__icon-img { width: 15px; height: 15px; flex: 0 0 auto; display: block; }
-.pipeline-container__name { font-size: 0.76rem; line-height: 1.2; color: var(--color-text); white-space: nowrap; }
+.pipeline-container__icon-img { width: 16px; height: 16px; flex: 0 0 auto; display: block; }
+.pipeline-container__name { font-size: 0.78rem; line-height: 1.2; color: var(--color-text); white-space: nowrap; }
 
-/* ── Connector — the line itself IS the bead's travel path. `left`/`top`
-   animate together (0%→100% of this box, see `travelConnector` in
-   PipelineDiagram.jsx) — the same code works whether the box is flat (a
-   desktop row) or standing (the narrow stack), no orientation branch. ──── */
-.pipeline-connector {
-  position: relative;
-  flex: 1 1 28px; min-width: 20px; height: 1px;
-  background: var(--color-border);
-  align-self: center;
-}
-.pipeline-connector--inline { flex: 0 0 24px; width: 1px; height: 24px; min-width: 0; align-self: center; }
-.pipeline-bead {
-  position: absolute; top: 50%; left: 0; transform: translate(-50%, -50%);
-  width: 10px; height: 10px; border-radius: 50%;
-  background: var(--color-accent); border: 1px solid var(--color-bg); opacity: 0;
-}
-.pipeline-connector__note-toggle {
-  position: absolute; top: -22px; left: 50%; transform: translateX(-50%);
-  width: 16px; height: 16px;
-  display: flex; align-items: center; justify-content: center;
-  border-radius: 50%;
-  border: 1px solid var(--color-border);
-  background: var(--color-surface);
-  color: var(--color-text-muted);
-  font-size: 0.62rem; font-style: italic; font-family: var(--font-display);
-  line-height: 1; cursor: pointer;
-}
-.pipeline-connector__note {
-  position: absolute; top: 6px; left: 50%; transform: translateX(-50%);
-  width: 220px; z-index: 20;
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  padding: 10px 12px;
-  font-size: 0.75rem; line-height: 1.5; color: var(--color-text);
-  box-shadow: 0 8px 24px rgba(0,0,0,0.3);
-}
-.pipeline-connector__note strong {
-  display: block; margin-bottom: 4px;
-  font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.04em;
-  color: var(--color-accent);
-}
+/* ── The strip below the row: every data preview, absolutely positioned so
+   its centre falls under the column it illustrates — not inline next to
+   its chip (that forced Bronze/Silver into a cramped stack in the first
+   port). Numbers below are the mockup's own hand-tuned geometry: they hold
+   exactly because every box above has a FIXED pixel width (sources 145,
+   ADLS 388, SQL 196, Function App 205, Static Web Apps 150, gaps 10/36) —
+   nothing here depends on label or data length. ───────────────────────── */
+.pipeline-below { position: relative; width: 1150px; height: 230px; }
+.pipeline-links { position: absolute; left: 0; top: -102px; width: 1150px; height: 352px; color: var(--color-border); pointer-events: none; }
 
-/* ── Data previews — a quote, not a reading: everything here is shrunk far
-   below body text size on purpose, the mockup's own calibration. Reuses
-   the app's `.content-codeblock`/`.json-block` classes (JsonBlock.jsx has
-   no other caller) so the port is a straight visual rescale, not a new
-   component. ─────────────────────────────────────────────────────────── */
-.pipeline-peek { display: flex; flex-direction: column; gap: 6px; outline: 1.5px solid transparent; }
+.pipeline-peek { position: absolute; display: flex; flex-direction: column; gap: 6px; outline: 1.5px solid transparent; }
+.pipeline-peek--bronze { left: 202px; top: 22px; }
+.pipeline-peek--silver { left: 400px; top: 22px; }
+.pipeline-peek--fact   { left: 560px; top: 22px; }
+.pipeline-peek--dim1   { left: 728px; top: 22px; }
+.pipeline-peek--dim2   { left: 728px; top: 82px; }
+.pipeline-peek--dim3   { left: 728px; top: 142px; }
+.pipeline-peek--api    { left: 870px; top: 22px; }
+
 .pipeline-peek .content-codeblock {
   margin: 0;
+  width: 164px;
   background: var(--color-surface);
+  border: 1px solid var(--color-border);
   padding: 5px 6px;
   font-size: 0.62rem;
   line-height: 1.35;
+  outline: 1.5px solid transparent;
 }
-.pipeline-peek .json-block--compact { padding: 5px 6px; font-size: 0.62rem; line-height: 1.35; }
-.pipeline-route { display: flex; gap: 4px; white-space: nowrap; }
+.pipeline-peek--api .content-codeblock { width: 130px; }
+.pipeline-route { display: flex; flex-direction: column; gap: 2px; }
+.pipeline-route__line { display: flex; gap: 4px; white-space: nowrap; }
 .pipeline-http-verb { color: #10b981; font-weight: 700; }
 
 .pipeline-table {
@@ -2347,6 +2403,11 @@ input[type="date"] {
   border: 1px solid var(--color-border);
   outline: 1.5px solid transparent;
 }
+.pipeline-peek--silver .pipeline-table { width: 151px; }
+.pipeline-peek--fact .pipeline-table   { width: 112px; }
+.pipeline-peek--dim1 .pipeline-table,
+.pipeline-peek--dim2 .pipeline-table,
+.pipeline-peek--dim3 .pipeline-table   { width: 128px; }
 .pipeline-table caption {
   text-align: left; padding: 2px 5px;
   font-size: 0.58rem; letter-spacing: 0.04em; text-transform: uppercase;
@@ -2354,19 +2415,14 @@ input[type="date"] {
   background: var(--color-surface-2);
   border-bottom: 1px solid var(--color-border);
 }
-.pipeline-table th, .pipeline-table td { padding: 2px 6px; text-align: left; white-space: nowrap; }
-.pipeline-table th { font-weight: 600; color: var(--color-text-muted); }
-.pipeline-table td { color: var(--color-text); border-left: 1px solid var(--color-border); }
+.pipeline-table th, .pipeline-table td { padding: 2px 6px; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pipeline-table th { font-weight: 600; color: var(--color-text-muted); max-width: 96px; }
+.pipeline-table td { color: var(--color-text); border-left: 1px solid var(--color-border); max-width: 84px; }
 .pipeline-table tr + tr th, .pipeline-table tr + tr td { border-top: 1px solid var(--color-border); }
 
-/* ── Star cluster — Gold's fact table + its dimensions, grouped. No
-   crow's-foot lines to a specific key (a connector draws block-to-block,
-   not key-to-key) — the grouping alone says "these belong together". ──── */
-.pipeline-star { display: flex; align-items: flex-start; gap: 8px; }
-.pipeline-star__dims { display: flex; flex-direction: column; gap: 6px; }
-
 .pipeline-source-links {
-  margin: 14px 0 0;
+  width: 1150px;
+  margin: 14px auto 0;
   text-align: right;
   font-size: 0.74rem;
   color: var(--color-text-muted);
@@ -2385,17 +2441,4 @@ input[type="date"] {
   .pipeline-bead { display: none; }
   .pipeline-node { transition: none; }
   .pipeline-node:hover, .pipeline-node:focus-visible { transform: none; }
-}
-
-/* ── Vertical stack under ~760px — one axis change on the row flex is
-   enough: source tiles, Bronze/Silver (already a column), Gold, Endpoints
-   and Dashboard fall into this order because it's already the DOM order.
-   Connectors go from flat lines to standing ones; layer/star go column so
-   a preview follows its block instead of pushing the row wider. ───────── */
-@media (max-width: 760px) {
-  .pipeline-scene__row { flex-direction: column; align-items: stretch; gap: 4px; min-width: 0; }
-  .pipeline-connector { flex: 0 0 28px; width: 1px; height: auto; min-width: 0; min-height: 20px; align-self: center; }
-  .pipeline-connector--inline { flex-basis: 20px; }
-  .pipeline-layer, .pipeline-star { flex-direction: column; align-items: flex-start; }
-  .pipeline-node { width: 100%; }
 }

@@ -7,15 +7,15 @@
  * `visitedCount` is how many of the 5 fixed stages (bronze/silver/gold/
  * api/dashboard) this source's animated path covers, always starting at
  * bronze — no source skips a stage in the middle.
+ *
+ * `previews.bronze`/`previews.silver` are arrays (one real ingestion job
+ * per entry) and `previews.api` is an array of route strings rendered as
+ * stacked lines in one block — every current source has exactly one, but
+ * the shape stays an array because the diagram (and the mockup it ports)
+ * supports more than one sharing a chip. `previews.gold.extra` is the same
+ * idea for Gold: extra flat fact tables under the star schema, unused for
+ * now.
  */
-
-export const STAGES = [
-  { kind: 'bronze',    label: 'Bronze' },
-  { kind: 'silver',    label: 'Silver' },
-  { kind: 'gold',      label: 'Gold' },
-  { kind: 'api',       label: 'Endpoints' },
-  { kind: 'dashboard', label: 'Dashboard' },
-]
 
 export const SOURCES = [
   {
@@ -36,7 +36,7 @@ export const SOURCES = [
     visitedCount: 5,
     dwell: [1300, 1300, 1500, 1100],
     previews: {
-      bronze: {
+      bronze: [{
         kind: 'json',
         path: 'bronze/rte/production/2026/08/28/eco2mix_regional_....json',
         data: {
@@ -51,13 +51,13 @@ export const SOURCES = [
           pompage: '0',
           bioenergies: 34,
         },
-      },
-      silver: {
+      }],
+      silver: [{
         kind: 'table',
         path: 'silver/rte/production/year=2026/month=08/day=28/data.parquet',
         columns: ['code_insee_region', 'date_heure', 'consommation_mw', 'eolien_mw', 'solaire_mw'],
         row: ['53', '2026-08-28T14:15:00Z', 3120, 842, 156],
-      },
+      }],
       gold: {
         kind: 'star',
         fact: {
@@ -65,13 +65,12 @@ export const SOURCES = [
           columns: ['id_date', 'id_region', 'id_source', 'valeur_mw', 'consommation_mw'],
           row: [4821, 8, 2, 842, 3120],
         },
-        dims: [
-          { table: 'dim_time', columns: ['id_date', 'horodatage', 'heure'], row: [4821, '2026-08-28T12:15:00Z', 14] },
-          { table: 'dim_region', columns: ['id_region', 'code_insee', 'nom_region'], row: [8, '53', 'Bretagne'] },
-          { table: 'dim_source', columns: ['id_source', 'source_name', 'is_green'], row: [2, 'eolien', 1] },
-        ],
+        dim1: { table: 'dim_time', columns: ['id_date', 'horodatage', 'heure'], row: [4821, '2026-08-28T12:15:00Z', 14] },
+        dim2: { table: 'dim_region', columns: ['id_region', 'code_insee', 'nom_region'], row: [8, '53', 'Bretagne'] },
+        dim3: { table: 'dim_source', columns: ['id_source', 'source_name', 'is_green'], row: [2, 'eolien', 1] },
+        extra: [],
       },
-      api: { kind: 'api', route: 'GET /v1/production/regional?region_code=53' },
+      api: ['GET /v1/production/regional?region_code=53'],
     },
   },
   {
@@ -92,7 +91,7 @@ export const SOURCES = [
     visitedCount: 5,
     dwell: [1300, 1300, 1500, 1100],
     previews: {
-      bronze: {
+      bronze: [{
         kind: 'json',
         path: 'bronze/meteo/regional/2026/08/28/eco2mix_regional_....json',
         data: {
@@ -103,13 +102,13 @@ export const SOURCES = [
           wind_speed_10m: 24.8,
           cloudcover_pct: 62,
         },
-      },
-      silver: {
+      }],
+      silver: [{
         kind: 'table',
         path: 'silver/meteo/regional/year=2026/month=08/data.parquet',
         columns: ['region_code', 'timestamp', 'temperature_c', 'wind_speed_10m', 'cloudcover_pct'],
         row: ['53', '2026-08-28T14:00', 19.4, 24.8, 62],
-      },
+      }],
       gold: {
         kind: 'star',
         fact: {
@@ -117,12 +116,12 @@ export const SOURCES = [
           columns: ['id_date', 'id_region', 'temperature_c', 'wind_speed_10m', 'cloudcover_pct'],
           row: [4821, 8, 19.4, 24.8, 62],
         },
-        dims: [
-          { table: 'dim_time', columns: ['id_date', 'horodatage', 'heure'], row: [4821, '2026-08-28T12:00:00Z', 14] },
-          { table: 'dim_region', columns: ['id_region', 'code_insee', 'nom_region'], row: [8, '53', 'Bretagne'] },
-        ],
+        dim1: { table: 'dim_time', columns: ['id_date', 'horodatage', 'heure'], row: [4821, '2026-08-28T12:00:00Z', 14] },
+        dim2: { table: 'dim_region', columns: ['id_region', 'code_insee', 'nom_region'], row: [8, '53', 'Bretagne'] },
+        dim3: null,
+        extra: [],
       },
-      api: { kind: 'api', route: 'GET /v1/meteo/regional?region_code=53' },
+      api: ['GET /v1/meteo/regional?region_code=53'],
     },
   },
   {
@@ -144,18 +143,18 @@ export const SOURCES = [
     visitedCount: 5,
     dwell: [1300, 1300, 1500, 1100],
     previews: {
-      bronze: {
+      bronze: [{
         kind: 'csv',
         path: 'bronze/capacity/2026/08/28/capacity_....csv',
         header: 'coderegion;region;filiere;puismaxinstallee',
         row: '53;Bretagne;Éolien terrestre;1042000',
-      },
-      silver: {
+      }],
+      silver: [{
         kind: 'table',
         path: 'silver/capacity/data.parquet',
         columns: ['region_code', 'source_name', 'puissance_installee_mw', 'annee'],
         row: ['53', 'eolien', 1042.0, 2026],
-      },
+      }],
       gold: {
         kind: 'star',
         fact: {
@@ -163,56 +162,12 @@ export const SOURCES = [
           columns: ['id_region', 'id_source', 'puissance_installee_mw', 'annee'],
           row: [8, 2, 1042.0, 2026],
         },
-        dims: [
-          { table: 'dim_region', columns: ['id_region', 'code_insee', 'nom_region'], row: [8, '53', 'Bretagne'] },
-          { table: 'dim_source', columns: ['id_source', 'source_name', 'is_green'], row: [2, 'eolien', 1] },
-        ],
+        dim1: null,
+        dim2: { table: 'dim_region', columns: ['id_region', 'code_insee', 'nom_region'], row: [8, '53', 'Bretagne'] },
+        dim3: { table: 'dim_source', columns: ['id_source', 'source_name', 'is_green'], row: [2, 'eolien', 1] },
+        extra: [],
       },
-      api: { kind: 'api', route: 'GET /v1/capacity/regional?region_code=53' },
-    },
-  },
-  {
-    id: 'rte-maintenance',
-    label: 'Maintenance réseau (RTE)',
-    homepage: 'https://www.services-rte.com',
-    lede: [
-      { text: 'Toutes les 15 minutes, le ' }, { text: 'JSON', cls: 'tech' }, { text: " brut de l'" }, { text: 'API', cls: 'tech' },
-      { text: ' RTE Services, concernant les ' }, { text: 'arrêts et maintenances programmés', cls: 'data' }, { text: ' du réseau, est stocké tel quel dans le ' },
-      { text: 'Data Lake', cls: 'storage' }, { text: ', où il est nettoyé. Il est ensuite chargé dans une ' }, { text: 'table', cls: 'tech' },
-      { text: ' de la ' }, { text: 'base de données', cls: 'storage' }, { text: ", puis exposé par l'" }, { text: 'API', cls: 'tech' },
-      { text: ' et affiché en ' }, { text: 'alerte', cls: 'data' }, { text: ' sur le tableau de bord.' },
-    ],
-    logo: '/logos/rte.png',
-    color: 'var(--color-source-rte)',
-    glow: 'var(--color-source-rte-glow)',
-    visitedCount: 5,
-    dwell: [1300, 1300, 1500, 1100],
-    previews: {
-      bronze: {
-        kind: 'json',
-        path: 'bronze/maintenance/2026/08/28/eco2mix_regional_....json',
-        data: {
-          event_id: 'EVT-20260828-014',
-          unit_name: 'GRAVELINES 5',
-          event_type: 'Arrêt programmé',
-          start_date: '2026-09-01T06:00:00Z',
-          end_date: '2026-09-15T18:00:00Z',
-          unavailable_mw: 900,
-        },
-      },
-      silver: {
-        kind: 'table',
-        path: 'silver/maintenance/year=2026/month=09/data.parquet',
-        columns: ['event_id', 'unit_name', 'start_date', 'end_date', 'unavailable_mw'],
-        row: ['EVT-20260828-014', 'GRAVELINES 5', '2026-09-01T06:00Z', '2026-09-15T18:00Z', 900],
-      },
-      gold: {
-        kind: 'table',
-        table: 'fact_maintenance',
-        columns: ['event_id', 'unit_name', 'start_date', 'end_date', 'unavailable_mw'],
-        row: ['EVT-20260828-014', 'GRAVELINES 5', '2026-09-01T06:00Z', '2026-09-15T18:00Z', 900],
-      },
-      api: { kind: 'api', route: 'GET /v1/maintenance' },
+      api: ['GET /v1/capacity/regional?region_code=53'],
     },
   },
   {
@@ -233,20 +188,20 @@ export const SOURCES = [
       { text: 'calibrage du seuil « excédent export »', cls: 'data' }, { text: '.' },
     ],
     previews: {
-      bronze: {
+      bronze: [{
         kind: 'json',
         path: 'bronze/price/2026/08/28/eco2mix_regional_....json',
         data: {
           timestamp: '2026-08-28T14:00:00+00:00',
           price_eur_mwh: -12.4,
         },
-      },
-      silver: {
+      }],
+      silver: [{
         kind: 'table',
         path: 'silver/price/market/year=2026/month=08/data.parquet',
         columns: ['timestamp', 'price_eur_mwh'],
         row: ['2026-08-28T14:00:00Z', -12.4],
-      },
+      }],
       gold: {
         kind: 'star',
         fact: {
@@ -254,21 +209,12 @@ export const SOURCES = [
           columns: ['id_date', 'price_eur_mwh', 'retrieved_at'],
           row: [4821, -12.4, '2026-08-28T14:03:11Z'],
         },
-        dims: [
-          { table: 'dim_time', columns: ['id_date', 'horodatage', 'heure'], row: [4821, '2026-08-28T14:00:00Z', 14] },
-        ],
+        dim1: { table: 'dim_time', columns: ['id_date', 'horodatage', 'heure'], row: [4821, '2026-08-28T14:00:00Z', 14] },
+        dim2: null,
+        dim3: null,
+        extra: [],
       },
+      api: [],
     },
   },
 ]
-
-export const CABLE_NOTES = {
-  cleaning: {
-    label: 'Étape de nettoyage',
-    text: "Dépend de la source, mais toujours la même logique : renommage des colonnes, cast des types, dédoublonnage. Un null n'est jamais réécrit à zéro — il veut souvent dire « pas encore publié », pas « valeur nulle » (RTE publie avec quelques minutes de retard).",
-  },
-  aggregation: {
-    label: "Étape d'agrégation",
-    text: 'Gold résout les clés étrangères vers les dimensions (région, horodatage, filière) et calcule les métriques dérivées avant de charger la table de faits — la lecture par API se fait ensuite en simple SELECT, sans jointure côté client.',
-  },
-}

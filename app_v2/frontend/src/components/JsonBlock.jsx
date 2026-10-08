@@ -19,12 +19,14 @@ function highlightLine(line) {
   })
 }
 
-export function JsonBlock({ data, compact = false }) {
+import { forwardRef } from 'react'
+
+export const JsonBlock = forwardRef(function JsonBlock({ data, compact = false }, ref) {
   const html = JSON.stringify(data, null, 2)
     .split('\n')
     .map(line => `<span class="json-line">${highlightLine(line)}</span>`)
     .join('\n')
 
   const cls = 'content-codeblock json-block' + (compact ? ' json-block--compact' : '')
-  return <pre className={cls} dangerouslySetInnerHTML={{ __html: html }} />
-}
+  return <pre ref={ref} className={cls} dangerouslySetInnerHTML={{ __html: html }} />
+})

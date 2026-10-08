@@ -1,85 +1,168 @@
 /**
- * PipelineDiagram — a direct port of the validated mockup
- * (app_v2/mockups/pipeline-block.html): one shared scene, auto-cycling
- * through every source. Each lap is a chain of discrete facts, not a
- * progress bar on a shared timeline — the bead travels a connector, that
- * fact ends, the block it reaches lights up (holds, it's a trace of what
- * just passed through) and its preview flashes (peaks, then fades — it
- * shows what the data just became, not where it is), that fact ends, the
- * bead leaves again. A click on a source jumps the chain to it immediately.
+ * PipelineDiagram — a direct port of the VALIDATED mockup:
+ * app_v2/mockups/pipeline-block.pre-css-rewrite.bak.html (not the later
+ * full-CSS-rewrite sibling file, which this component used to be ported
+ * from by mistake — wrong geometry, wrong preview placement, wrong font
+ * scale, hence the layout bugs this rewrite fixes).
  *
- * Bronze/Silver/Gold/Endpoints/Dashboard are grouped under the real Azure
- * services that host them (ADLS Gen2 / SQL Server / Function App / Static
- * Web Apps) — this reflects the certification-era (v1) architecture this
- * portfolio piece is built to explain, not the cost-trimmed v2 deployment
- * actually serving this page today (see `watt_watcher_unazureing` —
- * deliberate, not stale).
+ * Fixed 1150px geometry: five source tiles, four Azure service cards at
+ * hand-tuned widths (ADLS 388 / SQL 196 / Function App 205 / Static Web
+ * Apps 150 + gaps) that sum to exactly 1150px — see the mockup's own
+ * comment block for the arithmetic. Data previews live in a separate strip
+ * BELOW the row, each absolutely positioned so its centre falls under the
+ * column it illustrates, not inline next to its chip.
+ *
+ * Connector paths are real: a single SVG layer whose `d` is computed from
+ * every block's measured position (`measureScene`/`layoutChains`, ported
+ * near-verbatim from the mockup's vanilla-JS functions of the same name) —
+ * never hard-coded coordinates, because those drift the moment an icon,
+ * font, or label changes. The bead travels one real segment at a time
+ * (`travelBead`), its duration from actual on-screen distance (`SPEED`
+ * px/s) rather than a fixed-but-arbitrary one, exactly like the mockup.
+ *
+ * Deliberately NOT responsive past the horizontal-scroll fallback in CSS:
+ * the mockup scoped true responsiveness as separate future work, and a
+ * fixed-pixel diagram that reflows per block size is a different, bigger
+ * component than this one.
  */
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { SOURCES, CABLE_NOTES } from '../../data/pipelineSources.js'
+import { SOURCES } from '../../data/pipelineSources.js'
 import { usePrefersReducedMotion } from '../../hooks/usePrefersReducedMotion.js'
-import { PreviewPanel } from './PreviewPanel.jsx'
+import { JsonBlock } from '../JsonBlock.jsx'
 
-const TRAVEL_MS = 500
-const FLASH_PEAK_MS = 250
-const STAGE_FLASH_MS = FLASH_PEAK_MS + 450 // block: peak then held
-const PEEK_FLASH_MS = FLASH_PEAK_MS + 750  // preview: peak then decays to neutral
-const LOOP_PAUSE_MS = 400
+const SPEED = 46          // px/s — bead travel speed, real distance ÷ this = duration
+const FLASH_PEAK = 0.25   // s — halo rise to peak
+const FLASH_SETTLE = 0.45 // s — peak to held-full (blocks)
+const FLASH_DECAY = 0.75  // s — peak to neutral (previews)
+const LOOP_PAUSE = 0.4    // s — pause after Dashboard, before the next source
 
-const STAGE_KINDS = ['bronze', 'silver', 'gold', 'api', 'dashboard']
+// Tile id → flow-color slug.
+const FLOW_SLUG = {
+  'rte-production': 'rte',
+  'open-meteo': 'meteo',
+  'odre-capacity': 'capacity',
+  'entsoe-price': 'price',
+}
 
-function cancelAnim(el) { if (el) el.getAnimations().forEach(a => a.cancel()) }
+function rectIn(el, origin) {
+  const b = el.getBoundingClientRect()
+  return { l: b.left - origin.left, r: b.right - origin.left, cy: b.top - origin.top + b.height / 2 }
+}
+function pathD(a, b) { return `M${a.x} ${a.y}L${b.x} ${b.y}` }
+function dist(a, b) { return Math.hypot(b.x - a.x, b.y - a.y) }
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)) }
+function cancelAnim(el) { if (el) el.getAnimations().forEach(a => a.cancel()) }
 
-// Contour of a block: the whole perimeter (outline, not just top/bottom)
-// lights at once, passes through a wide blurred halo at its peak, then
-// STAYS lit — a trace of the pass, held until the next lap resets it.
-function lightNode(el, color, glow) {
+// Cancelling a `fill:forwards` animation should be enough on its own to
+// drop an element back to its stylesheet default — but belt-and-suspenders
+// against any WAAPI edge case that leaves a held color behind lap to lap:
+// also clear the inline properties `lightNode`/`flashPeek` ever touch.
+function hardReset(el) {
+  if (!el) return
+  cancelAnim(el)
+  el.style.removeProperty('outline-color')
+  el.style.removeProperty('box-shadow')
+}
+
+function flowColors(scene, slug) {
+  const cs = getComputedStyle(scene)
+  return {
+    flow: cs.getPropertyValue(`--color-source-${slug}`).trim(),
+    soft: cs.getPropertyValue(`--flow-${slug}-soft`).trim(),
+    gone: cs.getPropertyValue(`--flow-${slug}-gone`).trim(),
+  }
+}
+
+// Contour of a block: the whole outline lights at once, peaks through a
+// wide halo, then STAYS lit — a trace of the pass, reset at the top of the
+// next lap.
+function lightNode(el, colors) {
   if (!el) return Promise.resolve()
   cancelAnim(el)
+  const total = FLASH_PEAK + FLASH_SETTLE
   const anim = el.animate([
-    { offset: 0, outlineColor: 'transparent', boxShadow: `0 0 0 0 ${glow}` },
-    { offset: FLASH_PEAK_MS / STAGE_FLASH_MS, outlineColor: color, boxShadow: `0 0 26px 8px ${glow}` },
-    { offset: 1, outlineColor: color, boxShadow: `0 0 0 0 ${glow}` },
-  ], { duration: STAGE_FLASH_MS, fill: 'forwards', easing: 'linear' })
+    { offset: 0, outlineColor: 'transparent', boxShadow: `0 0 0 0 ${colors.gone}` },
+    { offset: FLASH_PEAK / total, outlineColor: colors.flow, boxShadow: `0 0 26px 8px ${colors.soft}` },
+    { offset: 1, outlineColor: colors.flow, boxShadow: `0 0 0 0 ${colors.gone}` },
+  ], { duration: total * 1000, fill: 'forwards', easing: 'linear' })
   return anim.finished.catch(() => {})
 }
 
-// Halo of a data preview: lights, peaks, then returns to neutral — a
-// preview shows what the data just BECAME at this step, not where it is;
-// unlike a block, it must not stay lit.
-function flashPeek(el, color, glow) {
-  if (!el) return Promise.resolve()
-  cancelAnim(el)
-  const anim = el.animate([
-    { offset: 0, outlineColor: 'transparent', boxShadow: `0 0 0 0 ${glow}` },
-    { offset: FLASH_PEAK_MS / PEEK_FLASH_MS, outlineColor: color, boxShadow: `0 0 34px 10px ${glow}` },
-    { offset: 1, outlineColor: 'transparent', boxShadow: `0 0 0 0 ${glow}` },
-  ], { duration: PEEK_FLASH_MS, fill: 'forwards', easing: 'linear' })
-  return anim.finished.catch(() => {})
+// Halo of a data preview: lights, peaks, decays back to neutral — a
+// preview shows what the data just BECAME, not where it is, so unlike a
+// block it must not stay lit. Takes a list: Gold flashes fact + up to 3
+// dims together.
+function flashPeek(els, colors) {
+  const list = (Array.isArray(els) ? els : [els]).filter(Boolean)
+  if (!list.length) return Promise.resolve()
+  const total = FLASH_PEAK + FLASH_DECAY
+  return Promise.all(list.map(el => {
+    cancelAnim(el)
+    const anim = el.animate([
+      { offset: 0, outlineColor: 'transparent', boxShadow: `0 0 0 0 ${colors.gone}` },
+      { offset: FLASH_PEAK / total, outlineColor: colors.flow, boxShadow: `0 0 34px 10px ${colors.soft}` },
+      { offset: 1, outlineColor: 'transparent', boxShadow: `0 0 0 0 ${colors.gone}` },
+    ], { duration: total * 1000, fill: 'forwards', easing: 'linear' })
+    return anim.finished.catch(() => {})
+  }))
 }
 
-// Bead travel along one connector: a LOCAL animation on the connector's own
-// box, in percentage (left/top 0%→100%) — works the same whether the
-// connector is a flat line (desktop row) or a standing one (narrow stack),
-// without knowing which. The line itself tints and holds, same logic as a
-// block (reset at the top of the next lap).
-function travelConnector(wrap, bead, color) {
-  if (!wrap) return Promise.resolve()
-  cancelAnim(wrap)
+// One travel segment: bead + its trail, both driven by the real measured
+// distance so a long diagonal takes visibly longer than a short hop.
+function travelBead(bead, trailEl, from, to, colors) {
+  const len = dist(from, to)
+  const durSec = Math.max(0.15, len / SPEED)
+  trailEl.setAttribute('d', pathD(from, to))
+  trailEl.style.stroke = colors.flow
+  cancelAnim(trailEl)
+  const totalLen = trailEl.getTotalLength()
+  trailEl.style.strokeDasharray = String(totalLen)
+  const trailAnim = trailEl.animate(
+    [{ strokeDashoffset: totalLen }, { strokeDashoffset: 0 }],
+    { duration: durSec * 1000, fill: 'forwards', easing: 'linear' }
+  )
   cancelAnim(bead)
-  const beadAnim = bead?.animate([
-    { offset: 0, left: '0%', top: '0%', opacity: 0 },
-    { offset: 0.12, left: '0%', top: '0%', opacity: 1 },
-    { offset: 0.88, opacity: 1 },
-    { offset: 1, left: '100%', top: '100%', opacity: 0 },
-  ], { duration: TRAVEL_MS, fill: 'forwards', easing: 'linear' })
-  const lineAnim = wrap.animate([
-    { offset: 0, backgroundColor: 'var(--color-border)' },
-    { offset: 1, backgroundColor: color },
-  ], { duration: TRAVEL_MS, fill: 'forwards', easing: 'linear' })
-  return Promise.all([beadAnim?.finished.catch(() => {}), lineAnim.finished.catch(() => {})])
+  const edge = Math.min(0.4, 0.12 / durSec)
+  const beadAnim = bead.animate([
+    { offset: 0, transform: `translate(${from.x}px, ${from.y}px)`, opacity: 0 },
+    { offset: edge, transform: `translate(${from.x}px, ${from.y}px)`, opacity: 1 },
+    { offset: 1 - edge, opacity: 1 },
+    { offset: 1, transform: `translate(${to.x}px, ${to.y}px)`, opacity: 0 },
+  ], { duration: durSec * 1000, fill: 'forwards', easing: 'linear' })
+  return Promise.all([trailAnim.finished.catch(() => {}), beadAnim.finished.catch(() => {})])
+}
+
+function measureScene(refs) {
+  const scene = refs.sceneRef.current.getBoundingClientRect()
+  const R = el => rectIn(el, scene)
+  const geo = { tiles: {} }
+  for (const id of Object.keys(refs.tileRefs.current)) {
+    geo.tiles[id] = R(refs.tileRefs.current[id])
+  }
+  geo.bronze = R(refs.bronzeRef.current)
+  geo.silver = R(refs.silverRef.current)
+  geo.gold = R(refs.goldRef.current)
+  geo.fn = R(refs.fnRef.current)
+  geo.swa = R(refs.swaRef.current)
+  geo.rowCy = geo.bronze.cy
+  return geo
+}
+
+function layoutChains(geo, refs) {
+  for (const [id, box] of Object.entries(geo.tiles)) {
+    const el = refs.tileChainRefs.current[id]
+    if (el) el.setAttribute('d', pathD({ x: box.r, y: box.cy }, { x: geo.bronze.l, y: geo.rowCy }))
+  }
+  const fixed = [
+    [refs.chainBronzeSilverRef, geo.bronze, geo.silver],
+    [refs.chainSilverGoldRef, geo.silver, geo.gold],
+    [refs.chainGoldFnRef, geo.gold, geo.fn],
+    [refs.chainFnSwaRef, geo.fn, geo.swa],
+  ]
+  for (const [ref, a, b] of fixed) {
+    if (ref.current) ref.current.setAttribute('d', pathD({ x: a.r, y: geo.rowCy }, { x: b.l, y: geo.rowCy }))
+  }
 }
 
 function StageIcon({ kind }) {
@@ -88,77 +171,36 @@ function StageIcon({ kind }) {
     case 'silver':
     case 'gold':
       return <img className="pipeline-container__icon-img" src="/logos/azure/storage-container.svg" alt="" aria-hidden="true" />
-    case 'api':
+    case 'fn':
       return <img className="pipeline-container__icon-img" src="/logos/azure/function-apps.svg" alt="" aria-hidden="true" />
-    case 'dashboard':
+    case 'app':
       return <img className="pipeline-container__icon-img" src="/logos/azure/dashboard.svg" alt="" aria-hidden="true" />
     default:
       return null
   }
 }
 
-function ServiceCard({ icon, title, stack, children }) {
+function MiniTable({ innerRef, table, columns, row, caption = false }) {
   return (
-    <div className="pipeline-store">
-      <p className="pipeline-store__head">
-        <span className="pipeline-store__icon"><img src={icon} alt="" aria-hidden="true" /></span>
-        <span className="pipeline-store__title">{title}</span>
-      </p>
-      <ul className={'pipeline-store__list' + (stack ? ' pipeline-store__list--stack' : '')}>
-        {children}
-      </ul>
-    </div>
+    <table ref={innerRef} className="pipeline-table">
+      {caption && <caption>{table}</caption>}
+      <tbody>
+        {columns.map((c, i) => (
+          <tr key={c}>
+            <th scope="row">{c}</th>
+            <td>{String(row[i])}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
   )
 }
 
-function Layer({ kind, label, source, muted, containerRef, peekRef, wide, onClick }) {
-  const preview = source.previews[kind]
-  const className = 'pipeline-container' + (wide ? ' pipeline-container--wide' : '') + (onClick ? ' pipeline-container--link' : '')
-  const container = onClick
-    ? <button type="button" ref={containerRef} className={className} data-layer={kind} onClick={onClick} title="Aller au dashboard">
-        <StageIcon kind={kind} /><span className="pipeline-container__name">{label}</span>
-      </button>
-    : <span ref={containerRef} className={className} data-layer={kind}>
-        <StageIcon kind={kind} /><span className="pipeline-container__name">{label}</span>
-      </span>
-
-  return (
-    <li className={'pipeline-layer' + (muted ? ' pipeline-layer--muted' : '')}>
-      {container}
-      {preview && (
-        <div ref={peekRef} className="pipeline-peek">
-          <PreviewPanel source={source} stageKind={kind} />
-        </div>
-      )}
-    </li>
-  )
-}
-
-function Connector({ cableKey, wrapRef, beadRef }) {
-  const [open, setOpen] = useState(false)
-  const note = cableKey && CABLE_NOTES[cableKey]
-  return (
-    <div ref={wrapRef} className="pipeline-connector">
-      <i ref={beadRef} className="pipeline-bead" aria-hidden="true" />
-      {note && (
-        <button type="button" className="pipeline-connector__note-toggle" onClick={() => setOpen(o => !o)} aria-expanded={open} title={note.label}>i</button>
-      )}
-      {note && open && (
-        <div className="pipeline-connector__note" role="note">
-          <strong>{note.label}</strong>
-          <p>{note.text}</p>
-        </div>
-      )}
-    </div>
-  )
-}
-
-function InlineConnector({ wrapRef, beadRef }) {
-  return (
-    <div ref={wrapRef} className="pipeline-connector pipeline-connector--inline">
-      <i ref={beadRef} className="pipeline-bead" aria-hidden="true" />
-    </div>
-  )
+// Normalizes Gold's two shapes (star schema vs. a plain fact table, for
+// sources with no dimensions worth drawing) to one `{table, columns, row}`
+// the preview strip can render the same way.
+function factOf(gold) {
+  return gold.kind === 'star' ? gold.fact : gold
 }
 
 export function PipelineDiagram() {
@@ -168,13 +210,44 @@ export function PipelineDiagram() {
   const navigate = useNavigate()
 
   const source = SOURCES.find(s => s.id === selectedId)
+  const gold = source.previews.gold
+  const fact = factOf(gold)
+  const goldExtra = gold.kind === 'star' ? (gold.extra || []) : []
+  const dim1 = gold.kind === 'star' ? gold.dim1 : null
+  const dim2 = gold.kind === 'star' ? gold.dim2 : null
+  const dim3 = gold.kind === 'star' ? gold.dim3 : null
 
-  const sourceRefs = useRef({})
-  const containerRefs = useRef({ bronze: null, silver: null, gold: null, api: null, dashboard: null })
-  const peekRefs = useRef({ bronze: null, silver: null, gold: null, api: null })
-  // 5 connectors: src→bronze, bronze→silver, silver→gold, gold→api, api→dashboard
-  const connWrapRefs = useRef([null, null, null, null, null])
-  const connBeadRefs = useRef([null, null, null, null, null])
+  const sceneRef = useRef(null)
+  const tileRefs = useRef({})
+  const tileChainRefs = useRef({})
+  const bronzeRef = useRef(null)
+  const silverRef = useRef(null)
+  const goldRef = useRef(null)
+  const fnRef = useRef(null)
+  const swaRef = useRef(null)
+  const chainBronzeSilverRef = useRef(null)
+  const chainSilverGoldRef = useRef(null)
+  const chainGoldFnRef = useRef(null)
+  const chainFnSwaRef = useRef(null)
+  const trailSrcBronzeRef = useRef(null)
+  const trailBronzeSilverRef = useRef(null)
+  const trailSilverGoldRef = useRef(null)
+  const trailGoldFnRef = useRef(null)
+  const trailFnSwaRef = useRef(null)
+  const beadRef = useRef(null)
+  const bronzeInnerRefs = useRef([])
+  const silverInnerRefs = useRef([])
+  const factInnerRef = useRef(null)
+  const factExtraInnerRefs = useRef([])
+  const dim1InnerRef = useRef(null)
+  const dim2InnerRef = useRef(null)
+  const dim3InnerRef = useRef(null)
+  const apiInnerRef = useRef(null)
+
+  const refs = {
+    sceneRef, tileRefs, tileChainRefs, bronzeRef, silverRef, goldRef, fnRef, swaRef,
+    chainBronzeSilverRef, chainSilverGoldRef, chainGoldFnRef, chainFnSwaRef,
+  }
 
   useEffect(() => {
     setSwapping(true)
@@ -183,49 +256,83 @@ export function PipelineDiagram() {
   }, [selectedId])
 
   useEffect(() => {
-    const allNodes = Object.values(sourceRefs.current)
-    const allContainers = Object.values(containerRefs.current)
-    const allPeeks = Object.values(peekRefs.current)
-    const allWraps = connWrapRefs.current
-    const allBeads = connBeadRefs.current
+    const allAnimated = [
+      ...Object.values(tileRefs.current), bronzeRef.current, silverRef.current, goldRef.current, fnRef.current, swaRef.current,
+      ...bronzeInnerRefs.current, ...silverInnerRefs.current, factInnerRef.current, ...factExtraInnerRefs.current,
+      dim1InnerRef.current, dim2InnerRef.current, dim3InnerRef.current, apiInnerRef.current,
+    ]
+    const trails = [trailSrcBronzeRef.current, trailBronzeSilverRef.current, trailSilverGoldRef.current, trailGoldFnRef.current, trailFnSwaRef.current]
+
+    const geo = measureScene(refs)
+    layoutChains(geo, refs)
+    const slug = FLOW_SLUG[selectedId]
+    const scene = sceneRef.current
+    const colors = flowColors(scene, slug)
+
+    const stopsAll = [
+      { enter: { x: geo.tiles[selectedId].r, y: geo.tiles[selectedId].cy }, exit: { x: geo.tiles[selectedId].r, y: geo.tiles[selectedId].cy }, el: tileRefs.current[selectedId] },
+      { enter: { x: geo.bronze.l, y: geo.rowCy }, exit: { x: geo.bronze.r, y: geo.rowCy }, el: bronzeRef.current },
+      { enter: { x: geo.silver.l, y: geo.rowCy }, exit: { x: geo.silver.r, y: geo.rowCy }, el: silverRef.current },
+      { enter: { x: geo.gold.l, y: geo.rowCy }, exit: { x: geo.gold.r, y: geo.rowCy }, el: goldRef.current },
+      { enter: { x: geo.fn.l, y: geo.rowCy }, exit: { x: geo.fn.r, y: geo.rowCy }, el: fnRef.current },
+      { enter: { x: geo.swa.l, y: geo.rowCy }, exit: { x: geo.swa.r, y: geo.rowCy }, el: swaRef.current },
+    ]
+    const steps = Math.min(source.visitedCount, 5)
 
     if (reducedMotion) {
-      allNodes.forEach(cancelAnim); allContainers.forEach(cancelAnim); allPeeks.forEach(cancelAnim)
-      allWraps.forEach(cancelAnim); allBeads.forEach(cancelAnim)
-      const { color } = source
-      const node = sourceRefs.current[selectedId]
-      if (node) { node.style.outlineColor = color; node.style.boxShadow = 'none' }
-      for (let i = 0; i < source.visitedCount; i++) {
-        const kind = STAGE_KINDS[i]
-        const c = containerRefs.current[kind]
-        if (c) { c.style.outlineColor = color; c.style.boxShadow = 'none' }
-        const w = connWrapRefs.current[i]
-        if (w) w.style.backgroundColor = color
+      allAnimated.forEach(hardReset)
+      const tile = tileRefs.current[selectedId]
+      if (tile) { tile.style.outlineColor = colors.flow; tile.style.boxShadow = 'none' }
+      for (let i = 0; i < steps; i++) {
+        const el = stopsAll[i + 1].el
+        if (el) { el.style.outlineColor = colors.flow; el.style.boxShadow = 'none' }
       }
+      trails.forEach((el, i) => {
+        if (!el) return
+        if (i < steps) {
+          el.setAttribute('d', pathD(stopsAll[i].exit, stopsAll[i + 1].enter))
+          el.style.stroke = colors.flow
+          el.style.strokeDashoffset = 0
+        } else {
+          el.style.strokeDasharray = '0'
+        }
+      })
       return
     }
 
     let cancelled = false
-
     async function run() {
-      allNodes.forEach(cancelAnim); allContainers.forEach(cancelAnim); allPeeks.forEach(cancelAnim)
-      allWraps.forEach(cancelAnim); allBeads.forEach(cancelAnim)
+      allAnimated.forEach(hardReset)
+      trails.forEach(el => {
+        cancelAnim(el)
+        if (el && el.getAttribute('d')) el.style.strokeDashoffset = String(el.getTotalLength())
+      })
+      cancelAnim(beadRef.current)
 
-      const { color, glow } = source
-      await lightNode(sourceRefs.current[selectedId], color, glow)
+      await lightNode(stopsAll[0].el, colors)
       if (cancelled) return
 
-      for (let i = 0; i < source.visitedCount; i++) {
-        await travelConnector(connWrapRefs.current[i], connBeadRefs.current[i], color)
+      const trailRefsArr = [trailSrcBronzeRef, trailBronzeSilverRef, trailSilverGoldRef, trailGoldFnRef, trailFnSwaRef]
+      const peekTargets = [
+        null,
+        () => bronzeInnerRefs.current,
+        () => silverInnerRefs.current,
+        () => [factInnerRef.current, ...factExtraInnerRefs.current, dim1InnerRef.current, dim2InnerRef.current, dim3InnerRef.current],
+        () => apiInnerRef.current,
+        null,
+      ]
+
+      for (let i = 0; i < steps; i++) {
+        await travelBead(beadRef.current, trailRefsArr[i].current, stopsAll[i].exit, stopsAll[i + 1].enter, colors)
         if (cancelled) return
-        const kind = STAGE_KINDS[i]
-        const tasks = [lightNode(containerRefs.current[kind], color, glow)]
-        if (peekRefs.current[kind]) tasks.push(flashPeek(peekRefs.current[kind], color, glow))
+        const tasks = [lightNode(stopsAll[i + 1].el, colors)]
+        const targetFn = peekTargets[i + 1]
+        if (targetFn) tasks.push(flashPeek(targetFn(), colors))
         await Promise.all(tasks)
         if (cancelled) return
       }
 
-      await sleep(LOOP_PAUSE_MS)
+      await sleep(LOOP_PAUSE * 1000)
       if (cancelled) return
       const idx = SOURCES.findIndex(s => s.id === selectedId)
       setSelectedId(SOURCES[(idx + 1) % SOURCES.length].id)
@@ -234,8 +341,9 @@ export function PipelineDiagram() {
 
     return () => {
       cancelled = true
-      allNodes.forEach(cancelAnim); allContainers.forEach(cancelAnim); allPeeks.forEach(cancelAnim)
-      allWraps.forEach(cancelAnim); allBeads.forEach(cancelAnim)
+      allAnimated.forEach(hardReset)
+      trails.forEach(cancelAnim)
+      cancelAnim(beadRef.current)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedId, reducedMotion])
@@ -246,69 +354,209 @@ export function PipelineDiagram() {
         {source.lede.map((seg, i) => (seg.cls ? <span key={i} className={'pipeline-lede__' + seg.cls}>{seg.text}</span> : seg.text))}
       </p>
 
-      <div className="pipeline-scene">
-        <div className="pipeline-scene__row">
-          <div className="pipeline-sources" role="tablist" aria-label="Choisir une source">
+      <div className="pipeline-scene-scroll">
+        <div className="pipeline-scene" ref={sceneRef}>
+          <svg className="pipeline-flow" viewBox="0 0 1150 450" fill="none" aria-hidden="true">
             {SOURCES.map(s => (
-              <button
+              <path
                 key={s.id}
-                type="button"
-                ref={el => { sourceRefs.current[s.id] = el }}
-                className={'pipeline-node' + (s.id === selectedId ? ' pipeline-node--active' : '')}
-                style={{ '--pipeline-src': s.color }}
-                onClick={() => setSelectedId(s.id)}
-                aria-pressed={s.id === selectedId}
-              >
-                <span className="pipeline-node__body">
-                  <span className="pipeline-node__dot" aria-hidden="true" />
-                  <span className="pipeline-node__icon" aria-hidden="true">
-                    <img className="pipeline-node__icon-img pipeline-node__icon-img--light" src={s.logo} alt="" />
-                    <img className="pipeline-node__icon-img pipeline-node__icon-img--dark" src={s.logoDark || s.logo} alt="" />
-                  </span>
-                  <span className="pipeline-node__title">{s.label}</span>
-                </span>
-              </button>
+                ref={el => { tileChainRefs.current[s.id] = el }}
+                className={'pipeline-chain pipeline-chain--src' + (s.id === selectedId ? ' is-active' : '') + ' pipeline-chain--' + FLOW_SLUG[s.id]}
+              />
             ))}
+            <path ref={chainBronzeSilverRef} className="pipeline-chain" />
+            <path ref={chainSilverGoldRef} className="pipeline-chain" />
+            <path ref={chainGoldFnRef} className="pipeline-chain" />
+            <path ref={chainFnSwaRef} className="pipeline-chain" />
+            <path ref={trailSrcBronzeRef} className="pipeline-chain--trail" />
+            <path ref={trailBronzeSilverRef} className="pipeline-chain--trail" />
+            <path ref={trailSilverGoldRef} className="pipeline-chain--trail" />
+            <path ref={trailGoldFnRef} className="pipeline-chain--trail" />
+            <path ref={trailFnSwaRef} className="pipeline-chain--trail" />
+          </svg>
+          <div className="pipeline-beads" aria-hidden="true">
+            <i ref={beadRef} className="pipeline-bead" />
           </div>
 
-          <Connector wrapRef={el => { connWrapRefs.current[0] = el }} beadRef={el => { connBeadRefs.current[0] = el }} />
+          <div className="pipeline-scene__row">
+            <div className="pipeline-sources" role="tablist" aria-label="Choisir une source">
+              {SOURCES.map(s => (
+                <button
+                  key={s.id}
+                  type="button"
+                  ref={el => { tileRefs.current[s.id] = el }}
+                  className={'pipeline-node' + (s.id === selectedId ? ' pipeline-node--active' : '')}
+                  style={{ '--pipeline-src': s.color }}
+                  onClick={() => setSelectedId(s.id)}
+                  aria-pressed={s.id === selectedId}
+                >
+                  <span className="pipeline-node__body">
+                    <span className="pipeline-node__dot" aria-hidden="true" />
+                    <span className="pipeline-node__icon" aria-hidden="true">
+                      <img className="pipeline-node__icon-img pipeline-node__icon-img--light" src={s.logo} alt="" />
+                      <img className="pipeline-node__icon-img pipeline-node__icon-img--dark" src={s.logoDark || s.logo} alt="" />
+                    </span>
+                    <span className="pipeline-node__title">{s.label}</span>
+                  </span>
+                </button>
+              ))}
+            </div>
 
-          <ServiceCard icon="/logos/azure/storage-accounts.svg" title="ADLS Gen 2" stack>
-            <Layer kind="bronze" label="Bronze" source={source} muted={source.visitedCount < 1}
-              containerRef={el => { containerRefs.current.bronze = el }} peekRef={el => { peekRefs.current.bronze = el }} />
-            <InlineConnector wrapRef={el => { connWrapRefs.current[1] = el }} beadRef={el => { connBeadRefs.current[1] = el }} />
-            <Layer kind="silver" label="Silver" source={source} muted={source.visitedCount < 2}
-              containerRef={el => { containerRefs.current.silver = el }} peekRef={el => { peekRefs.current.silver = el }} />
-          </ServiceCard>
+            <div className="pipeline-gap pipeline-gap--bus" />
 
-          <Connector cableKey="cleaning" wrapRef={el => { connWrapRefs.current[2] = el }} beadRef={el => { connBeadRefs.current[2] = el }} />
-          <ServiceCard icon="/logos/azure/sql-server.svg" title="SQL Server">
-            <Layer kind="gold" label="Gold" source={source} muted={source.visitedCount < 3}
-              containerRef={el => { containerRefs.current.gold = el }} peekRef={el => { peekRefs.current.gold = el }} />
-          </ServiceCard>
+            <div className="pipeline-store pipeline-store--adls">
+              <p className="pipeline-store__head">
+                <span className="pipeline-store__icon"><img src="/logos/azure/storage-accounts.svg" alt="" aria-hidden="true" /></span>
+                <span className="pipeline-store__title">ADLS Gen 2</span>
+              </p>
+              <ul className="pipeline-store__list">
+                <li>
+                  <span ref={bronzeRef} className="pipeline-container" data-layer="bronze">
+                    <StageIcon kind="bronze" /><span className="pipeline-container__name">Bronze</span>
+                  </span>
+                </li>
+                <li>
+                  <span ref={silverRef} className="pipeline-container" data-layer="silver">
+                    <StageIcon kind="silver" /><span className="pipeline-container__name">Silver</span>
+                  </span>
+                </li>
+              </ul>
+            </div>
 
-          <Connector cableKey="aggregation" wrapRef={el => { connWrapRefs.current[3] = el }} beadRef={el => { connBeadRefs.current[3] = el }} />
-          <ServiceCard icon="/logos/azure/function-apps.svg" title="Function App">
-            <Layer kind="api" label="Endpoints" source={source} muted={source.visitedCount < 4}
-              containerRef={el => { containerRefs.current.api = el }} peekRef={el => { peekRefs.current.api = el }} />
-          </ServiceCard>
+            <div className="pipeline-gap" />
 
-          <Connector wrapRef={el => { connWrapRefs.current[4] = el }} beadRef={el => { connBeadRefs.current[4] = el }} />
-          <ServiceCard icon="/logos/azure/static-web-apps.svg" title="Static Web Apps">
-            <Layer kind="dashboard" label="Dashboard" source={source} muted={source.visitedCount < 5} wide
-              containerRef={el => { containerRefs.current.dashboard = el }} onClick={() => navigate('/')} />
-          </ServiceCard>
+            <div className="pipeline-store pipeline-store--sql">
+              <p className="pipeline-store__head">
+                <span className="pipeline-store__icon"><img src="/logos/azure/sql-server.svg" alt="" aria-hidden="true" /></span>
+                <span className="pipeline-store__title">SQL Server</span>
+              </p>
+              <ul className="pipeline-store__list">
+                <li>
+                  <span ref={goldRef} className="pipeline-container" data-layer="gold">
+                    <StageIcon kind="gold" /><span className="pipeline-container__name">Gold</span>
+                  </span>
+                </li>
+              </ul>
+            </div>
+
+            <div className="pipeline-gap" />
+
+            <div className="pipeline-store pipeline-store--fn">
+              <p className="pipeline-store__head">
+                <span className="pipeline-store__icon"><img src="/logos/azure/function-apps.svg" alt="" aria-hidden="true" /></span>
+                <span className="pipeline-store__title">Function App</span>
+              </p>
+              <ul className="pipeline-store__list">
+                <li>
+                  <span ref={fnRef} className="pipeline-container" data-layer="fn">
+                    <StageIcon kind="fn" /><span className="pipeline-container__name">Endpoints</span>
+                  </span>
+                </li>
+              </ul>
+            </div>
+
+            <div className="pipeline-gap" />
+
+            <div className="pipeline-store pipeline-store--swa">
+              <p className="pipeline-store__head">
+                <span className="pipeline-store__icon"><img src="/logos/azure/static-web-apps.svg" alt="" aria-hidden="true" /></span>
+                <span className="pipeline-store__title">Static Web Apps</span>
+              </p>
+              <ul className="pipeline-store__list">
+                <li>
+                  <button
+                    type="button"
+                    ref={swaRef}
+                    className="pipeline-container pipeline-container--wide pipeline-container--link"
+                    data-layer="app"
+                    onClick={() => navigate('/')}
+                    title="Aller au dashboard"
+                  >
+                    <StageIcon kind="app" /><span className="pipeline-container__name">Dashboard</span>
+                  </button>
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          <div className="pipeline-below">
+            <svg className="pipeline-links" viewBox="0 -102 1150 352" fill="none" aria-hidden="true">
+              <path d="M284 -76V22" stroke="currentColor" strokeWidth="1" />
+              <path d="M476 -76V22" stroke="currentColor" strokeWidth="1" />
+              <path d="M682 -76L616 22" stroke="currentColor" strokeWidth="1" />
+              <path d="M887 -76L930 22" stroke="currentColor" strokeWidth="1" />
+              {dim1 && <>
+                <path d="M672 41L728 41" stroke="currentColor" strokeWidth="1" />
+                <path d="M672 41L665.0 37.5M672 41L665.0 44.5" stroke="currentColor" strokeWidth="1" />
+                <path d="M719.0 37.5L719.0 44.5" stroke="currentColor" strokeWidth="1" />
+              </>}
+              {dim2 && <>
+                <path d="M672 54L728 101" stroke="currentColor" strokeWidth="1" />
+                <path d="M672 54L668.9 46.8M672 54L664.4 52.2" stroke="currentColor" strokeWidth="1" />
+                <path d="M723.4 92.5L718.9 97.9" stroke="currentColor" strokeWidth="1" />
+              </>}
+              {dim3 && <>
+                <path d="M672 66L728 161" stroke="currentColor" strokeWidth="1" />
+                <path d="M672 66L671.5 58.2M672 66L665.4 61.7" stroke="currentColor" strokeWidth="1" />
+                <path d="M726.4 151.5L720.4 155.0" stroke="currentColor" strokeWidth="1" />
+              </>}
+            </svg>
+
+            <div className="pipeline-peek pipeline-peek--bronze">
+              {source.previews.bronze.map((p, i) => p.kind === 'csv'
+                ? <pre key={i} ref={el => { bronzeInnerRefs.current[i] = el }} className="content-codeblock">{p.header}{'\n'}{p.row}</pre>
+                : <JsonBlock key={i} ref={el => { bronzeInnerRefs.current[i] = el }} data={p.data} />)}
+            </div>
+
+            <div className="pipeline-peek pipeline-peek--silver">
+              {source.previews.silver.map((p, i) => (
+                <MiniTable key={i} innerRef={el => { silverInnerRefs.current[i] = el }} {...p} />
+              ))}
+            </div>
+
+            <div className="pipeline-peek pipeline-peek--fact">
+              <MiniTable innerRef={factInnerRef} {...fact} caption />
+              {goldExtra.map((t, i) => (
+                <MiniTable key={i} innerRef={el => { factExtraInnerRefs.current[i] = el }} {...t} caption />
+              ))}
+            </div>
+
+            {dim1 && <div className="pipeline-peek pipeline-peek--dim1">
+              <MiniTable innerRef={dim1InnerRef} {...dim1} caption />
+            </div>}
+            {dim2 && <div className="pipeline-peek pipeline-peek--dim2">
+              <MiniTable innerRef={dim2InnerRef} {...dim2} caption />
+            </div>}
+            {dim3 && <div className="pipeline-peek pipeline-peek--dim3">
+              <MiniTable innerRef={dim3InnerRef} {...dim3} caption />
+            </div>}
+
+            {source.previews.api.length > 0 && (
+              <div className="pipeline-peek pipeline-peek--api">
+                <pre ref={apiInnerRef} className="content-codeblock pipeline-route">
+                  {source.previews.api.map((route, i) => {
+                    const [verb, path] = route.split(' ')
+                    return (
+                      <span key={i} className="pipeline-route__line">
+                        <span className="pipeline-http-verb">{verb}</span> {path}
+                      </span>
+                    )
+                  })}
+                </pre>
+              </div>
+            )}
+          </div>
+
+          <p className="pipeline-source-links">
+            Liens des sources : {SOURCES.map((s, i) => (
+              <span key={s.id}>
+                {i > 0 && ' · '}
+                <a href={s.homepage} target="_blank" rel="noopener noreferrer">{s.label}</a>
+              </span>
+            ))}
+          </p>
         </div>
       </div>
-
-      <p className="pipeline-source-links">
-        Liens des sources : {SOURCES.map((s, i) => (
-          <span key={s.id}>
-            {i > 0 && ' · '}
-            <a href={s.homepage} target="_blank" rel="noopener noreferrer">{s.label}</a>
-          </span>
-        ))}
-      </p>
     </div>
   )
 }
