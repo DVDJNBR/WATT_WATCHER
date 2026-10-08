@@ -1,3 +1,17 @@
+## [1.53.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.52.3...v1.53.0) (2026-10-08)
+
+### ⚠ BREAKING CHANGES
+
+* **app_v2:** app_v2/ is now the active application; deployment target
+moved from Azure to a VPS, auth/alerting dropped, Supabase replaces the
+Azure-managed SQL/auth stack.
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+
+### Features
+
+* **app_v2:** certify app_v2 as the 2.0 architecture milestone ([1e3d058](https://github.com/DVDJNBR/WATT_WATCHER/commit/1e3d058c6b2b23c1cd2bccc50cfa918cf5a9e76b))
+
 ## [1.52.3](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.52.2...v1.52.3) (2026-10-08)
 
 ### Bug Fixes
