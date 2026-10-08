@@ -1,3 +1,9 @@
+## [1.52.2](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.52.1...v1.52.2) (2026-10-08)
+
+### Bug Fixes
+
+* **meteo:** backfill historical weather data and bound fact_meteo to ~3 months ([a933c4f](https://github.com/DVDJNBR/WATT_WATCHER/commit/a933c4f6b863f10b8d54c5b83fa9701f0bb40d4c))
+
 ## [1.52.1](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.52.0...v1.52.1) (2026-10-08)
 
 ### Bug Fixes
