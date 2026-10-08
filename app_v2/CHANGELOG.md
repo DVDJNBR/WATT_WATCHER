@@ -1,3 +1,23 @@
+## [2.0.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.53.0...v2.0.0) (2026-10-08)
+
+### ⚠ BREAKING CHANGES
+
+* **app_v2:** check ran, releasing 1.53.0 instead of major. Reasserting
+now that the rule order is fixed, so this correctly lands as 2.0.0.
+* **app_v2:** app_v2/ is now the active application; deployment target
+moved from Azure to a VPS, auth/alerting dropped, Supabase replaces the
+Azure-managed SQL/auth stack.
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+
+### Features
+
+* **app_v2:** certify app_v2 as the 2.0 architecture milestone (reassert) ([9cc242b](https://github.com/DVDJNBR/WATT_WATCHER/commit/9cc242ba81b0f5b8eaa99617bde0c7483052e700))
+
+### Bug Fixes
+
+* **release:** evaluate breaking-change rule before type-based defaults ([bc80a64](https://github.com/DVDJNBR/WATT_WATCHER/commit/bc80a6414ff4ee44f447d9f0284f833696d82eea))
+
 ## [1.53.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.52.3...v1.53.0) (2026-10-08)
 
 ### ⚠ BREAKING CHANGES
