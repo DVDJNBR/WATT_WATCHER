@@ -30,6 +30,7 @@ REGION_CENTROIDS = {
 }
 
 BASE_URL = "https://api.open-meteo.com/v1/forecast"
+ARCHIVE_URL = "https://archive-api.open-meteo.com/v1/archive"
 
 # Canvas map grid constants (must match SourcesCanvasMap.jsx)
 _G_LON0, _G_LAT0 = -5.0, 41.0
@@ -169,4 +170,70 @@ def fetch_meteo_all_regions(past_days: int = 3) -> list[dict]:
             logger.warning("Failed to fetch météo for region %s: %s", code, exc)
 
     logger.info("Total météo records fetched: %d", len(records))
+    return records
+
+
+def fetch_meteo_archive_all_regions(start_date: str, end_date: str) -> list[dict]:
+    """
+    Fetch hourly temperature, wind speed, and cloud cover for all French
+    regions over a historical [start_date, end_date] range (inclusive,
+    "YYYY-MM-DD"), via Open-Meteo's Archive API (ERA5-based reanalysis).
+
+    Unlike fetch_meteo_all_regions (forecast endpoint, capped at
+    past_days<=7), the archive endpoint serves arbitrary historical ranges —
+    used for one-off backfills, not the 15-minute pipeline. Typically lags
+    ~5 days behind present (reanalysis latency), so end_date shouldn't be
+    too recent.
+
+    Returns records in the same shape as fetch_meteo_all_regions:
+    {region_code, region_name, timestamp, temperature_c, wind_speed_10m,
+    cloudcover_pct}.
+    """
+    records = []
+
+    for code, info in REGION_CENTROIDS.items():
+        try:
+            resp = requests.get(
+                ARCHIVE_URL,
+                params={
+                    "latitude": info["lat"],
+                    "longitude": info["lon"],
+                    "hourly": "temperature_2m,wind_speed_10m,cloudcover",
+                    "timezone": "UTC",
+                    "start_date": start_date,
+                    "end_date": end_date,
+                },
+                timeout=30,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            hourly = data.get("hourly", {})
+            times  = hourly.get("time", [])
+            temps  = hourly.get("temperature_2m", [])
+            winds  = hourly.get("wind_speed_10m", [])
+            clouds = hourly.get("cloudcover", [])
+
+            kept = 0
+            for ts, temp, wind, cloud in zip(times, temps, winds, clouds):
+                if temp is None:
+                    continue
+                kept += 1
+                records.append({
+                    "region_code": code,
+                    "region_name": info["name"],
+                    "timestamp": ts,          # "YYYY-MM-DDTHH:MM", UTC
+                    "temperature_c":  float(temp),
+                    "wind_speed_10m": float(wind)  if wind  is not None else None,
+                    "cloudcover_pct": float(cloud) if cloud is not None else None,
+                })
+
+            logger.info(
+                "Archive: fetched %d/%d météo records for region %s (%s)",
+                kept, len(times), code, info["name"],
+            )
+
+        except Exception as exc:
+            logger.warning("Failed to fetch archive météo for region %s: %s", code, exc)
+
+    logger.info("Total archive météo records fetched: %d", len(records))
     return records
