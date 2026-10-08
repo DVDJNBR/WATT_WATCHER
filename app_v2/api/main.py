@@ -201,7 +201,10 @@ def meteo_regional(request: Request):
             region_code=params.get("region_code") or None,
             start_date=params.get("start_date") or None,
             end_date=params.get("end_date") or None,
-            limit=min(int(params.get("limit", 500)), 5000),
+            # Cap covers the worst case: 13 regions x 91 days x 24h (3-month
+            # "all regions" frontend view) ~= 28.4k rows. 500 default for
+            # single-region/short-range callers that don't pass limit.
+            limit=min(int(params.get("limit", 500)), 30000),
             request_id=request_id,
         )
         cache.set(key, result)

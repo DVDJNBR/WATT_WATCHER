@@ -324,9 +324,12 @@ export default function DashboardPage() {
   const loadDrillData = useCallback(async (code, start, end) => {
     setDrillLoading(true)
     try {
+      // All-regions "France" view needs up to 13x the rows of a single
+      // region for the same date range (3m preset ~= 13 * 91 * 24 = 28.4k) —
+      // a flat 5000 cap silently truncated to the most recent ~16 days.
       const meteoParams = code
         ? { regionCode: code, startDate: start, endDate: end, limit: 5000 }
-        : { startDate: start, endDate: end, limit: 5000 }
+        : { startDate: start, endDate: end, limit: 30000 }
       const [meteoRes, capacityRes] = await Promise.allSettled([
         fetchMeteo(meteoParams),
         fetchCapacity(code ? { regionCode: code } : {}),
