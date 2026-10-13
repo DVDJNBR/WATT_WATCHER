@@ -9,6 +9,11 @@ services:
       CORS_ALLOW_ORIGINS: ${CORS_ALLOW_ORIGINS:-*}
     ports:
       - "127.0.0.1:8002:8000"
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "1.0"
 
   frontend:
     build:
@@ -18,3 +23,8 @@ services:
     restart: unless-stopped
     ports:
       - "127.0.0.1:8001:80"
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: "0.5"
