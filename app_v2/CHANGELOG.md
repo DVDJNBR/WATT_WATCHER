@@ -1,3 +1,9 @@
+## [2.0.1](https://github.com/DVDJNBR/WATT_WATCHER/compare/v2.0.0...v2.0.1) (2026-10-13)
+
+### Bug Fixes
+
+* **app_v2:** cap api/frontend container memory and CPU ([437b754](https://github.com/DVDJNBR/WATT_WATCHER/commit/437b754ae17d65ca80a9f460cc392e8cac0d02e6))
+
 ## [2.0.0](https://github.com/DVDJNBR/WATT_WATCHER/compare/v1.53.0...v2.0.0) (2026-10-08)
 
 ### ⚠ BREAKING CHANGES
