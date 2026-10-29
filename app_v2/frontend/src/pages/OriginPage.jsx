@@ -20,8 +20,9 @@ export default function OriginPage() {
         <p>
           Ainsi, ce dashboard permet de l'anticiper au niveau national en surveillant la
           production et la consommation de l'énergie toutes sources confondues. Il croise
-          cinq sources, chacune à son propre rythme : la production/consommation RTE et la
-          météo toutes les 15 minutes, les prix de marché et les indisponibilités de
+          cinq sources, chacune à son propre rythme : la production/consommation RTE
+          toutes les 15 minutes, la météo du modèle AROME de Météo-France toutes les
+          heures, les prix de marché et les indisponibilités de
           centrales publiés chaque jour par ENTSO-E, et le registre des capacités installées
           par région (ODRE), mis à jour une fois par semaine puisqu'il ne bouge presque
           jamais. Toutes ces données transitent par un data lake où elles sont nettoyées
