@@ -1,3 +1,9 @@
+## [2.0.3](https://github.com/DVDJNBR/WATT_WATCHER/compare/v2.0.2...v2.0.3) (2026-10-29)
+
+### Bug Fixes
+
+* **map:** show "Màj" in Paris time instead of bare UTC ([efef506](https://github.com/DVDJNBR/WATT_WATCHER/commit/efef50673169f4145f6b31ef61f2bae3ed985b4c))
+
 ## [2.0.2](https://github.com/DVDJNBR/WATT_WATCHER/compare/v2.0.1...v2.0.2) (2026-10-29)
 
 ### Bug Fixes
