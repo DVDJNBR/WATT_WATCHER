@@ -524,14 +524,38 @@ class EntsoeClient:
                     tzinfo=timezone.utc
                 )
 
+                points: dict[int, float] = {}
                 for point in period.findall("{*}Point"):
                     position_str = point.findtext("{*}position")
                     price_str = point.findtext("{*}price.amount")
                     if position_str is None or price_str is None:
                         continue
-                    position = int(position_str)
+                    points[int(position_str)] = float(price_str)
+                if not points:
+                    continue
+
+                # curveType A03 ("variable sized block") omits every position
+                # whose price equals the one before it: a missing position
+                # holds the previous price. Read as-is, those slots were simply
+                # absent (4 of 96 on 2026-10-29). Expand them back, up to the
+                # period's end when it's given.
+                if ts_elem.findtext("{*}curveType") == "A03":
+                    end_str = period.findtext("{*}timeInterval/{*}end")
+                    last = max(points)
+                    if end_str:
+                        period_end = datetime.strptime(end_str, "%Y-%m-%dT%H:%MZ").replace(
+                            tzinfo=timezone.utc
+                        )
+                        last = max(last, int((period_end - period_start) / step))
+                    price = None
+                    for position in range(1, last + 1):
+                        price = points.get(position, price)
+                        if price is not None:
+                            points[position] = price
+
+                for position, price in sorted(points.items()):
                     ts = period_start + step * (position - 1)
-                    records.append({"timestamp": ts, "price_eur_mwh": float(price_str)})
+                    records.append({"timestamp": ts, "price_eur_mwh": price})
 
         logger.info("Parsed %d price points from ENTSO-E response", len(records))
         return records

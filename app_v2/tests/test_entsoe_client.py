@@ -46,7 +46,8 @@ def _zip_of(*xml_docs: str) -> bytes:
     return buf.getvalue()
 
 
-def _price_document(period_start: str, resolution: str, points: list[tuple[int, float]]) -> str:
+def _price_document(period_start: str, resolution: str, points: list[tuple[int, float]],
+                    curve_type: str | None = None, period_end: str | None = None) -> str:
     """Build a minimal but valid A44 Publication_MarketDocument."""
     points_xml = "".join(
         f"<Point><position>{pos}</position><price.amount>{price}</price.amount></Point>"
@@ -62,8 +63,9 @@ def _price_document(period_start: str, resolution: str, points: list[tuple[int, 
     <out_Domain.mRID codingScheme="A01">10YFR-RTE------C</out_Domain.mRID>
     <currency_Unit.name>EUR</currency_Unit.name>
     <price_Measure_Unit.name>MWH</price_Measure_Unit.name>
+    {f"<curveType>{curve_type}</curveType>" if curve_type else ""}
     <Period>
-      <timeInterval><start>{period_start}</start></timeInterval>
+      <timeInterval><start>{period_start}</start>{f"<end>{period_end}</end>" if period_end else ""}</timeInterval>
       <resolution>{resolution}</resolution>
       {points_xml}
     </Period>
@@ -132,6 +134,37 @@ class TestFetchDayAheadPrices:
         assert records[1]["timestamp"] == datetime(2025, 10, 1, 1, 0, tzinfo=timezone.utc)
         # position 96 -> 95 * 15min = 23h45 after period start
         assert records[2]["timestamp"] == datetime(2025, 10, 1, 23, 45, tzinfo=timezone.utc)
+
+    def test_a03_curve_fills_omitted_positions_with_previous_price(self, client):
+        """A03 omits positions repeating the previous price (2026-10-29: 16, 17, 21, 52 of 96)."""
+        xml = _price_document(
+            "2026-10-28T23:00Z", "PT15M", [(1, 10.0), (4, 20.0), (6, 30.0)],
+            curve_type="A03", period_end="2026-10-29T01:00Z",
+        )
+        mock_resp = MagicMock(status_code=200, text=xml)
+
+        with patch.object(client.session, "get", return_value=mock_resp):
+            records = client.fetch_day_ahead_prices(
+                datetime(2026, 10, 28, 23, tzinfo=timezone.utc),
+                datetime(2026, 10, 29, 1, tzinfo=timezone.utc),
+            )
+
+        # 2 h of 15-min slots, the tail (7, 8) filled up to the period end.
+        assert [r["price_eur_mwh"] for r in records] == [10.0, 10.0, 10.0, 20.0, 20.0, 30.0, 30.0, 30.0]
+        assert records[-1]["timestamp"] == datetime(2026, 10, 29, 0, 45, tzinfo=timezone.utc)
+
+    def test_a01_curve_left_as_is(self, client):
+        """Only A03 means "repeat the previous price"; other curves aren't filled."""
+        xml = _price_document("2026-10-28T23:00Z", "PT15M", [(1, 10.0), (4, 20.0)], curve_type="A01")
+        mock_resp = MagicMock(status_code=200, text=xml)
+
+        with patch.object(client.session, "get", return_value=mock_resp):
+            records = client.fetch_day_ahead_prices(
+                datetime(2026, 10, 28, 23, tzinfo=timezone.utc),
+                datetime(2026, 10, 29, 1, tzinfo=timezone.utc),
+            )
+
+        assert len(records) == 2
 
     def test_negative_prices_parsed_correctly(self, client):
         """Negative prices are the whole point of this integration — must round-trip exactly."""

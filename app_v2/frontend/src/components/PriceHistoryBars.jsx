@@ -40,11 +40,15 @@ function GutterBar({ x, y, width, height, fill, downward }) {
   return <rect x={x} y={downward ? top + ZERO_GUTTER : top} width={w} height={h} fill={fill} />
 }
 
-/** Day key in UTC — the same frame every other chart on the dashboard plots in. */
+const PARIS_DAY = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit',
+})
+
+/** Paris delivery day — the day a day-ahead auction prices, 00:00-24:00 local. */
 function dayKey(ts) {
   const d = new Date(ts.replace(' ', 'T'))
   if (isNaN(d)) return String(ts).slice(0, 10)
-  return d.toISOString().slice(0, 10)
+  return PARIS_DAY.format(d)
 }
 
 function fmtEur(v, digits = 0) {

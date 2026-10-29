@@ -81,7 +81,11 @@ def query_day_ahead(
     tbl_flow = "FACT_ENERGY_FLOW" if sqlite_ else "fact_energy_flow"
     tbl_src = "DIM_SOURCE" if sqlite_ else "dim_source"
     tbl_time = "DIM_TIME" if sqlite_ else "dim_time"
-    day_expr = "date(t.horodatage)" if sqlite_ else "t.horodatage::date"
+    # A day-ahead auction prices a Paris delivery day (00:00-24:00 local),
+    # i.e. 23:00 or 22:00 UTC the day before onwards. Cutting it on the UTC
+    # date dropped the first hour and pulled in the next day's first one.
+    # SQLite (tests / local dev) has no time zone database: UTC date there.
+    day_expr = "date(t.horodatage)" if sqlite_ else "(t.horodatage AT TIME ZONE 'Europe/Paris')::date"
 
     # The most recent priced day that also has production: prices now run one
     # day ahead of the meter (ENTSO-E publishes tomorrow's day-ahead around

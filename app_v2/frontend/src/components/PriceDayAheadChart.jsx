@@ -28,11 +28,28 @@ const W = 900
 const H = 660
 const PAD = { t: 18, r: 46, b: 34, l: 44 }
 
-/** Minutes since midnight, in the UTC frame every chart here plots in. */
-function minsOf(ts) {
+// Day-ahead prices are set per Paris delivery day, so slots and days are
+// read in Paris time; timestamps arrive as UTC with an explicit offset.
+const PARIS_PARTS = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'Europe/Paris', hourCycle: 'h23',
+  year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit',
+})
+
+function parisParts(ts) {
   const d = new Date(String(ts).replace(' ', 'T'))
-  if (isNaN(d)) return 0
-  return d.getUTCHours() * 60 + d.getUTCMinutes()
+  if (isNaN(d)) return null
+  const p = Object.fromEntries(PARIS_PARTS.formatToParts(d).map(x => [x.type, x.value]))
+  return { day: `${p.year}-${p.month}-${p.day}`, mins: Number(p.hour) * 60 + Number(p.minute) }
+}
+
+/** Minutes since Paris midnight. */
+function minsOf(ts) {
+  return parisParts(ts)?.mins ?? 0
+}
+
+/** Paris delivery day, YYYY-MM-DD. */
+function dayOf(ts) {
+  return parisParts(ts)?.day ?? String(ts).slice(0, 10)
 }
 
 function hhmm(ts) {
@@ -70,7 +87,7 @@ function buildContext(history) {
   for (const r of history) {
     const v = r.price_eur_mwh
     if (v == null) continue
-    const day = String(r.timestamp).slice(0, 10)
+    const day = dayOf(r.timestamp)
     const m = minsOf(r.timestamp)
     if (!byDay.has(day)) byDay.set(day, [])
     byDay.get(day).push([m, v])
