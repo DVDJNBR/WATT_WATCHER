@@ -49,6 +49,9 @@ class ProductionResponse:
         }
 
 
+MAX_PRODUCTION_LIMIT = 10000
+
+
 def parse_production_request(params: dict) -> tuple["ProductionRequest", Optional[str]]:
     """
     Parse and validate query parameters for /v1/production/regional.
@@ -61,16 +64,12 @@ def parse_production_request(params: dict) -> tuple["ProductionRequest", Optiona
     except (ValueError, TypeError):
         return ProductionRequest(), "limit and offset must be integers"
 
-    # query_production() already fetches and aggregates the *entire*
-    # requested date range internally in one query, independent of `limit`
-    # (see build_production_query's span-based sql_limit) — pagination only
-    # slices the already-computed result afterward. Capping this at 1000
-    # forced the frontend into ~9 sequential page requests per load, each
-    # one redoing that full-range aggregation from scratch for nothing.
-    # 50000 covers the widest range exposed in the UI (30 days, ~34.5k
-    # aggregated records) in a single request.
-    if limit < 1 or limit > 50000:
-        return ProductionRequest(), "limit must be between 1 and 50000"
+    # query_production() paginates in SQL, so a page costs only its own
+    # rows. The cap bounds what one request holds in memory: 10000 records
+    # (~80k raw rows) peak around +50 MB, safe for a few concurrent pages
+    # inside the 512 MB API container; 50000 peaked near +270 MB.
+    if limit < 1 or limit > MAX_PRODUCTION_LIMIT:
+        return ProductionRequest(), f"limit must be between 1 and {MAX_PRODUCTION_LIMIT}"
     if offset < 0:
         return ProductionRequest(), "offset must be >= 0"
 

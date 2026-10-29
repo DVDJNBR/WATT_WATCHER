@@ -142,9 +142,9 @@ class TestModels:
         assert "integer" in err
 
     def test_parse_production_limit_out_of_range(self):
-        _, err = parse_production_request({"limit": "50001"})
+        _, err = parse_production_request({"limit": "10001"})
         assert err is not None
-        assert "50000" in err
+        assert "10000" in err
 
     def test_parse_production_negative_offset(self):
         _, err = parse_production_request({"offset": "-1"})

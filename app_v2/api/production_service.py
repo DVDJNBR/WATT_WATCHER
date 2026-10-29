@@ -19,29 +19,13 @@ logger = logging.getLogger(__name__)
 # CREATE INDEX IX_FACT_region_date ON FACT_ENERGY_FLOW (id_region, id_date);
 
 
-def build_production_query(
-    region_code: Optional[str] = None,
-    start_date: Optional[str] = None,
-    end_date: Optional[str] = None,
-    source_type: Optional[str] = None,
-    limit: int = 100,
-    offset: int = 0,
-    is_sqlite: bool = False,
+def _production_filters(
+    region_code: Optional[str],
+    start_date: Optional[str],
+    end_date: Optional[str],
+    source_type: Optional[str],
 ) -> tuple[str, list]:
-    """
-    Build parameterized SQL query for production data.
-
-    Returns (sql, params). Uses ? placeholders for SQLite, %s for PostgreSQL.
-    AC #2: Parameterized → query plan caching, index usage.
-
-    Note: LIMIT is applied on raw rows (one per source). Multiply by 10 to
-    ensure enough rows are fetched before aggregation into (region, timestamp)
-    records. Final pagination is applied in query_production() after aggregation.
-
-    Args:
-        is_sqlite: Use SQLite syntax (? placeholders, uppercase tables) vs
-                   PostgreSQL syntax (%s placeholders, lowercase tables).
-    """
+    """WHERE clause (with ? placeholders) and its params, shared by every production query."""
     where_clauses: list[str] = []
     params: list[Any] = []
 
@@ -65,6 +49,35 @@ def build_production_query(
         params.append(source_type)
 
     where = ("WHERE " + " AND ".join(where_clauses)) if where_clauses else ""
+    return where, params
+
+
+def build_production_query(
+    region_code: Optional[str] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    source_type: Optional[str] = None,
+    limit: int = 100,
+    offset: int = 0,
+    is_sqlite: bool = False,
+    max_rows: Optional[int] = None,
+) -> tuple[str, list]:
+    """
+    Build parameterized SQL query for production data.
+
+    Returns (sql, params). Uses ? placeholders for SQLite, %s for PostgreSQL.
+    AC #2: Parameterized → query plan caching, index usage.
+
+    Note: LIMIT is applied on raw rows (one per source). Multiply by 10 to
+    ensure enough rows are fetched before aggregation into (region, timestamp)
+    records. Final pagination is applied in query_production() after aggregation.
+
+    Args:
+        is_sqlite: Use SQLite syntax (? placeholders, uppercase tables) vs
+                   PostgreSQL syntax (%s placeholders, lowercase tables).
+        max_rows: Hard cap on raw rows, overriding the span-based one below.
+    """
+    where, params = _production_filters(region_code, start_date, end_date, source_type)
 
     # ORDER BY ... DESC: fetch the most recent rows in the (optionally
     # date-bounded) range first. Matches the DESC-then-limit pattern used by
@@ -87,6 +100,8 @@ def build_production_query(
             sql_limit = min(MAX_SQL_LIMIT, max((offset + limit) * 10, span_days * 12 * 9 * 96))
         except ValueError:
             pass
+    if max_rows is not None:
+        sql_limit = min(sql_limit, max_rows)
 
     if is_sqlite:
         # SQLite: LIMIT clause at end
@@ -209,25 +224,59 @@ def query_production(
     import sqlite3
     is_sqlite = isinstance(conn, sqlite3.Connection)
 
-    sql, params = build_production_query(
-        region_code, start_date, end_date, source_type, limit, offset,
-        is_sqlite=is_sqlite,
+    # Paginate in SQL, on (région, horodatage) keys, then fetch only that
+    # page's rows. Fetching the whole range and paginating the pivoted records
+    # in Python held up to 700k raw rows at once: a 3-month range peaked at
+    # ~620 MB and got the 512 MB API container OOM-killed.
+    #
+    # A key is kept only if one of its sources is non-zero — RTE nulls filled
+    # by quality rules leave all-zero "data not yet available" slots, not
+    # actual zero-production measurements. NULL counts as non-zero, as the
+    # former Python filter (`v != 0`) did.
+    where, params = _production_filters(region_code, start_date, end_date, source_type)
+    ph = "?" if is_sqlite else "%s"
+    fact, region, time_, source = (
+        ("FACT_ENERGY_FLOW", "DIM_REGION", "DIM_TIME", "DIM_SOURCE") if is_sqlite
+        else ("fact_energy_flow", "dim_region", "dim_time", "dim_source")
     )
+    joins = f"""
+        FROM {fact} f
+        JOIN {region} r ON f.id_region = r.id_region
+        JOIN {time_} t ON f.id_date = t.id_date
+        JOIN {source} s ON f.id_source = s.id_source
+    """
+    where = where.replace("?", ph)
+    keys_sql = f"""
+        SELECT f.id_date, f.id_region, t.horodatage, r.code_insee
+        {joins}
+        {where}
+        GROUP BY f.id_date, f.id_region, t.horodatage, r.code_insee
+        HAVING SUM(CASE WHEN f.valeur_mw IS NULL OR f.valeur_mw <> 0 THEN 1 ELSE 0 END) > 0
+    """
 
     cursor = conn.cursor()
-    cursor.execute(sql, params)
+    cursor.execute(f"SELECT COUNT(*) FROM ({keys_sql}) k", params)
+    total = cursor.fetchone()[0]
+
+    cursor.execute(
+        f"""
+        WITH page AS (
+            {keys_sql}
+            ORDER BY t.horodatage DESC, r.code_insee
+            LIMIT {ph} OFFSET {ph}
+        )
+        SELECT r.code_insee, r.nom_region, t.horodatage, s.source_name,
+               f.valeur_mw, f.facteur_charge, f.consommation_mw
+        {joins}
+        JOIN page p ON p.id_date = f.id_date AND p.id_region = f.id_region
+        {where}
+        ORDER BY t.horodatage DESC, r.code_insee
+        """,
+        params + [limit, offset] + params,
+    )
     rows = cursor.fetchall()
     cols = [d[0] for d in cursor.description]
-
     data = _aggregate_rows(rows, cols)
-
-    # Filter out records where all sources are 0 (RTE nulls filled by quality rules =
-    # "data not yet available" slots — not actual zero-production measurements)
-    data = [r for r in data if any(v != 0 for v in r["sources"].values())]
-
-    # Apply pagination on aggregated records (not on raw rows)
-    total = len(data)
-    data = data[offset: offset + limit]
 
     logger.debug(
         "production query: region=%s, start=%s, end=%s → %d/%d records [req=%s]",

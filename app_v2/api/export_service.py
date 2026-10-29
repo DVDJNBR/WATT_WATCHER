@@ -41,6 +41,10 @@ def _format_cell(value: Any) -> str:
     return str(value)
 
 
+# ~2 weeks of every région x source at 15-min resolution.
+EXPORT_MAX_ROWS = 100_000
+
+
 def export_to_csv(
     conn: Any,
     region_code: Optional[str] = None,
@@ -70,10 +74,13 @@ def export_to_csv(
     import sqlite3
     is_sqlite = isinstance(conn, sqlite3.Connection)
 
-    # Fetch all rows (no pagination for CSV — capped at 10 000 for safety)
+    # No pagination for CSV, so the raw row count is capped outright: without
+    # it a request with no dates pulled up to 700k rows and got the 512 MB
+    # API container OOM-killed. Newest rows first, so a capped export keeps
+    # the most recent part of the range.
     sql, params = build_production_query(
         region_code, start_date, end_date, source_type,
-        limit=10_000, offset=0, is_sqlite=is_sqlite,
+        limit=EXPORT_MAX_ROWS, offset=0, is_sqlite=is_sqlite, max_rows=EXPORT_MAX_ROWS,
     )
 
     cursor = conn.cursor()

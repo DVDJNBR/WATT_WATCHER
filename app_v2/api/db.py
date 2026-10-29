@@ -35,6 +35,9 @@ class _PooledConnection:
         return getattr(self._conn, name)
 
 
+_PG_POOL_MAX = 10
+
+
 def _get_pg_pool():
     """
     Lazily create a process-wide connection pool.
@@ -60,7 +63,7 @@ def _get_pg_pool():
                 # Parse manually — libpq truncates usernames containing dots (Supabase pooler issue)
                 p = urlparse(db_url)
                 _pg_pool = ThreadedConnectionPool(
-                    1, 10,
+                    1, _PG_POOL_MAX,
                     host=p.hostname,
                     port=p.port or 5432,
                     dbname=(p.path or "/postgres").lstrip("/"),
@@ -88,14 +91,31 @@ def get_db_connection():
     if db_type == "sqlite":
         return sqlite3.connect(os.environ.get("SQLITE_PATH", ":memory:"))
 
+    import psycopg2
+
     pool = _get_pg_pool()
-    for _attempt in range(3):
+    # After a long idle spell every pooled connection can be dead, so allow
+    # one attempt per pool slot plus a fresh one.
+    for _attempt in range(_PG_POOL_MAX + 1):
         raw = pool.getconn()
         if raw.closed:
             pool.putconn(raw, close=True)
             continue
+        # `closed` only reflects a close on our side. A connection the server
+        # dropped while idle (Neon closes them after a few minutes) still
+        # reads as open and fails on first use with "SSL connection has been
+        # closed unexpectedly" — a 500 for whoever drew it. Ping it first.
+        try:
+            with raw.cursor() as cur:
+                cur.execute("SELECT 1")
+            raw.rollback()
+        except psycopg2.Error:
+            pool.putconn(raw, close=True)
+            continue
         return _PooledConnection(raw, pool)
-    raise RuntimeError("Could not obtain a live database connection after 3 attempts")
+    raise RuntimeError(
+        f"Could not obtain a live database connection after {_PG_POOL_MAX + 1} attempts"
+    )
 
 
 def is_sqlite(conn) -> bool:

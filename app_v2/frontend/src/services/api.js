@@ -77,32 +77,24 @@ export async function fetchProduction({ regionCode, startDate, endDate, sourceTy
 /**
  * Fetch every record of a paginated endpoint.
  *
- * query_production() (the only caller today) fetches and aggregates the
- * *entire* requested date range internally in one DB query no matter what
- * `limit` is passed — pagination only slices that already-computed result
- * afterward. Chunking the fetch into 1000-row pages therefore used to mean
- * ~9 sequential HTTP round-trips for a week of data, each one redoing that
- * same full-range aggregation from scratch for nothing (confirmed: this
- * was the dominant cost in the dashboard's ~20-25s cold load, well above
- * the backend's actual per-query time). One request with a big enough
- * limit does the same backend work exactly once.
+ * query_production() (the only caller today) paginates in SQL, so each page
+ * costs the server only its own rows. Pages are capped server-side
+ * (api/models.py, 10000) to bound the API container's memory, and fetched
+ * at most PAGE_CONCURRENCY at a time for the same reason: a 3-month range
+ * is ~11 pages, and firing them all at once would hold them all at once.
  *
  * @param {(params: Object) => Promise<{data: Array, total_records: number}>} fetchFn
  * @param {Object} params
- * @param {number} pageSize  Unused for the common single-shot path; only
- *   sizes the fallback pages below (kept as a parameter so callers can tune
- *   it, e.g. for endpoints with a smaller server-side limit cap).
+ * @param {number} pageSize  must not exceed the endpoint's server-side cap
  * @returns {Promise<{data: Array, total_records: number}>}
  */
 async function fetchAllPages(fetchFn, params, pageSize) {
-  // Covers the widest range exposed in the UI (30 days x 12 regions x 96
-  // slots/day ≈ 34.5k aggregated records) in one request — matches the
-  // server-side cap in api/models.py.
-  const SINGLE_SHOT_LIMIT = 50000
-  // Safety net, not a real constraint, for the fallback path below.
+  // Safety net, not a real constraint: 45 x 10000 covers well over a year.
   const MAX_PAGES = 45
+  const PAGE_CONCURRENCY = 3
 
-  const first = await fetchFn({ ...params, limit: SINGLE_SHOT_LIMIT, offset: 0 })
+  // A week (12 regions x 96 slots/day x 7 ≈ 8k records) fits in this one.
+  const first = await fetchFn({ ...params, limit: pageSize, offset: 0 })
   const firstData = first.data || []
   const total = first.total_records ?? firstData.length
 
@@ -110,18 +102,20 @@ async function fetchAllPages(fetchFn, params, pageSize) {
     return { data: firstData, total_records: total }
   }
 
-  // Only reached for a range wider than SINGLE_SHOT_LIMIT can cover in one
-  // shot — not reachable via the UI's own controls, but a manually-typed
-  // date range could exceed it. Page the remainder the old way.
   const totalPages = Math.min(Math.ceil(total / pageSize), MAX_PAGES)
-  const rest = await Promise.all(
-    Array.from({ length: Math.max(totalPages - 1, 0) }, (_, i) => {
-      const offset = firstData.length + i * pageSize
-      return fetchFn({ ...params, limit: pageSize, offset }).then(r => r.data || [])
-    })
-  )
+  const offsets = Array.from({ length: totalPages - 1 }, (_, i) => (i + 1) * pageSize)
+  const pages = new Array(offsets.length)
+  let next = 0
+  const worker = async () => {
+    while (next < offsets.length) {
+      const i = next++
+      const r = await fetchFn({ ...params, limit: pageSize, offset: offsets[i] })
+      pages[i] = r.data || []
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(PAGE_CONCURRENCY, offsets.length) }, worker))
 
-  return { data: firstData.concat(...rest), total_records: total }
+  return { data: firstData.concat(...pages), total_records: total }
 }
 
 /**
@@ -130,11 +124,8 @@ async function fetchAllPages(fetchFn, params, pageSize) {
  * @returns {Promise<{data: Array, total_records: number}>}
  */
 export async function fetchAllProduction(params = {}) {
-  // pageSize matches SINGLE_SHOT_LIMIT in fetchAllPages — the fallback path
-  // (only reached above 50000 rows, e.g. a 6-month range) must stay within
-  // MAX_PAGES=45 pages. 1000 used to cap a 6-month fetch at ~45k of ~210k
-  // rows (missing the older portion, since data returns newest-first).
-  return fetchAllPages(fetchProduction, params, 50000)
+  // Matches the server-side cap (MAX_PRODUCTION_LIMIT in api/models.py).
+  return fetchAllPages(fetchProduction, params, 10000)
 }
 
 /**
