@@ -1,3 +1,9 @@
+## [2.0.6](https://github.com/DVDJNBR/WATT_WATCHER/compare/v2.0.5...v2.0.6) (2026-10-29)
+
+### Bug Fixes
+
+* **api:** bound production/export memory and drop dead pooled connections ([cd4da18](https://github.com/DVDJNBR/WATT_WATCHER/commit/cd4da1844465576d555ff7d9030aa3055f8c4e87))
+
 ## [2.0.5](https://github.com/DVDJNBR/WATT_WATCHER/compare/v2.0.4...v2.0.5) (2026-10-29)
 
 ### Bug Fixes
