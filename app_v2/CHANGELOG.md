@@ -1,3 +1,9 @@
+## [2.0.2](https://github.com/DVDJNBR/WATT_WATCHER/compare/v2.0.1...v2.0.2) (2026-10-29)
+
+### Bug Fixes
+
+* **meteo:** switch live weather source from Open-Meteo to Météo-France AROME ([9ba15ba](https://github.com/DVDJNBR/WATT_WATCHER/commit/9ba15ba65baeda9e25d78fa651afd9ac940bffab))
+
 ## [2.0.1](https://github.com/DVDJNBR/WATT_WATCHER/compare/v2.0.0...v2.0.1) (2026-10-13)
 
 ### Bug Fixes
