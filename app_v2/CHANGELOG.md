@@ -1,3 +1,9 @@
+## [2.0.7](https://github.com/DVDJNBR/WATT_WATCHER/compare/v2.0.6...v2.0.7) (2026-10-29)
+
+### Bug Fixes
+
+* **api:** clamp production limit to the cap instead of rejecting it ([29f579f](https://github.com/DVDJNBR/WATT_WATCHER/commit/29f579fbc1ac2c49c76d94e5b789aeb64d9208d8))
+
 ## [2.0.6](https://github.com/DVDJNBR/WATT_WATCHER/compare/v2.0.5...v2.0.6) (2026-10-29)
 
 ### Bug Fixes
