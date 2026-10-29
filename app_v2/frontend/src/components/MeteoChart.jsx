@@ -2,7 +2,7 @@
  * MeteoChart — temperature and wind speed over time for a region.
  *
  * Data comes from GET /v1/meteo/regional (fact_meteo Gold table,
- * sourced from Open-Meteo free API).
+ * sourced from Météo-France AROME open data).
  */
 import {
   ComposedChart, Line, Bar, Area,
@@ -65,7 +65,7 @@ export function MeteoChart({ data = [], region, loading = false }) {
             </svg>
           </span>
           <p className="empty-state__title">Pas encore de données météo</p>
-          <p className="empty-state__hint">Lancez le pipeline pour ingérer les données Open-Meteo.</p>
+          <p className="empty-state__hint">Lancez le pipeline pour ingérer les données Météo-France.</p>
         </div>
       </section>
     )

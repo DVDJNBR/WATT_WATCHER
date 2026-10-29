@@ -40,7 +40,7 @@ const LOOP_PAUSE = 0.4    // s — pause after Dashboard, before the next source
 // Tile id → flow-color slug.
 const FLOW_SLUG = {
   'rte-production': 'rte',
-  'open-meteo': 'meteo',
+  'meteo-france': 'meteo',
   'odre-capacity': 'capacity',
   'entsoe-price': 'price',
 }

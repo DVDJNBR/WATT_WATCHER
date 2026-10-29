@@ -1,4 +1,8 @@
-"""Open-Meteo stage — part of the 15-minute pipeline (weather changes continuously)."""
+"""Météo stage (Météo-France AROME) — part of the 15-minute pipeline.
+
+AROME is hourly and a new run lands every 3 h, so only the first slot of each
+hour does any work; the other three are skipped (see _fetched_this_hour).
+"""
 
 import logging
 import sqlite3
@@ -15,11 +19,15 @@ RETENTION_DAYS = 95
 
 
 def run(job_id: str, bronze: Any, silver: Any) -> dict:
-    """Fetch Open-Meteo data for every region, Bronze -> Silver -> Gold (fact_meteo)."""
-    from shared.open_meteo_client import fetch_meteo_all_regions
+    """Fetch AROME data for every region, Bronze -> Silver -> Gold (fact_meteo) + meteo_grid."""
+    from shared.meteofrance_client import fetch_arome
+
+    if _fetched_this_hour():
+        logger.info("[%s] Meteo: already fetched this hour, skipping", job_id)
+        return {"status": "skipped", "reason": "already fetched this hour"}
 
     logger.info("[%s] Meteo: ingestion", job_id)
-    meteo_records = fetch_meteo_all_regions(past_days=3)
+    meteo_records, grid_rows = fetch_arome()
     result = load_meteo_records(job_id, bronze, silver, meteo_records)
 
     try:
@@ -31,7 +39,7 @@ def run(job_id: str, bronze: Any, silver: Any) -> dict:
     # meteo_grid (current 22x16 canvas-map snapshot) only makes sense for the
     # live forecast run, not a historical backfill — kept out of
     # load_meteo_records so backfill_meteo_history.py doesn't touch it.
-    if result.get("status") == "success":
+    if result.get("status") == "success" and grid_rows:
         from shared.db import get_db_connection
         import sqlite3 as _sqlite3
 
@@ -41,8 +49,6 @@ def run(job_id: str, bronze: Any, silver: Any) -> dict:
             is_sqlite = isinstance(conn, _sqlite3.Connection)
             grid_loaded = 0
             try:
-                from shared.open_meteo_client import fetch_meteo_grid
-                grid_rows = fetch_meteo_grid()
                 tbl_grid = "METEO_GRID" if is_sqlite else "meteo_grid"
                 for gr in grid_rows:
                     if is_sqlite:
@@ -79,6 +85,36 @@ def run(job_id: str, bronze: Any, silver: Any) -> dict:
     return result
 
 
+def _fetched_this_hour() -> bool:
+    """True once meteo_grid was written during the current UTC hour."""
+    from datetime import datetime, timezone
+
+    try:
+        conn = get_db_connection()
+    except Exception:
+        return False
+    try:
+        tbl = "METEO_GRID" if isinstance(conn, sqlite3.Connection) else "meteo_grid"
+        cursor = conn.cursor()
+        cursor.execute(f"SELECT MAX(updated_at) FROM {tbl}")
+        row = cursor.fetchone()
+    except Exception as exc:
+        logger.warning("meteo_grid freshness check failed (fetching anyway): %s", exc)
+        return False
+    finally:
+        conn.close()
+
+    last = row[0] if row else None
+    if last is None:
+        return False
+    if isinstance(last, str):  # sqlite datetime('now'): "YYYY-MM-DD HH:MM:SS", UTC
+        last = datetime.fromisoformat(last)
+    if last.tzinfo is None:
+        last = last.replace(tzinfo=timezone.utc)
+    hour_start = datetime.now(timezone.utc).replace(minute=0, second=0, microsecond=0)
+    return last >= hour_start
+
+
 def _purge_old_meteo(job_id: str) -> int:
     """Delete fact_meteo rows older than RETENTION_DAYS. Doesn't touch
     dim_time — that dimension is shared across every fact table."""
@@ -112,8 +148,8 @@ def load_meteo_records(job_id: str, bronze: Any, silver: Any, meteo_records: lis
     """Bronze -> Silver -> Gold (fact_meteo) for already-fetched météo records.
 
     Shared by the live 15-minute run() above and scripts/backfill_meteo_history.py
-    (which fetches historical records via the Archive API instead of the
-    forecast API) — same Gold load either way, no separate write logic to
+    (which fetches historical records via the Open-Meteo Archive API instead
+    of AROME) — same Gold load either way, no separate write logic to
     keep in sync.
     """
     from shared.transformations.meteo_silver import transform_meteo_to_silver
