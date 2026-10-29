@@ -12,6 +12,8 @@ dependencies = [
     "pandas>=2.0.0",
     "requests>=2.32.5",
     "psycopg2-binary>=2.9.11",
+    "imagecodecs>=2026.3.6",
+    "numpy>=1.26.0",
 ]
 
 [dependency-groups]

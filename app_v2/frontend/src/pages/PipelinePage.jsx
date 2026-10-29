@@ -7,7 +7,7 @@
 import { PipelineDiagram } from '../components/pipeline/PipelineDiagram.jsx'
 
 const SATELLITE_FACTS = [
-  ['fact_meteo', 'région × horodatage', 'Open-Meteo — température, vent, nébulosité'],
+  ['fact_meteo', 'région × horodatage', 'Météo-France AROME — température, vent, nébulosité'],
   ['fact_capacity', 'région × filière × année', 'RTE — puissance installée de référence'],
   ['fact_maintenance', '1 ligne / événement', "RTE — arrêts et maintenances planifiés"],
   ['fact_market_price', 'horodatage seul', 'ENTSO-E — prix day-ahead, France entière'],

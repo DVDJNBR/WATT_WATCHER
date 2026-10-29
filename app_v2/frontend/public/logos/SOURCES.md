@@ -6,7 +6,7 @@ nominatif : on cite d'où vient la donnée, on ne revendique aucun partenariat.
 | Fichier | Source | Provenance | Licence |
 |---|---|---|---|
 | `rte.png` | RTE eCO2mix | `odre.opendatasoft.com/assets/theme_image/logo-rte-v4.png` | marque RTE |
-| `open-meteo.png` | Open-Meteo | `open-meteo.com/favicon.ico`, converti en PNG | marque Open-Meteo |
+| `meteo-france.png` | Météo-France (AROME) | `meteofrance.com/sites/default/files/favicon_0.png` (90×90) | marque Météo-France |
 | `entsoe.svg` | ENTSO-E Transparency | Wikimedia Commons — *Logo European Transmission System Operators.svg* | domaine public |
 | `odre.svg` | ODRE | `odre.opendatasoft.com/assets/theme_image/logo-odre.svg` | marque ODRE |
 
@@ -19,8 +19,12 @@ fichiers avec ces encres éclaircies — teinte et saturation conservées, seule
 clarté est remontée, donc la marque reste elle-même. Les accents de couleur
 (l'or `#fabd17` d'ENTSO-E, le turquoise `#01ABB0` d'ODRE) ne sont pas touchés.
 
-RTE et Open-Meteo n'ont pas de variante : luminance d'encre mesurée à 137/255,
-lisible sur les deux fonds.
+RTE n'a pas de variante : luminance d'encre mesurée à 137/255, lisible sur les
+deux fonds. Météo-France non plus : pictogramme blanc sur carré bleu plein,
+qui porte son propre fond.
+
+Le logo Open-Meteo a été retiré le 2026-10-29, quand la météo est passée sur
+AROME (quota gratuit Open-Meteo dépassé : 1 appel compté par point de grille).
 
 Récupérés le 2026-10-01. Servis depuis `frontend/public/logos/`, jamais en lien
 direct vers le serveur d'origine : pas de hotlink, et la page ne dépend pas de

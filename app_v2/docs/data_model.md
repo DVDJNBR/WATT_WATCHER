@@ -27,7 +27,7 @@ dim_region ──────< fact_maintenance
 | `dim_time` | 1 row / 15-min settlement period | RTE eco2mix | every 15 min |
 | `dim_source` | 1 row / energy source type | static list (8 sources) | rarely |
 | `fact_energy_flow` | region × time × source | RTE eco2mix-regional-tr | every 15 min |
-| `fact_meteo` | region × time | Open-Meteo (ERA5) | every 15 min |
+| `fact_meteo` | region × time | Météo-France AROME 0.025° (open data) | hourly |
 | `fact_capacity` | region × source × year | ODRE reference registry | weekly (source itself changes ~yearly) |
 | `fact_maintenance` | 1 row / outage event | ENTSO-E generation outages (A77) | daily |
 | `fact_market_price` | 1 row / time (national, no region split) | ENTSO-E Transparency (A44) | daily, no purge — full history kept like every other fact table |

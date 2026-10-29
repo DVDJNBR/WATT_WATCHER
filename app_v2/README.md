@@ -86,7 +86,7 @@ Also requires the `AZURE_CREDENTIALS` GitHub secret (service principal) for the 
 Push to `main` → GitHub Actions runs tests → deploys the Functions pipeline.
 
 **Timer triggers — one per real refresh cadence, not one job doing everything every 15 minutes regardless of need:**
-- `*/15 * * * *` (`pipeline_15min`) — RTE eCO2mix + Open-Meteo, the two sources that genuinely change continuously. Bronze → Silver → Gold.
+- `*/15 * * * *` (`pipeline_15min`) — RTE eCO2mix + Météo-France AROME, the two sources that genuinely change continuously. Bronze → Silver → Gold. AROME is hourly, so the météo stage only does work in the first slot of each hour.
 - `0 6 * * *` (`pipeline_daily`) — ENTSO-E day-ahead prices + ENTSO-E generation-unit outages (A77), both published once a day.
 - `0 3 * * 0` (`pipeline_weekly`) — ODRE installed-capacity registry, which the source itself only updates ~once a year.
 - `0 1 * * *` — SQL reference snapshot (`DIM_REGION`/`DIM_SOURCE`) → Bronze.
