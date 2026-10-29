@@ -1,3 +1,9 @@
+## [2.0.5](https://github.com/DVDJNBR/WATT_WATCHER/compare/v2.0.4...v2.0.5) (2026-10-29)
+
+### Bug Fixes
+
+* **prices:** fill A03-omitted slots and cut day-ahead days on Paris time ([2bfef19](https://github.com/DVDJNBR/WATT_WATCHER/commit/2bfef198aab38740bdc5f3b9e0591f40e438e9fe))
+
 ## [2.0.4](https://github.com/DVDJNBR/WATT_WATCHER/compare/v2.0.3...v2.0.4) (2026-10-29)
 
 ### Bug Fixes
