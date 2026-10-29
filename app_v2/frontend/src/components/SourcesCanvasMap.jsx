@@ -729,9 +729,9 @@ export default function SourcesCanvasMap({ selectedCode = '' }) {
             })
           })
           FILIERES.forEach(f=>{const inst=_NATIONAL_MW[f]||_installedMW[f]||1;_capFactor[f]=Math.min(1,actual[f]/inst)})
-          // UTC: horodatage is stored UTC, so rendering in local time would
-          // shift the map's "Màj" 2 h ahead of the data it describes.
-          const ts=latest?new Date(latest.replace(' ','T')).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit',timeZone:'UTC'}):''
+          // horodatage is true UTC (checked against RTE's own +00:00 stamps);
+          // shown in Paris time, which is what a French visitor reads "Màj" as.
+          const ts=latest?new Date(latest.replace(' ','T')).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit',timeZone:'Europe/Paris'}):''
           setMixTs('Màj '+ts)
           const parts=['nucl. '+Math.round(actual.nucleaire/1000)+'GW','hydro '+Math.round(actual.hydraulique/1000)+'GW','éol. '+Math.round(actual.eolien/1000)+'GW','sol. '+Math.round(actual.solaire/1000)+'GW','therm. '+Math.round(actual.thermique/1000)+'GW']
           setMixNote(parts.join(' · '))
