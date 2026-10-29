@@ -142,9 +142,15 @@ class TestModels:
         assert "integer" in err
 
     def test_parse_production_limit_out_of_range(self):
-        _, err = parse_production_request({"limit": "10001"})
+        _, err = parse_production_request({"limit": "0"})
         assert err is not None
         assert "10000" in err
+
+    def test_parse_production_limit_above_cap_is_clamped(self):
+        """A pre-cap bundle still sends 50000 — clamp, don't 400 the dashboard."""
+        req, err = parse_production_request({"limit": "50000"})
+        assert err is None
+        assert req.limit == 10000
 
     def test_parse_production_negative_offset(self):
         _, err = parse_production_request({"offset": "-1"})
@@ -424,8 +430,13 @@ class TestHTTPIntegration:
         assert body["status_code"] == 400
         assert "request_id" in body
 
-    def test_production_400_limit_too_high(self, client):
+    def test_production_limit_too_high_is_clamped(self, client):
         resp = client.get("/v1/production/regional", params={"limit": "50001"})
+        assert resp.status_code == 200
+        assert resp.json()["limit"] == 10000
+
+    def test_production_400_limit_zero(self, client):
+        resp = client.get("/v1/production/regional", params={"limit": "0"})
         assert resp.status_code == 400
 
     def test_production_404_no_data(self, client):

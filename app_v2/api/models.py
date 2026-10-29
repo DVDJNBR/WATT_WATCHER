@@ -68,8 +68,12 @@ def parse_production_request(params: dict) -> tuple["ProductionRequest", Optiona
     # rows. The cap bounds what one request holds in memory: 10000 records
     # (~80k raw rows) peak around +50 MB, safe for a few concurrent pages
     # inside the 512 MB API container; 50000 peaked near +270 MB.
-    if limit < 1 or limit > MAX_PRODUCTION_LIMIT:
+    # Clamped rather than rejected: a browser tab still running a bundle from
+    # before the cap asks for 50000, and a 400 there blanks the dashboard.
+    # Callers page on total_records, so a short page is fetched on, not lost.
+    if limit < 1:
         return ProductionRequest(), f"limit must be between 1 and {MAX_PRODUCTION_LIMIT}"
+    limit = min(limit, MAX_PRODUCTION_LIMIT)
     if offset < 0:
         return ProductionRequest(), "offset must be >= 0"
 
