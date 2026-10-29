@@ -18,7 +18,7 @@ const CLOUD_COLOR = '#94a3b8'
 function formatTs(ts) {
   const d = new Date(ts)
   if (isNaN(d)) return ts
-  return d.toLocaleString('fr-FR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'UTC' })
+  return d.toLocaleString('fr-FR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' })
 }
 
 const tooltipStyle = {
