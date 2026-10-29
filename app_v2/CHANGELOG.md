@@ -1,3 +1,9 @@
+## [2.0.4](https://github.com/DVDJNBR/WATT_WATCHER/compare/v2.0.3...v2.0.4) (2026-10-29)
+
+### Bug Fixes
+
+* **charts:** render chart time axes in Paris time, matching the map's "Màj" ([eed04ea](https://github.com/DVDJNBR/WATT_WATCHER/commit/eed04eae9a6a1a020bb2bf877e913eab9ed1fdd7))
+
 ## [2.0.3](https://github.com/DVDJNBR/WATT_WATCHER/compare/v2.0.2...v2.0.3) (2026-10-29)
 
 ### Bug Fixes
